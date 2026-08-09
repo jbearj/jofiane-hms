@@ -209,7 +209,7 @@ function Employees({ employees, openModal }) {
         <div className="panel animation-fade-in">
           <div className="panel-header" style={{ borderBottom: '1px solid var(--border-light)', paddingBottom: '20px', marginBottom: '20px' }}>
             <h3>Staff Roster</h3>
-            {/* The + NEW EMPLOYEE button was removed from here */}
+            {}
           </div>
 
           <div style={{ display: 'flex', gap: '20px', marginBottom: '25px', background: 'var(--bg-main)', padding: '15px', borderRadius: '8px', border: '1px solid var(--border-light)' }}>

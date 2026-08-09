@@ -71,8 +71,8 @@ h2,
 h3,
 h4,
 .serif {
-  font-family: 'Playfair Display', serif;
-  font-weight: 500;
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
   letter-spacing: -0.01em;
 }
 
@@ -416,9 +416,9 @@ textarea {
   font-size: 12px;
 }
 .kpi-card .val {
-  font-family: 'Playfair Display', serif;
+  font-family: 'Inter', sans-serif;
   font-size: 34px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text-primary);
   line-height: 1.1;
   display: block;
@@ -1250,7 +1250,7 @@ tr:last-child td {
 .cal-current-month {
   font-size: 14px;
   font-weight: 600;
-  font-family: 'Playfair Display', serif;
+  font-family: 'Inter', sans-serif;
   color: var(--text-primary);
   min-width: 110px;
   text-align: center;

@@ -5,7 +5,7 @@ import logoMini from '../../assets/Jofiane-logo 2.png';
 function Sidebar({ activeTab, setActiveTab }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
-  // Replaced FontAwesome tags with pure, high-quality SVG icons
+ 
   const tabs = [
     { 
       id: 'overview', 
