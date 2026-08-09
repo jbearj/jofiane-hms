@@ -17,12 +17,12 @@ function Rooms() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
 
-  // Form state for selected room editing[cite: 1]
+  // Form state for selected room editing[cite: 2]
   const activeRoom = rooms.find((r) => r.id === selectedRoomId) || rooms[0];
   const [amenities, setAmenities] = useState(activeRoom ? activeRoom.amenities : []);
   const [newAmenity, setNewAmenity] = useState('');
 
-  // Form state for new room modal
+  // Form state for new room modal[cite: 2]
   const [newRoomData, setNewRoomData] = useState({
     id: '',
     type: 'Garden Room',
@@ -30,7 +30,7 @@ function Rooms() {
     floor: 1,
   });
 
-  // Amenity handlers[cite: 1]
+  // Amenity handlers[cite: 2]
   const addAmenity = (e) => {
     if (e.key === 'Enter' && newAmenity.trim()) {
       e.preventDefault();
@@ -43,7 +43,7 @@ function Rooms() {
     setAmenities(amenities.filter((_, i) => i !== index));
   };
 
-  // Add Room Submit Handler
+  // Add Room Submit Handler[cite: 2]
   const handleCreateRoom = (e) => {
     e.preventDefault();
     if (!newRoomData.id) return;
@@ -63,7 +63,7 @@ function Rooms() {
     setNewRoomData({ id: '', type: 'Garden Room', rate: 3500, floor: 1 });
   };
 
-  // Status helper for CSS styling
+  // Status helper for CSS styling[cite: 2]
   const getCardStatusColor = (occ, hk) => {
     if (hk === 'Maintenance') return { border: '#6c757d', bg: '#f8f9fa', label: 'Out of Order' };
     if (occ === 'Occupied') return { border: '#dc3545', bg: '#fff5f5', label: 'Occupied' };
@@ -71,12 +71,12 @@ function Rooms() {
     return { border: '#28a745', bg: '#f4fbf7', label: 'Vacant & Clean' };
   };
 
-  // Filtered rooms search
+  // Filtered rooms search[cite: 2]
   const filteredRooms = rooms.filter(
     (room) => room.id.includes(searchQuery) || room.type.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Group rooms by floor for Grid View
+  // Group rooms by floor for Grid View[cite: 2]
   const floors = Array.from(new Set(rooms.map((r) => r.floor))).sort();
 
   return (
@@ -86,30 +86,14 @@ function Rooms() {
         <div className="left">
           <h2>Room Operation</h2>
         </div>
-        <div className="right" style={{ display: 'flex', gap: 10 }}>
-          {/* VIEW SWITCHER */}
-          <div className="btn-group" style={{ display: 'flex', background: '#eee', borderRadius: 6, padding: 2 }}>
-            <button
-              className={`btn btn-sm ${viewMode === 'grid' ? 'btn-gold' : ''}`}
-              onClick={() => setViewMode('grid')}
-            >
-              <i className="fas fa-th-large"></i> Grid View
-            </button>
-            <button
-              className={`btn btn-sm ${viewMode === 'table' ? 'btn-gold' : ''}`}
-              onClick={() => setViewMode('table')}
-            >
-              <i className="fas fa-list"></i> Table View
-            </button>
-          </div>
-
+        <div className="right">
           <button className="btn btn-sm btn-gold" onClick={() => setShowAddModal(true)}>
             <i className="fas fa-plus"></i> Add Room
           </button>
         </div>
       </div>
 
-      {/* KPI METRICS GRID[cite: 1] */}
+      {/* KPI METRICS GRID[cite: 2] */}
       <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
         <div className="kpi-card">
           <span className="lbl"><i className="fas fa-hotel"></i> Total Units</span>
@@ -133,22 +117,43 @@ function Rooms() {
         </div>
       </div>
 
-      {/* MAIN SPLIT VIEW LAYOUT[cite: 1] */}
+      {/* MAIN SPLIT VIEW LAYOUT[cite: 2] */}
       <div className="dashboard-split dashboard-split-13">
         {/* LEFT PANEL: GRID OR TABLE */}
         <div className="panel">
-          <div className="panel-header" style={{ marginBottom: 15 }}>
+          {/* UPDATED PANEL HEADER: View Switcher and Search moved together inside */}
+          <div className="panel-header" style={{ marginBottom: 15, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h3>Room Inventory</h3>
-            <input
-              type="text"
-              placeholder="🔍 Search unit..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              style={{ padding: '6px 10px', fontSize: 12, borderRadius: 4, border: '1px solid #ccc' }}
-            />
+            
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+              {/* VIEW SWITCHER MOVED HERE */}
+              <div className="btn-group" style={{ display: 'flex', background: '#eee', borderRadius: 6, padding: 2 }}>
+                <button
+                  className={`btn btn-sm ${viewMode === 'grid' ? 'btn-gold' : ''}`}
+                  onClick={() => setViewMode('grid')}
+                >
+                  <i className="fas fa-th-large"></i> Grid View
+                </button>
+                <button
+                  className={`btn btn-sm ${viewMode === 'table' ? 'btn-gold' : ''}`}
+                  onClick={() => setViewMode('table')}
+                >
+                  <i className="fas fa-list"></i> Table View
+                </button>
+              </div>
+
+              {/* SEARCH INPUT */}
+              <input
+                type="text"
+                placeholder="🔍 Search unit..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                style={{ padding: '6px 10px', fontSize: 12, borderRadius: 4, border: '1px solid #ccc' }}
+              />
+            </div>
           </div>
 
-          {/* MODE 1: VISUAL FLOOR PLAN GRID VIEW */}
+          {/* MODE 1: VISUAL FLOOR PLAN GRID VIEW[cite: 2] */}
           {viewMode === 'grid' && (
             <div className="floor-plan-container" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
               {floors.map((floorNum) => (
@@ -196,7 +201,7 @@ function Rooms() {
             </div>
           )}
 
-          {/* MODE 2: TABLE VIEW[cite: 1] */}
+          {/* MODE 2: TABLE VIEW[cite: 2] */}
           {viewMode === 'table' && (
             <div className="table-wrap">
               <table>
@@ -242,7 +247,7 @@ function Rooms() {
           )}
         </div>
 
-        {/* RIGHT PANEL: DETAILS EDITOR[cite: 1] */}
+        {/* RIGHT PANEL: DETAILS EDITOR[cite: 2] */}
         <div className="panel">
           <div className="panel-header" style={{ marginBottom: 12 }}>
             <h3>Room Details</h3>
@@ -302,7 +307,7 @@ function Rooms() {
               />
             </div>
 
-            {/* TAG INPUT FOR AMENITIES[cite: 1] */}
+            {/* TAG INPUT FOR AMENITIES[cite: 2] */}
             <div className="form-group">
               <label>Room Amenities</label>
               <div className="tag-input-container">
@@ -330,7 +335,7 @@ function Rooms() {
         </div>
       </div>
 
-      {/* ADD NEW ROOM MODAL POPUP */}
+      {/* ADD NEW ROOM MODAL POPUP[cite: 2] */}
       {showAddModal && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
