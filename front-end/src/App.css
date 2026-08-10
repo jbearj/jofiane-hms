@@ -119,6 +119,7 @@ textarea {
 .portal-shell {
   display: flex;
   min-height: 100vh;
+  position: relative;
 }
 
 /* ---- SIDEBAR ---- */
@@ -129,13 +130,15 @@ textarea {
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
-  position: sticky;
+  position: fixed;
   top: 0;
+  left: 0;
   height: 100vh;
   overflow-y: auto;
   border-right: 1px solid rgba(255, 255, 255, 0.04);
+  z-index: 100;
   
-  /* NEW: Smooth transition for collapsing */
+  /* Smooth transition for collapsing */
   transition: width 0.3s cubic-bezier(0.22, 1, 0.36, 1), padding 0.3s ease; 
 }
 
@@ -177,6 +180,9 @@ textarea {
 .sidebar.collapsed {
   width: 86px;
   padding: 32px 12px;
+}
+.sidebar.collapsed + .main-content {
+  margin-left: 86px;
 }
 .sidebar.collapsed .menu-toggle-container {
   justify-content: center; /* Centers the = button when collapsed */
@@ -310,6 +316,8 @@ textarea {
   overflow-y: auto;
   min-height: 100vh;
   background: var(--bg-body);
+  margin-left: 260px;
+  transition: margin-left 0.3s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /* ============================================================
@@ -593,7 +601,7 @@ th {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--text-muted);
+  color: var(--gold-dark);
   padding: 0 12px 14px 12px;
   border-bottom: 1px solid var(--border-light);
 }
@@ -1031,6 +1039,9 @@ tr:last-child td {
   .sidebar {
     width: 72px;
     padding: 20px 12px;
+  }
+  .sidebar + .main-content {
+    margin-left: 72px;
   }
   .sidebar-brand h1 {
     font-size: 18px;

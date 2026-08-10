@@ -1,214 +1,341 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 
 function Overview() {
+  const [isLoading, setIsLoading] = useState(true);
+  const [period, setPeriod] = useState('today');
+  const [dashboardData, setDashboardData] = useState(null);
+
+  useEffect(() => {
+    fetchDashboardData(period);
+  }, [period]);
+
+  const fetchDashboardData = async (selectedPeriod) => {
+    setIsLoading(true);
+    try {
+      // TODO: Replace with actual API call
+      // const res = await fetch(`http://localhost:8080/api/admin/dashboard?period=${selectedPeriod}`);
+      // const data = await res.json();
+      await new Promise(resolve => setTimeout(resolve, 600));
+
+      // Mock data — will be replaced by API response
+      const data = {
+        kpis: {
+          totalRevenue: { value: 18420, trend: '+12%', trendDir: 'up', sub: 'vs last week' },
+          occupancyRate: { value: 88.5, trend: '+3.2%', trendDir: 'up', sub: '106 / 120 rooms' },
+          adr: { value: 165, trend: '+12', trendDir: 'up', sub: 'vs target' },
+          revpar: { value: 146, trend: '+8%', trendDir: 'up', sub: 'month to date' }
+        },
+        revenueTrend: {
+          labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+          values: [9500, 12000, 16000, 18000, 14500, 17000, 15500],
+          thisWeekTotal: 18420,
+          lastWeekTotal: 16450,
+          growth: '+12%'
+        },
+        departmentHealth: [
+          { id: 1, dept: 'Front Desk', status: 'All clear', level: 'good' },
+          { id: 2, dept: 'Housekeeping', status: '4 rooms pending', level: 'warning' },
+          { id: 3, dept: 'Maintenance', status: '3 critical orders', level: 'critical' },
+          { id: 4, dept: 'F&B', status: 'Fully staffed', level: 'good' }
+        ],
+        roomStatus: {
+          total: 120,
+          occupied: 78,
+          vacant: 28,
+          maintenance: 9,
+          cleaning: 5
+        },
+        weeklyBookings: {
+          data: [
+            { day: 'Mon', count: 5 },
+            { day: 'Tue', count: 7 },
+            { day: 'Wed', count: 4 },
+            { day: 'Thu', count: 8 },
+            { day: 'Fri', count: 9 },
+            { day: 'Sat', count: 10 },
+            { day: 'Sun', count: 4 }
+          ],
+          total: 47,
+          avgPerDay: 6.7
+        }
+      };
+
+      setDashboardData(data);
+    } catch (err) {
+      console.error('Failed to fetch dashboard data:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+  if (isLoading || !dashboardData) {
+    return (
+      <section className="admin-tab-content active">
+        <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-muted)' }}>
+          <div style={{ fontSize: '16px', fontWeight: '500' }}>Loading dashboard...</div>
+        </div>
+      </section>
+    );
+  }
+
+  const { kpis, revenueTrend, departmentHealth, roomStatus, weeklyBookings } = dashboardData;
+
+  // Calculate chart points from revenue trend data
+  const maxRevenue = Math.max(...revenueTrend.values);
+  const chartPoints = revenueTrend.values.map((val, i) => {
+    const x = 60 + (i * 70);
+    const y = 110 - ((val / maxRevenue) * 90);
+    return { x, y };
+  });
+  const polylinePoints = chartPoints.map(p => `${p.x},${p.y}`).join(' ');
+  const areaPath = `M${chartPoints[0].x},${chartPoints[0].y} ${chartPoints.map(p => `L${p.x},${p.y}`).join(' ')} L${chartPoints[chartPoints.length - 1].x},115 L${chartPoints[0].x},115 Z`;
+
+  // Room status percentages for donut
+  const roomPercentages = {
+    occupied: (roomStatus.occupied / roomStatus.total) * 100,
+    vacant: (roomStatus.vacant / roomStatus.total) * 100,
+    maintenance: (roomStatus.maintenance / roomStatus.total) * 100,
+    cleaning: (roomStatus.cleaning / roomStatus.total) * 100
+  };
+
+  // Weekly bookings max for bar height calculation
+  const maxBooking = Math.max(...weeklyBookings.data.map(d => d.count));
+
+  // Alert level to color mapping
+  const levelColors = { good: '#4CAF50', warning: '#FFC107', critical: '#F44336' };
+
   return (
     <section className="admin-tab-content active">
       
       {/* PAGE HEADER */}
-      <div className="page-header">
-        <div className="left">
-          <h2 style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}>Executive KPI Summary</h2>
-          <p>Today's Snapshot</p>
-        </div>
-        <div className="right">
-          <span className="date-badge">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight: '6px', color: 'var(--gold)'}}>
-              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-              <line x1="16" y1="2" x2="16" y2="6"></line>
-              <line x1="8" y1="2" x2="8" y2="6"></line>
-              <line x1="3" y1="10" x2="21" y2="10"></line>
-            </svg>
-            Aug 09, 2026
-          </span>
-          <button className="btn btn-sm btn-outline-gold">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight: '6px'}}><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
-            Refresh
-          </button>
-        </div>
+      <div style={{ marginBottom: '32px' }}>
+        <h2 style={{ fontSize: '28px', fontWeight: '700', color: 'var(--text-primary)', margin: '0 0 6px 0' }}>Executive Dashboard</h2>
+        <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>{today}</p>
       </div>
 
-      <div className="overview-wrapper" style={{ flexDirection: 'column' }}>
-        
-        {/* =======================================
-            TOP ROW: KPI SUMMARY
-            ======================================= */}
-        <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', marginBottom: '22px' }}>
-          <div className="kpi-card">
-            <span className="lbl">TOTAL REVENUE</span>
-            <span className="val">$18,420.00</span>
-            <span className="sub"><span className="trend-up" style={{fontWeight: 'bold'}}>▲</span> +12% vs last wk</span>
-          </div>
-          <div className="kpi-card">
-            <span className="lbl">OCCUPANCY RATE</span>
-            <span className="val">88.5%</span>
-            <span className="sub">106 / 120 Rooms</span>
-          </div>
-          <div className="kpi-card">
-            <span className="lbl">ADR (AVG RATE)</span>
-            <span className="val">$165.00</span>
-            <span className="sub"><span className="trend-up" style={{fontWeight: 'bold'}}>▲</span> +$12 vs target</span>
-          </div>
-          <div className="kpi-card">
-            <span className="lbl">RevPAR</span>
-            <span className="val">$146.02</span>
-            <span className="sub"><span className="trend-up" style={{fontWeight: 'bold'}}>▲</span> +8% MTD</span>
-          </div>
+      {/* DATE FILTER BAR */}
+      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)', padding: '14px 24px', marginBottom: '22px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: 'var(--shadow-sm)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Period:</span>
+          <select 
+            className="floor-dropdown" 
+            style={{ minWidth: '140px' }}
+            value={period}
+            onChange={(e) => setPeriod(e.target.value)}
+          >
+            <option value="today">Today</option>
+            <option value="week">This Week</option>
+            <option value="month">This Month</option>
+            <option value="quarter">This Quarter</option>
+          </select>
         </div>
+        <button className="btn btn-sm btn-outline-gold" onClick={() => fetchDashboardData(period)}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+          Refresh
+        </button>
+      </div>
 
-        {/* =======================================
-            MIDDLE ROW: TRENDS & CONTROLS
-            ======================================= */}
-        <div className="dashboard-split" style={{ marginBottom: '22px' }}>
+      {/* KPI ROW — 4 Cards */}
+      <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', marginBottom: '22px' }}>
+        <KpiCard label="TOTAL REVENUE" value={formatNumber(kpis.totalRevenue.value)} trend={kpis.totalRevenue.trend} trendDir={kpis.totalRevenue.trendDir} sub={kpis.totalRevenue.sub} />
+        <KpiCard label="OCCUPANCY RATE" value={`${kpis.occupancyRate.value}%`} trend={kpis.occupancyRate.trend} trendDir={kpis.occupancyRate.trendDir} sub={kpis.occupancyRate.sub} />
+        <KpiCard label="ADR (AVG DAILY RATE)" value={formatNumber(kpis.adr.value)} trend={kpis.adr.trend} trendDir={kpis.adr.trendDir} sub={kpis.adr.sub} />
+        <KpiCard label="RevPAR" value={formatNumber(kpis.revpar.value)} trend={kpis.revpar.trend} trendDir={kpis.revpar.trendDir} sub={kpis.revpar.sub} />
+      </div>
+
+      {/* REVENUE AREA CHART — Full Width with Legend */}
+      <div className="panel" style={{ marginBottom: '22px', padding: '28px 32px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           
-          {/* Revenue & Occupancy Trends Chart */}
-          <div className="panel">
-            <div className="panel-header">
-              <h3 style={{ textTransform: 'uppercase', fontSize: '13px', letterSpacing: '0.05em' }}>Revenue & Occupancy Trends (This Month)</h3>
+          {/* Chart Area */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="panel-header" style={{ marginBottom: '16px' }}>
+              <h3 style={{ fontSize: '14px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-primary)' }}>Revenue Trend</h3>
             </div>
-            
-            {/* Custom SVG Line Chart matching the peak/valley from the reference */}
-            <div style={{ position: 'relative', height: '160px', marginTop: '20px', padding: '0 10px' }}>
-              <svg viewBox="0 0 400 120" style={{ width: '100%', height: '100%', overflow: 'visible' }}>
-                <line x1="0" y1="20" x2="400" y2="20" stroke="var(--border-light)" strokeDasharray="4 4" />
-                <line x1="0" y1="50" x2="400" y2="50" stroke="var(--border-light)" strokeDasharray="4 4" />
-                <line x1="0" y1="80" x2="400" y2="80" stroke="var(--border-light)" strokeDasharray="4 4" />
+            <div style={{ position: 'relative', height: '180px' }}>
+              <svg viewBox="0 0 560 140" style={{ width: '100%', height: '100%', overflow: 'visible' }}>
+                {/* Grid Lines */}
+                <line x1="40" y1="10" x2="540" y2="10" stroke="var(--border-light)" strokeDasharray="3 3" />
+                <line x1="40" y1="45" x2="540" y2="45" stroke="var(--border-light)" strokeDasharray="3 3" />
+                <line x1="40" y1="80" x2="540" y2="80" stroke="var(--border-light)" strokeDasharray="3 3" />
+                <line x1="40" y1="115" x2="540" y2="115" stroke="var(--border-light)" strokeDasharray="3 3" />
                 
-                <text x="-5" y="24" fontSize="10" fill="var(--text-muted)" textAnchor="end">$25k</text>
-                <text x="-5" y="54" fontSize="10" fill="var(--text-muted)" textAnchor="end">$15k</text>
-                <text x="-5" y="84" fontSize="10" fill="var(--text-muted)" textAnchor="end">$5k</text>
+                {/* Y-Axis Labels */}
+                <text x="35" y="14" fontSize="10" fill="var(--text-muted)" textAnchor="end">{formatCompact(maxRevenue)}</text>
+                <text x="35" y="49" fontSize="10" fill="var(--text-muted)" textAnchor="end">{formatCompact(maxRevenue * 0.66)}</text>
+                <text x="35" y="84" fontSize="10" fill="var(--text-muted)" textAnchor="end">{formatCompact(maxRevenue * 0.33)}</text>
+                <text x="35" y="119" fontSize="10" fill="var(--text-muted)" textAnchor="end">0</text>
 
-                {/* The Line */}
-                <polyline points="0,80 70,50 140,15 210,60 280,80 400,80" fill="none" stroke="var(--gold)" strokeWidth="3" strokeLinejoin="round" />
+                {/* Area Fill */}
+                <path d={areaPath} fill="rgba(201,168,76,0.12)" />
+                
+                {/* Line */}
+                <polyline points={polylinePoints} fill="none" stroke="var(--gold)" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
                 
                 {/* Data Points */}
-                <circle cx="70" cy="50" r="4" fill="var(--bg-card)" stroke="var(--gold)" strokeWidth="2" />
-                <circle cx="140" cy="15" r="4" fill="var(--bg-card)" stroke="var(--gold)" strokeWidth="2" />
-                <circle cx="210" cy="60" r="4" fill="var(--bg-card)" stroke="var(--gold)" strokeWidth="2" />
-                
-                {/* X-Axis */}
-                <text x="70" y="110" fontSize="11" fill="var(--text-muted)" textAnchor="middle">Aug 1</text>
-                <text x="140" y="110" fontSize="11" fill="var(--text-muted)" textAnchor="middle">Aug 3</text>
-                <text x="210" y="110" fontSize="11" fill="var(--text-muted)" textAnchor="middle">Aug 5</text>
-                <text x="280" y="110" fontSize="11" fill="var(--text-muted)" textAnchor="middle">Aug 7</text>
-                <text x="350" y="110" fontSize="11" fill="var(--text-muted)" textAnchor="middle">Aug 9</text>
+                {chartPoints.map((p, i) => (
+                  <circle key={i} cx={p.x} cy={p.y} r="4" fill="var(--bg-card)" stroke="var(--gold)" strokeWidth="2" />
+                ))}
+
+                {/* X-Axis Labels */}
+                {revenueTrend.labels.map((label, i) => (
+                  <text key={i} x={chartPoints[i].x} y="135" fontSize="10" fill="var(--text-muted)" textAnchor="middle">{label}</text>
+                ))}
               </svg>
             </div>
           </div>
 
-          {/* Yield / Rate Controls */}
-          <div className="panel">
-            <div className="panel-header" style={{ marginBottom: '25px' }}>
-              <h3 style={{ textTransform: 'uppercase', fontSize: '13px', letterSpacing: '0.05em' }}>Yield / Rate Controls</h3>
+          {/* Right Legend / Stats */}
+          <div style={{ width: '200px', paddingLeft: '32px', borderLeft: '1px solid var(--border-light)', marginLeft: '32px', display: 'flex', flexDirection: 'column', gap: '20px', paddingTop: '8px' }}>
+            <div>
+              <span style={{ fontSize: '10px', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>This Week</span>
+              <div style={{ fontSize: '22px', fontWeight: '700', color: 'var(--text-primary)', marginTop: '4px' }}>{formatNumber(revenueTrend.thisWeekTotal)}</div>
             </div>
-            
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-muted)' }}>SEASONAL PRICING</span>
-                <span className="status-tag tag-success">Active</span>
-              </div>
-              
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: '14px', fontWeight: 500 }}>Mode:</span>
-                <select className="floor-dropdown" style={{ width: '160px', background: 'var(--bg-input)' }}>
-                  <option>High Season</option>
-                  <option>Low Season</option>
-                  <option>Event Weekend</option>
-                </select>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: '14px', fontWeight: 500 }}>Base Rate:</span>
-                <input type="text" defaultValue="$150.00" style={{ width: '160px', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border-light)', background: 'var(--bg-input)', fontFamily: 'monospace' }} />
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: '14px', fontWeight: 500 }}>Multiplier:</span>
-                <input type="text" defaultValue="1.2x" style={{ width: '160px', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border-light)', background: 'var(--bg-input)', fontFamily: 'monospace' }} />
-              </div>
-
-              <button className="btn btn-gold" style={{ marginTop: '10px', padding: '12px', borderRadius: '6px', fontWeight: 600, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
-                Update Rates
-              </button>
+            <div>
+              <span style={{ fontSize: '10px', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Last Week</span>
+              <div style={{ fontSize: '22px', fontWeight: '700', color: 'var(--text-muted)', marginTop: '4px' }}>{formatNumber(revenueTrend.lastWeekTotal)}</div>
+            </div>
+            <div>
+              <span style={{ fontSize: '10px', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Growth</span>
+              <div style={{ fontSize: '18px', fontWeight: '700', color: '#2E7D32', marginTop: '4px' }}>{revenueTrend.growth}</div>
             </div>
           </div>
-        </div>
-
-        {/* =======================================
-            BOTTOM ROW: ALERTS & OTA
-            ======================================= */}
-        <div className="dashboard-split">
-          
-          {/* Departmental Health & Alerts */}
-          <div className="panel">
-            <div className="panel-header" style={{ marginBottom: '20px' }}>
-              <h3 style={{ textTransform: 'uppercase', fontSize: '13px', letterSpacing: '0.05em' }}>Departmental Health & Alerts</h3>
-            </div>
-            
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: 'var(--bg-input)', borderRadius: '6px', border: '1px solid var(--border-light)' }}>
-                <span style={{ width: '14px', height: '14px', borderRadius: '50%', background: '#FFC107', flexShrink: 0, boxShadow: '0 0 8px rgba(255, 193, 7, 0.4)' }}></span>
-                <div>
-                  <span style={{ fontWeight: 600 }}>Front Desk:</span> <span style={{ color: 'var(--text-muted)' }}>2 Late Checkouts</span>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: 'var(--bg-input)', borderRadius: '6px', border: '1px solid var(--border-light)' }}>
-                <span style={{ width: '14px', height: '14px', borderRadius: '50%', background: '#4CAF50', flexShrink: 0, boxShadow: '0 0 8px rgba(76, 175, 80, 0.4)' }}></span>
-                <div>
-                  <span style={{ fontWeight: 600 }}>Housekeeping:</span> <span style={{ color: 'var(--text-muted)' }}>92% Rooms Cleaned</span>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: 'var(--bg-input)', borderRadius: '6px', border: '1px solid var(--border-light)' }}>
-                <span style={{ width: '14px', height: '14px', borderRadius: '50%', background: '#F44336', flexShrink: 0, boxShadow: '0 0 8px rgba(244, 67, 54, 0.4)' }}></span>
-                <div>
-                  <span style={{ fontWeight: 600 }}>Maintenance:</span> <span style={{ color: 'var(--text-muted)' }}>3 Critical Work Orders</span>
-                </div>
-              </div>
-
-            </div>
-          </div>
-
-          {/* Online Channel Sync */}
-          <div className="panel">
-            <div className="panel-header" style={{ marginBottom: '20px' }}>
-              <h3 style={{ textTransform: 'uppercase', fontSize: '13px', letterSpacing: '0.05em' }}>Online Channel Sync (OTA)</h3>
-            </div>
-            
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px', background: 'var(--bg-input)', borderRadius: '6px', border: '1px solid var(--border-light)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <span style={{ width: '14px', height: '14px', borderRadius: '50%', background: '#4CAF50', flexShrink: 0 }}></span>
-                  <span style={{ fontWeight: 600 }}>Booking.com</span>
-                </div>
-                <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Syncing (100%)</span>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px', background: 'var(--bg-input)', borderRadius: '6px', border: '1px solid var(--border-light)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <span style={{ width: '14px', height: '14px', borderRadius: '50%', background: '#4CAF50', flexShrink: 0 }}></span>
-                  <span style={{ fontWeight: 600 }}>Expedia</span>
-                </div>
-                <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Syncing (100%)</span>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px', background: 'var(--bg-input)', borderRadius: '6px', border: '1px solid var(--border-light)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <span style={{ width: '14px', height: '14px', borderRadius: '50%', background: '#FFC107', flexShrink: 0 }}></span>
-                  <span style={{ fontWeight: 600 }}>Agoda</span>
-                </div>
-                <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>1 Pending Sync</span>
-              </div>
-
-            </div>
-          </div>
-
         </div>
       </div>
+
+      {/* BOTTOM ROW — 3 Panels */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '22px' }}>
+        
+        {/* Panel 1: Departmental Alerts */}
+        <div className="panel" style={{ padding: '24px 28px' }}>
+          <h3 style={{ fontSize: '13px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-primary)', marginBottom: '20px' }}>Dept. Health</h3>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            {departmentHealth.map((item) => (
+              <AlertRow key={item.id} color={levelColors[item.level]} dept={item.dept} status={item.status} />
+            ))}
+          </div>
+        </div>
+
+        {/* Panel 2: Room Status Donut */}
+        <div className="panel" style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <h3 style={{ fontSize: '13px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-primary)', marginBottom: '20px', alignSelf: 'flex-start' }}>Room Status</h3>
+          
+          {/* Donut Chart */}
+          <div style={{ position: 'relative', width: '150px', height: '150px', marginBottom: '20px' }}>
+            <svg viewBox="0 0 36 36" style={{ width: '100%', height: '100%', transform: 'rotate(-90deg)' }}>
+              <circle cx="18" cy="18" r="14" fill="none" stroke="#4a3728" strokeWidth="4" strokeDasharray={`${roomPercentages.occupied} ${100 - roomPercentages.occupied}`} strokeDashoffset="0" />
+              <circle cx="18" cy="18" r="14" fill="none" stroke="#C9A84C" strokeWidth="4" strokeDasharray={`${roomPercentages.vacant} ${100 - roomPercentages.vacant}`} strokeDashoffset={`-${roomPercentages.occupied}`} />
+              <circle cx="18" cy="18" r="14" fill="none" stroke="#3b82f6" strokeWidth="4" strokeDasharray={`${roomPercentages.maintenance} ${100 - roomPercentages.maintenance}`} strokeDashoffset={`-${roomPercentages.occupied + roomPercentages.vacant}`} />
+              <circle cx="18" cy="18" r="14" fill="none" stroke="#E65100" strokeWidth="4" strokeDasharray={`${roomPercentages.cleaning} ${100 - roomPercentages.cleaning}`} strokeDashoffset={`-${roomPercentages.occupied + roomPercentages.vacant + roomPercentages.maintenance}`} />
+            </svg>
+            <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center' }}>
+              <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-primary)' }}>{roomStatus.total}</div>
+              <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>rooms</div>
+            </div>
+          </div>
+
+          {/* Legend */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px', width: '100%' }}>
+            <LegendDot color="#4a3728" label="Occupied" value={roomStatus.occupied} />
+            <LegendDot color="#C9A84C" label="Vacant" value={roomStatus.vacant} />
+            <LegendDot color="#3b82f6" label="Maintenance" value={roomStatus.maintenance} />
+            <LegendDot color="#E65100" label="Cleaning" value={roomStatus.cleaning} />
+          </div>
+        </div>
+
+        {/* Panel 3: Weekly Bookings Bar Chart */}
+        <div className="panel" style={{ padding: '24px 28px' }}>
+          <h3 style={{ fontSize: '13px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-primary)', marginBottom: '20px' }}>Weekly Bookings</h3>
+          
+          {/* Bar Chart */}
+          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', height: '140px', gap: '8px', paddingBottom: '24px', borderBottom: '1px solid var(--border-light)', position: 'relative' }}>
+            {weeklyBookings.data.map((item, i) => (
+              <BarItem key={i} label={item.day} height={(item.count / maxBooking) * 100} />
+            ))}
+          </div>
+
+          {/* Summary */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '16px' }}>
+            <div>
+              <div style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '600', textTransform: 'uppercase' }}>Total</div>
+              <div style={{ fontSize: '18px', fontWeight: '700', color: 'var(--text-primary)' }}>{weeklyBookings.total}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '600', textTransform: 'uppercase' }}>Avg/Day</div>
+              <div style={{ fontSize: '18px', fontWeight: '700', color: 'var(--text-primary)' }}>{weeklyBookings.avgPerDay}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </section>
+  );
+}
+
+/* ============================================================
+   HELPER FUNCTIONS
+   ============================================================ */
+
+function formatNumber(num) {
+  return num.toLocaleString();
+}
+
+function formatCompact(num) {
+  if (num >= 1000) return `${(num / 1000).toFixed(1)}k`;
+  return num.toString();
+}
+
+/* ============================================================
+   SUB-COMPONENTS
+   ============================================================ */
+
+function KpiCard({ label, value, trend, trendDir, sub }) {
+  return (
+    <div className="kpi-card">
+      <span className="lbl">{label}</span>
+      <span className="val">{value}</span>
+      <span className="sub">
+        <span className={trendDir === 'up' ? 'trend-up' : 'trend-down'} style={{ fontWeight: 'bold' }}>
+          {trendDir === 'up' ? '▲' : '▼'} {trend}
+        </span>
+        {' '}{sub}
+      </span>
+    </div>
+  );
+}
+
+function AlertRow({ color, dept, status }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 12px', background: 'var(--bg-input)', borderRadius: '6px', border: '1px solid var(--border-light)' }}>
+      <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: color, flexShrink: 0, boxShadow: `0 0 6px ${color}40` }}></span>
+      <span style={{ fontWeight: '600', fontSize: '13px', color: 'var(--text-primary)' }}>{dept}</span>
+      <span style={{ marginLeft: 'auto', fontSize: '12px', color: 'var(--text-muted)' }}>{status}</span>
+    </div>
+  );
+}
+
+function LegendDot({ color, label, value }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+      <span style={{ width: '10px', height: '10px', borderRadius: '3px', background: color, flexShrink: 0 }}></span>
+      <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{label}</span>
+      <span style={{ marginLeft: 'auto', fontSize: '11px', fontWeight: '700', color: 'var(--text-primary)' }}>{value}</span>
+    </div>
+  );
+}
+
+function BarItem({ label, height }) {
+  const maxHeight = 120;
+  const barH = (height / 100) * maxHeight;
+  
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, gap: '6px' }}>
+      <div style={{ width: '100%', maxWidth: '28px', height: `${barH}px`, background: 'linear-gradient(180deg, var(--gold) 0%, #4a3728 100%)', borderRadius: '4px 4px 0 0', transition: 'height 0.3s ease' }}></div>
+      <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '500', position: 'absolute', bottom: '-20px' }}>{label}</span>
+    </div>
   );
 }
 
