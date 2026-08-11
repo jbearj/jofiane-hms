@@ -3,10 +3,22 @@ import './App.css';
 import Login from './components/login/login';
 import Sidebar from './components/admin/Sidebar';
 import Overview from './components/admin/Overview';
-import Payments from './components/admin/Payments';
-import Rooms from './components/admin/Rooms';
-import Employees from './components/admin/Employees';
-import EmployeeModal from './components/admin/EmployeeModal';
+import Transactions from './components/admin/finance/Transactions';
+import AuditTrail from './components/admin/finance/AuditTrail';
+import RoomInventory from './components/admin/rooms/RoomInventory';
+import HousekeepingStatus from './components/admin/rooms/HousekeepingStatus';
+import Maintenance from './components/admin/rooms/Maintenance';
+import StaffList from './components/admin/employee-management/StaffList';
+import ShiftSchedules from './components/admin/employee-management/ShiftSchedules';
+import AllBookings from './components/admin/reservations/AllBookings';
+import Cancellations from './components/admin/reservations/Cancellations';
+import OtaChannels from './components/admin/reservations/OtaChannels';
+import OccupancyReports from './components/admin/reports/OccupancyReports';
+import FinancialReports from './components/admin/reports/FinancialReports';
+import GuestReports from './components/admin/reports/GuestReports';
+import Rooms from './components/admin/rooms/Rooms';
+import Employees from './components/admin/employee-management/Employees';
+import EmployeeModal from './components/admin/employee-management/EmployeeModal';
 import employee1 from './assets/employee1.jpeg';
 import EmployeePortal from './components/employee/EmployeePortal';
 
@@ -74,12 +86,28 @@ const initialEmployees = [
 ];
 
 function App() {
+  // Authentication states
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  
+  // Existing states
   const [activeTab, setActiveTab] = useState('overview');
   const [employees, setEmployees] = useState(initialEmployees);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [viewMode, setViewMode] = useState('admin'); // 'admin' or 'employee'
-  
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
+  // Login handler: Awtomatikong papalitan din ang viewMode batay sa napiling portal (admin o employee)
+  const handleLoginSuccess = (role, formData) => {
+    setViewMode(role);
+    setIsAuthenticated(true);
+  };
+
+  // Logout handler
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+  };
+
   const openModal = (employee = null) => {
     setSelectedEmployee(employee);
     setModalOpen(true);
@@ -92,7 +120,6 @@ function App() {
 
   const saveEmployee = (updatedEmployee) => {
     if (updatedEmployee.id) {
-      // Edit existing
       setEmployees((prev) =>
         prev.map((emp) => (emp.id === updatedEmployee.id ? updatedEmployee : emp))
       );
@@ -115,18 +142,46 @@ function App() {
     switch (activeTab) {
       case 'overview':
         return <Overview setActiveTab={setActiveTab} />;
+      case 'transactions':
       case 'payments':
-        return <Payments />;
+        return <Transactions />;
+      case 'audit-trail':
+        return <AuditTrail />;
       case 'rooms':
         return <Rooms />;
+      case 'room-inventory':
+        return <RoomInventory />;
+      case 'housekeeping':
+        return <HousekeepingStatus />;
+      case 'maintenance':
+        return <Maintenance />;
+      case 'staff-list':
+        return <StaffList />;
       case 'shifts':
-        return <Employees employees={employees} openModal={openModal} />;
+        return <ShiftSchedules />;
+      case 'all-bookings':
+        return <AllBookings />;
+      case 'cancellations':
+        return <Cancellations />;
+      case 'ota-channels':
+        return <OtaChannels />;
+      case 'occupancy-reports':
+        return <OccupancyReports />;
+      case 'financial-reports':
+        return <FinancialReports />;
+      case 'guest-reports':
+        return <GuestReports />;
       default:
         return <Overview setActiveTab={setActiveTab} />;
     }
   };
 
-  // Render Employee Portal view if selected
+  
+  if (!isAuthenticated) {
+    return <Login onLoginSuccess={handleLoginSuccess} />;
+  }
+
+  // LOGGED IN & EMPLOYEE PORTAL VIEW
   if (viewMode === 'employee') {
     return (
       <div>
@@ -150,12 +205,12 @@ function App() {
         >
           ← Switch to Admin View
         </button>
-        <EmployeePortal />
+        <EmployeePortal onLogout={handleLogout} />
       </div>
     );
   }
 
-  // Render Admin Console view by default
+  //  LOGGED IN & ADMIN CONSOLE VIEW
   return (
     <div className="portal-shell">
       <button 
@@ -179,7 +234,13 @@ function App() {
         Switch to Employee Portal →
       </button>
 
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+      <Sidebar 
+        isCollapsed={isCollapsed} 
+        setIsCollapsed={setIsCollapsed} 
+        activeTab={activeTab} 
+        setActiveTab={setActiveTab}
+        onLogout={handleLogout}
+      />
       <main className="main-content">
         {renderContent()}
       </main>
