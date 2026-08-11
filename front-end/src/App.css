@@ -1578,3 +1578,302 @@ tr:last-child td {
   border-color: var(--gold);
   box-shadow: inset 0 0 0 1px var(--gold);
 }
+
+/* ==========================================
+   JOFIANE HOTEL SINGLE CARD PORTAL SYSTEM
+   ========================================== */
+
+.portal-page-wrapper {
+  position: relative;
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  box-sizing: border-box;
+  padding: 20px;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+  /* HOTEL BACKGROUND WITH WARM DARK OVERLAY */
+ background: 
+  radial-gradient(circle at center, rgba(30, 18, 12, 0.45) 0%, rgba(12, 7, 4, 0.82) 100%), 
+  url('./assets/hotel-background.jpg') center/cover no-repeat fixed;
+}
+
+.top-brand-header {
+  position: absolute;
+  top: 32px;
+  left: 48px;
+  z-index: 10;
+}
+
+.header-logo {
+  height: 65px;
+  width: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.7));
+  transition: transform 0.25s ease;
+}
+
+.header-logo:hover {
+  transform: scale(1.03);
+}
+
+.portal-card-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+
+.portal-card-box {
+  width: 100%;
+  max-width: 520px;
+  min-height: 480px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 50px 45px;
+  box-sizing: border-box;
+  border-radius: 32px;
+  
+  background: linear-gradient(
+    135deg, 
+    rgba(252, 249, 242, 0.92) 0%, 
+    rgba(240, 230, 216, 0.92) 100%
+  );
+  
+  border: 1px solid rgba(201, 168, 76, 0.35);
+  box-shadow: 
+    0 30px 60px rgba(0, 0, 0, 0.7),
+    0 0 35px rgba(201, 168, 76, 0.15),
+    inset 0 1px 1px rgba(255, 255, 255, 0.4);
+    
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.portal-content {
+  width: 100%;
+}
+
+.portal-title {
+  font-size: 30px;
+  font-weight: 700;
+  color: #2C1B14;
+  margin: 0;
+  text-align: center;
+  letter-spacing: -0.3px;
+}
+
+.portal-subtitle {
+  font-size: 14px;
+  color: #8C6A27;
+  margin: 8px 0 32px 0;
+  text-align: center;
+}
+
+.card-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  position: relative;
+}
+
+.back-step-btn {
+  position: absolute;
+  left: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: rgba(201, 168, 76, 0.18);
+  border: 1px solid rgba(201, 168, 76, 0.4);
+  border-radius: 50%;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.25s ease;
+}
+
+.back-step-btn svg {
+  width: 18px;
+  height: 18px;
+  stroke: #2C1B14;
+}
+
+.back-step-btn:hover {
+  background: #2C1B14;
+  border-color: #2C1B14;
+}
+
+.back-step-btn:hover svg {
+  stroke: #C9A84C;
+}
+
+.role-cards-grid {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+}
+
+.role-card-btn {
+  flex: 1;
+  height: 165px;
+  background: linear-gradient(145deg, #2C1B14 0%, #1a100b 100%);
+  border: 1.5px solid rgba(201, 168, 76, 0.4);
+  border-radius: 22px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+  transition: all 0.25s ease;
+  padding: 16px;
+}
+
+.role-card-btn:hover {
+  transform: translateY(-4px);
+  border-color: #C9A84C;
+  box-shadow: 0 12px 25px rgba(0, 0, 0, 0.35), 0 0 20px rgba(201, 168, 76, 0.35);
+  background: linear-gradient(145deg, #3A231A 0%, #22140d 100%);
+}
+
+.role-icon-circle {
+  width: 60px;
+  height: 60px;
+  background: rgba(201, 168, 76, 0.12);
+  border: 1.5px solid rgba(201, 168, 76, 0.35);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 14px;
+  transition: all 0.2s ease;
+}
+
+.role-card-btn:hover .role-icon-circle {
+  background: rgba(201, 168, 76, 0.25);
+  border-color: #C9A84C;
+}
+
+.role-icon-circle svg {
+  width: 28px;
+  height: 28px;
+  stroke: #ffffff;
+}
+
+.role-title-text {
+  color: #E8D5A3;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 1px;
+}
+
+.card-main-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.card-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.card-input-group label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #2C1B14;
+}
+
+.card-input-group input {
+  padding: 14px 20px;
+  font-size: 14px;
+  border: 1px solid rgba(201, 168, 76, 0.35);
+  border-radius: 30px;
+  outline: none;
+  background: rgba(255, 255, 255, 0.85);
+  color: #2C1B14;
+  transition: all 0.2s ease;
+}
+
+.card-input-group input:focus {
+  border-color: #C9A84C;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(201, 168, 76, 0.25);
+}
+
+.card-options-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+}
+
+.card-remember {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #4A3B32;
+  cursor: pointer;
+}
+
+.card-forgot-btn {
+  background: none;
+  border: none;
+  color: #8C6A27;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.card-forgot-btn:hover {
+  text-decoration: underline;
+}
+
+.card-submit-btn {
+  padding: 14px;
+  background-color: #2C1B14;
+  color: #ffffff;
+  border: 1px solid rgba(201, 168, 76, 0.3);
+  border-radius: 30px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  margin-top: 8px;
+  width: 100%;
+}
+
+.card-submit-btn:hover {
+  background-color: #1a100c;
+  border-color: #C9A84C;
+  box-shadow: 0 4px 16px rgba(44, 27, 20, 0.35);
+}
+
+.animated-fade-in {
+  animation: fadeIn 0.25s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (max-width: 600px) {
+  .top-brand-header {
+    top: 20px;
+    left: 20px;
+  }
+  .header-logo {
+    height: 50px;
+  }
+  .portal-card-box {
+    padding: 35px 24px;
+  }
+}

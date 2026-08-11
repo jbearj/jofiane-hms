@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import './App.css';
+import Login from './components/login/login';
 import Sidebar from './components/admin/Sidebar';
 import Overview from './components/admin/Overview';
 import Transactions from './components/admin/finance/Transactions';
