@@ -92,6 +92,12 @@ function App() {
   const [modalOpen, setModalOpen] = useState(false);
   const [viewMode, setViewMode] = useState('admin'); // 'admin' or 'employee'
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  const handleLoginSuccess = (role, formData) => {
+    setViewMode(role);
+    setIsLoggedIn(true);
+  };
   
   const openModal = (employee = null) => {
     setSelectedEmployee(employee);
@@ -162,7 +168,12 @@ function App() {
     }
   };
 
-  // Render Employee Portal view if selected
+  // Render Login page 
+  if (!isLoggedIn) {
+    return <Login onLoginSuccess={handleLoginSuccess} />;
+  }
+
+  // Render Employee Portal 
   if (viewMode === 'employee') {
     return (
       <div>
