@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import logo from '../../assets/Jofiane-logo.png';
-import bgImage from '../../assets/hotel-background.jpg';
+import bgImage from '../../assets/login-bg.jpg';
 
 const Login = ({ onLoginSuccess }) => {
   const [step, setStep] = useState(1);
