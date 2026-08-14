@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import './App.css';
 import Login from './components/login/login';
 import Sidebar from './components/admin/Sidebar';
@@ -93,6 +93,22 @@ function App() {
   const [viewMode, setViewMode] = useState('admin'); // 'admin' or 'employee'
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isAdminDarkMode, setIsAdminDarkMode] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    const savedTheme = window.localStorage.getItem('jofiane-admin-theme');
+    if (savedTheme) return savedTheme === 'dark';
+    return typeof window.matchMedia === 'function' && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  });
+
+  useEffect(() => {
+    window.localStorage.setItem('jofiane-admin-theme', isAdminDarkMode ? 'dark' : 'light');
+  }, [isAdminDarkMode]);
+
+  useEffect(() => {
+    if (typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 900px)').matches) {
+      setIsCollapsed(true);
+    }
+  }, []);
 
   const handleLoginSuccess = (role, formData) => {
     setViewMode(role);
@@ -176,24 +192,10 @@ function App() {
   // Render Employee Portal 
   if (viewMode === 'employee') {
     return (
-      <div>
+      <div className="employee-view">
         <button 
           onClick={() => setViewMode('admin')} 
-          style={{ 
-            position: 'fixed', 
-            top: '12px', 
-            right: '20px', 
-            zIndex: 9999, 
-            padding: '8px 16px', 
-            background: '#2C1B14', 
-            color: '#E8D5A3', 
-            border: '1px solid #C9A84C', 
-            borderRadius: '6px', 
-            cursor: 'pointer', 
-            fontWeight: '600',
-            fontSize: '12px',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
-          }}
+          className="portal-mode-switch"
         >
           ← Switch to Admin View
         </button>
@@ -204,29 +206,26 @@ function App() {
 
   // Render Admin Console view by default
   return (
-    <div className="portal-shell">
+    <div className={`portal-shell employee-portal-shell admin-portal-shell admin-view ${isCollapsed ? 'nav-collapsed' : ''} ${isAdminDarkMode ? 'theme-dark' : 'theme-light'}`}>
       <button 
         onClick={() => setViewMode('employee')} 
-        style={{ 
-          position: 'fixed', 
-          top: '12px', 
-          right: '20px', 
-          zIndex: 9999, 
-          padding: '8px 16px', 
-          background: '#C9A84C', 
-          color: '#2C1B14', 
-          border: 'none', 
-          borderRadius: '6px', 
-          cursor: 'pointer', 
-          fontWeight: '600',
-          fontSize: '12px',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
-        }}
+        className="portal-mode-switch"
       >
         Switch to Employee Portal →
       </button>
 
-      <Sidebar isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} activeTab={activeTab} setActiveTab={setActiveTab} />
+      <Sidebar
+        isCollapsed={isCollapsed}
+        setIsCollapsed={setIsCollapsed}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        isDarkMode={isAdminDarkMode}
+        setIsDarkMode={setIsAdminDarkMode}
+      />
+      <button type="button" className="mobile-nav-trigger" onClick={() => setIsCollapsed(false)} aria-label="Open admin navigation">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
+      </button>
+      {!isCollapsed && <button type="button" className="mobile-nav-backdrop" onClick={() => setIsCollapsed(true)} aria-label="Close admin navigation" />}
       <main className="main-content">
         {renderContent()}
       </main>

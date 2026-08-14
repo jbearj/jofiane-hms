@@ -79,18 +79,19 @@ function Arrivals() {
 
  
   return (
-    <section className="admin-tab-content active">
+    <section className="admin-tab-content active employee-module arrivals-module">
       
       {/* PAGE HEADER */}
-      <div className="page-header" style={{ marginBottom: '24px' }}>
+      <div className="page-header employee-page-header" style={{ marginBottom: '24px' }}>
         <div className="left">
           <h2>Arrivals & Check-Ins</h2>
           <p>Manage today's expected arrivals, VIPs, and room assignments.</p>
         </div>
-        <div className="right" style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <div style={{ display: 'flex', background: '#f3f4f6', borderRadius: '8px', padding: '4px', alignItems: 'center' }}>
+        <div className="right employee-page-actions" style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <div className="date-navigator" style={{ display: 'flex', background: '#f3f4f6', borderRadius: '8px', padding: '4px', alignItems: 'center' }}>
             <button 
-              className="btn btn-sm" 
+              className="btn btn-sm"
+              aria-label="Previous day"
               style={{ background: 'transparent', border: 'none', boxShadow: 'none', color: '#4b5563' }}
               onClick={() => setSelectedDate(prev => {
                 const d = new Date(prev); d.setDate(d.getDate() - 1); return d.toISOString().slice(0, 10);
@@ -105,7 +106,8 @@ function Arrivals() {
               style={{ padding: '4px 8px', fontSize: '13px', border: 'none', background: 'transparent', outline: 'none', fontWeight: '600', color: '#111827' }}
             />
             <button 
-              className="btn btn-sm" 
+              className="btn btn-sm"
+              aria-label="Next day"
               style={{ background: 'transparent', border: 'none', boxShadow: 'none', color: '#4b5563' }}
               onClick={() => setSelectedDate(prev => {
                 const d = new Date(prev); d.setDate(d.getDate() + 1); return d.toISOString().slice(0, 10);
@@ -121,7 +123,7 @@ function Arrivals() {
       </div>
 
       {/* KPI METRICS GRID  */}
-      <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px', marginBottom: '24px' }}>
+      <div className="kpi-grid operational-kpi-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px', marginBottom: '24px' }}>
         <div className="kpi-card" style={{ borderRadius: '12px', padding: '20px', border: '1px solid #eaeaea', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
           <span className="lbl" style={{ fontSize: '11px', color: '#6b7280', letterSpacing: '0.5px' }}>TOTAL EXPECTED</span>
           <span className="val" style={{ fontSize: '28px', color: '#111827', margin: '8px 0' }}>{isLoading ? '-' : arrivals.length}</span>
@@ -145,11 +147,11 @@ function Arrivals() {
       </div>
 
       {/* MAIN ARRIVALS LIST PANEL */}
-      <div className="panel" style={{ borderRadius: '12px', border: '1px solid #eaeaea', boxShadow: '0 4px 6px rgba(0,0,0,0.02)' }}>
+      <div className="panel manifest-panel" style={{ borderRadius: '12px', border: '1px solid #eaeaea', boxShadow: '0 4px 6px rgba(0,0,0,0.02)' }}>
         
-        <div className="panel-header" style={{ padding: '20px', borderBottom: '1px solid #eaeaea', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="panel-header manifest-toolbar" style={{ padding: '20px', borderBottom: '1px solid #eaeaea', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '600', color: '#111827' }}>Arrival Manifest</h3>
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          <div className="manifest-filters" style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
             <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ padding: '8px 12px', fontSize: '13px', borderRadius: '6px', border: '1px solid #d1d5db', outline: 'none', color: '#4b5563', cursor: 'pointer' }}>
               <option value="All">All Statuses</option>
               <option value="Pending">Pending</option>
@@ -168,7 +170,7 @@ function Arrivals() {
           </div>
         </div>
 
-        <div className="table-wrap" style={{ padding: '0' }}>
+        <div className="table-wrap manifest-table" style={{ padding: '0' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid #eaeaea' }}>
@@ -198,34 +200,34 @@ function Arrivals() {
                 </tr>
               ) : (
                 filteredArrivals.map((arrival) => (
-                  <tr key={arrival.id} style={{ borderBottom: '1px solid #f3f4f6', background: arrival.isVIP ? '#fffdf0' : 'transparent', transition: 'background 0.2s' }}>
+                  <tr className={arrival.isVIP ? 'priority-row' : ''} key={arrival.id} style={{ borderBottom: '1px solid #f3f4f6', background: arrival.isVIP ? '#fffdf0' : 'transparent', transition: 'background 0.2s' }}>
                     <td style={{ padding: '16px 20px', textAlign: 'center' }}>
                       {arrival.isVIP && <i className="fas fa-star" style={{ color: '#c5a059', fontSize: 14 }} title="VIP Guest"></i>}
                     </td>
                     <td style={{ padding: '16px 20px' }}>
-                      <span style={{ fontWeight: '600', display: 'block', color: '#111827', fontSize: '14px' }}>{arrival.guestName}</span>
-                      <span style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px', display: 'block' }}>{arrival.id} • {arrival.adults}A {arrival.children > 0 ? `${arrival.children}C` : ''} • {arrival.nights} Nights</span>
-                      {arrival.requests && <div style={{ fontSize: '12px', color: '#0ea5e9', marginTop: '4px' }}>{arrival.requests}</div>}
+                      <span className="primary-table-text" style={{ fontWeight: '600', display: 'block', color: '#111827', fontSize: '14px' }}>{arrival.guestName}</span>
+                      <span className="secondary-table-text" style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px', display: 'block' }}>{arrival.id} • {arrival.adults}A {arrival.children > 0 ? `${arrival.children}C` : ''} • {arrival.nights} Nights</span>
+                      {arrival.requests && <div className="guest-request" style={{ fontSize: '12px', color: '#0ea5e9', marginTop: '4px' }}>{arrival.requests}</div>}
                     </td>
                     <td style={{ padding: '16px 20px' }}>
-                      <div style={{ fontWeight: '500', color: '#111827', fontSize: '13px' }}>{arrival.arrivalTime}</div>
-                      <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>{arrival.flight ? `Flight: ${arrival.flight}` : 'No flight details'}</div>
+                      <div className="primary-table-text" style={{ fontWeight: '500', color: '#111827', fontSize: '13px' }}>{arrival.arrivalTime}</div>
+                      <div className="secondary-table-text" style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>{arrival.flight ? `Flight: ${arrival.flight}` : 'No flight details'}</div>
                     </td>
                     <td style={{ padding: '16px 20px' }}>
                       {arrival.roomNumber ? (
                         <div>
-                          <span style={{ color: '#c5a059', fontWeight: '600', fontSize: '14px' }}>Rm {arrival.roomNumber}</span>
-                          <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>{arrival.roomType}</div>
+                          <span className="room-number" style={{ color: '#c5a059', fontWeight: '600', fontSize: '14px' }}>Rm {arrival.roomNumber}</span>
+                          <div className="secondary-table-text" style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>{arrival.roomType}</div>
                         </div>
                       ) : (
                         <div>
-                          <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '6px' }}>{arrival.roomType}</div>
+                          <div className="secondary-table-text" style={{ fontSize: '12px', color: '#6b7280', marginBottom: '6px' }}>{arrival.roomType}</div>
                           <button style={{ background: '#f3f4f6', border: 'none', padding: '4px 10px', borderRadius: '4px', fontSize: '11px', color: '#4b5563', fontWeight: '600', cursor: 'pointer' }}>Assign Room</button>
                         </div>
                       )}
                     </td>
                     <td style={{ padding: '16px 20px' }}>
-                      {arrival.prepaid ? <span style={{ color: '#10b981', fontWeight: '600', fontSize: '13px' }}>Prepaid</span> : <span style={{ color: '#ef4444', fontWeight: '600', fontSize: '13px' }}>₱{arrival.balance.toLocaleString()} Due</span>}
+                      {arrival.prepaid ? <span className="balance-settled" style={{ color: '#10b981', fontWeight: '600', fontSize: '13px' }}>Prepaid</span> : <span className="balance-warning" style={{ color: '#ef4444', fontWeight: '600', fontSize: '13px' }}>₱{arrival.balance.toLocaleString()} Due</span>}
                     </td>
                     <td style={{ padding: '16px 20px' }}>
                       <span className={`status-tag ${getStatusTag(arrival.status)}`} style={{ textTransform: 'uppercase', fontSize: '10px', padding: '4px 8px' }}>{arrival.status}</span>

@@ -45,20 +45,20 @@ function InHouseGuests() {
   };
 
   return (
-    <section className="admin-tab-content active">
-      <div className="page-header" style={{ marginBottom: '24px' }}>
+    <section className="admin-tab-content active employee-module inhouse-module">
+      <div className="page-header employee-page-header" style={{ marginBottom: '24px' }}>
         <div className="left">
           <h2>In-House Guests</h2>
           <p>Manage currently occupied rooms, post charges, and process check-outs.</p>
         </div>
       </div>
 
-      <div className="panel" style={{ borderRadius: '12px', border: '1px solid #eaeaea' }}>
+      <div className="panel manifest-panel guest-directory-panel" style={{ borderRadius: '12px', border: '1px solid #eaeaea' }}>
         <div className="panel-header" style={{ padding: '20px', borderBottom: '1px solid #eaeaea' }}>
           <h3 style={{ margin: 0 }}>Guest Directory</h3>
         </div>
 
-        <div className="table-wrap" style={{ padding: '0' }}>
+        <div className="table-wrap manifest-table" style={{ padding: '0' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid #eaeaea', textAlign: 'left' }}>

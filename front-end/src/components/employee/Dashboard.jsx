@@ -40,7 +40,7 @@ function Dashboard() {
 
   if (isLoading) {
     return (
-      <main className="main-content">
+      <main className="main-content employee-dashboard">
         <section className="admin-tab-content active">
           <div style={{ padding: '60px', textAlign: 'center', color: '#6b7280' }}>
             <i className="fas fa-spinner fa-spin" style={{ fontSize: '20px', marginBottom: '12px', display: 'block' }}></i>
@@ -54,81 +54,72 @@ function Dashboard() {
   const occupancyRate = stats ? Math.round((stats.rooms.occupied / stats.rooms.total) * 100) : 0;
 
   return (
-    <main className="main-content">
+    <main className="main-content employee-dashboard">
       <section className="admin-tab-content active">
 
         {/* Page Header */}
-        <div style={{ marginBottom: '32px' }}>
-          <h2 style={{ fontSize: '30px', fontWeight: '700', color: '#1a1917', margin: '0 0 6px 0' }}>Overview</h2>
-          <p style={{ margin: 0, fontSize: '14px', color: '#6b7280' }}>{todayDate}</p>
+        <div className="employee-dashboard-header" style={{ marginBottom: '32px' }}>
+          <div>
+            <span className="eyebrow">Front desk command center</span>
+            <h2 style={{ fontSize: '30px', fontWeight: '700', color: '#1a1917', margin: '0 0 6px 0' }}>Good day, Ana</h2>
+            <p style={{ margin: 0, fontSize: '14px', color: '#6b7280' }}>{todayDate}</p>
+          </div>
+          <div className="shift-status" aria-label="Current shift status">
+            <span className="shift-status-dot" />
+            <span><strong>Morning shift</strong><small>06:00 – 14:00</small></span>
+          </div>
         </div>
 
-        {/* Main Layout */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2.2fr', gap: '16px', alignItems: 'start' }}>
+        {/* Operational snapshot */}
+        <div className="employee-kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
+          <KpiCard label="PENDING ARRIVALS" value={stats.arrivals.pending} sub={`${stats.arrivals.total} expected today`} subColor="#9f6f16" tone="warning" icon="fa-arrow-right-to-bracket" iconBg="#f7edcf" iconColor="#8c6a27" />
+          <KpiCard label="PENDING DEPARTURES" value={stats.departures.pending} sub={`${stats.departures.balanceDue} with balance due`} subColor="#a84b3e" tone="alert" icon="fa-arrow-right-from-bracket" iconBg="#f7e2dc" iconColor="#a84b3e" />
+          <KpiCard label="IN-HOUSE GUESTS" value={stats.inHouse.total} sub={`${stats.inHouse.balanceOutstanding} with balance`} subColor="#62544d" icon="fa-bed" iconBg="#e9e3dc" iconColor="#4a3728" />
+          <KpiCard label="OCCUPANCY RATE" value={`${occupancyRate}%`} sub={`${stats.rooms.occupied} of ${stats.rooms.total} rooms`} subColor="#357653" icon="fa-chart-pie" iconBg="#dceee4" iconColor="#357653" />
+        </div>
 
-          {/* Left Column */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-
-            {/* KPI Cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-              <KpiCard label="IN-HOUSE GUESTS" value={stats.inHouse.total} sub={`${stats.inHouse.balanceOutstanding} with balance`} subColor="#6b7280" icon="fa-bed" iconBg="#e0e7ff" iconColor="#4338ca" />
-              <KpiCard label="OCCUPANCY RATE" value={`${occupancyRate}%`} sub={`${stats.rooms.occupied} of ${stats.rooms.total} rooms`} subColor="#059669" icon="fa-chart-pie" iconBg="#d1fae5" iconColor="#047857" />
-            </div>
-
-            {/* Arrivals Card */}
-            <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #edebe7', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+        {/* Today's primary workflows */}
+        <div className="employee-operations-grid">
+          <div className="employee-glass-card operations-card arrivals-card" style={{ background: '#fff', borderRadius: '12px', border: '1px solid #edebe7', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: '#1a1917' }}>Arrivals</h3>
+                <div><span className="card-eyebrow">Today</span><h3 style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: '#1a1917' }}>Arrivals</h3></div>
                 <span style={{ fontSize: '11px', fontWeight: '600', color: '#b45309', background: '#fef3c7', padding: '4px 10px', borderRadius: '20px' }}>{stats.arrivals.pending} pending</span>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+              <div className="mini-stat-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
                 <MiniStat label="Total Expected" value={stats.arrivals.total} />
                 <MiniStat label="Checked In" value={stats.arrivals.checkedIn} valueColor="#059669" />
                 <MiniStat label="VIP" value={stats.arrivals.vip} valueColor="#b45309" />
               </div>
-            </div>
+          </div>
 
-            {/* Departures Card */}
-            <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #edebe7', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+          <div className="employee-glass-card operations-card departures-card" style={{ background: '#fff', borderRadius: '12px', border: '1px solid #edebe7', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: '#1a1917' }}>Departures</h3>
+                <div><span className="card-eyebrow">Today</span><h3 style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: '#1a1917' }}>Departures</h3></div>
                 <span style={{ fontSize: '11px', fontWeight: '600', color: '#b91c1c', background: '#fee2e2', padding: '4px 10px', borderRadius: '20px' }}>{stats.departures.pending} overdue</span>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+              <div className="mini-stat-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
                 <MiniStat label="Total Expected" value={stats.departures.total} />
                 <MiniStat label="Checked Out" value={stats.departures.checkedOut} valueColor="#059669" />
                 <MiniStat label="Balance Due" value={stats.departures.balanceDue} valueColor="#dc2626" />
               </div>
-            </div>
+          </div>
+        </div>
 
-            {/* Reservations Chart */}
-            <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #edebe7', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                <h3 style={{ margin: 0, fontSize: '13px', fontWeight: '700', color: '#1a1917' }}>Reservations</h3>
-              </div>
-              <div style={{ display: 'flex', gap: '10px', fontSize: '9px', color: '#6b7280', marginBottom: '8px' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#C9A84C' }}></span> This week</span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#4a3728' }}></span> Last week</span>
-              </div>
-              <ReservationRadar bookings={stats.bookings} size={180} />
+        {/* Live room operations */}
+        <div className="employee-workspace-grid">
+          <div className="employee-glass-card room-status-card" style={{ background: '#fff', borderRadius: '12px', border: '1px solid #edebe7', padding: '28px 32px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '29px' }}>
+              <div><span className="card-eyebrow">Live inventory</span><h3 style={{ margin: 0, fontSize: '16px', fontWeight: '700', color: '#1a1917' }}>Room Status</h3></div>
+              <span style={{ fontSize: '12px', color: '#9ca3af' }}>{stats.rooms.total} rooms</span>
             </div>
+            <RoomGrid rooms={stats.rooms} />
           </div>
 
-          {/* Right Column */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-
-            {/* Top Row */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-              {/* Calendar Card */}
-              <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #edebe7', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-                <MiniCalendar />
-              </div>
-              {/* Activity Feed */}
-              <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #edebe7', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-                <h3 style={{ margin: '0 0 16px 0', fontSize: '15px', fontWeight: '700', color: '#1a1917' }}>Recent Activity</h3>
+          <div className="employee-glass-card activity-card" style={{ background: '#fff', borderRadius: '12px', border: '1px solid #edebe7', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+                <div className="card-section-heading"><span className="card-eyebrow">Live feed</span><h3 style={{ margin: '0 0 16px 0', fontSize: '15px', fontWeight: '700', color: '#1a1917' }}>Recent Activity</h3></div>
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                   {recentActivity.map((item) => (
-                    <div key={item.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '10px 0', borderBottom: '1px solid #f3f4f6' }}>
+                    <div className="activity-item" key={item.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '10px 0', borderBottom: '1px solid #f3f4f6' }}>
                       <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#f9fafb', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                         <i className={`fas ${item.icon}`} style={{ fontSize: '11px', color: '#6b7280' }}></i>
                       </div>
@@ -139,17 +130,23 @@ function Dashboard() {
                     </div>
                   ))}
                 </div>
-              </div>
-            </div>
+          </div>
+        </div>
 
-            {/* Room Status */}
-            <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #edebe7', padding: '28px 32px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '29px' }}>
-                <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '700', color: '#1a1917' }}>Room Status</h3>
-                <span style={{ fontSize: '12px', color: '#9ca3af' }}>{stats.rooms.total} rooms</span>
-              </div>
-              <RoomGrid rooms={stats.rooms} />
+        {/* Planning and reservation context */}
+        <div className="employee-insights-grid">
+          <div className="employee-glass-card reservations-card" style={{ background: '#fff', borderRadius: '12px', border: '1px solid #edebe7', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+              <div><span className="card-eyebrow">Booking mix</span><h3 style={{ margin: 0, fontSize: '13px', fontWeight: '700', color: '#1a1917' }}>Reservations</h3></div>
             </div>
+            <div style={{ display: 'flex', gap: '10px', fontSize: '9px', color: '#6b7280', marginBottom: '8px' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#C9A84C' }}></span> This week</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#4a3728' }}></span> Last week</span>
+            </div>
+            <ReservationRadar bookings={stats.bookings} size={180} />
+          </div>
+          <div className="employee-glass-card calendar-card" style={{ background: '#fff', borderRadius: '12px', border: '1px solid #edebe7', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+            <MiniCalendar />
           </div>
         </div>
 
@@ -160,24 +157,24 @@ function Dashboard() {
 
 /* Sub-Components */
 
-function KpiCard({ label, value, sub, subColor, icon, iconBg, iconColor }) {
+function KpiCard({ label, value, sub, subColor, tone = 'neutral', icon, iconBg, iconColor }) {
   return (
-    <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #edebe7', padding: '22px 24px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+    <div className="employee-glass-card employee-kpi-card" style={{ background: '#fff', borderRadius: '12px', border: '1px solid #edebe7', padding: '22px 24px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+      <div className="employee-kpi-heading" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
         <span style={{ fontSize: '11px', fontWeight: '700', color: '#78716c', textTransform: 'uppercase', letterSpacing: '0.6px' }}>{label}</span>
         <span style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px', background: iconBg, color: iconColor, fontSize: '13px' }}>
           <i className={`fas ${icon}`}></i>
         </span>
       </div>
       <div style={{ fontSize: '32px', fontWeight: '700', color: '#1a1917', lineHeight: '1', marginBottom: '8px' }}>{value}</div>
-      <div style={{ fontSize: '12px', fontWeight: '500', color: subColor }}>{sub}</div>
+      <div className={`employee-kpi-sub tone-${tone}`} style={{ fontSize: '12px', fontWeight: '500', color: subColor }}>{sub}</div>
     </div>
   );
 }
 
 function MiniStat({ label, value, valueColor = '#1a1917' }) {
   return (
-    <div>
+    <div className="mini-stat">
       <div style={{ fontSize: '11px', fontWeight: '600', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: '6px' }}>{label}</div>
       <div style={{ fontSize: '24px', fontWeight: '700', color: valueColor, lineHeight: '1' }}>{value}</div>
     </div>
@@ -205,12 +202,13 @@ function RoomGrid({ rooms }) {
 
   return (
     <div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(10, 1fr)', gap: '8px', marginBottom: '20px' }}>
+      <div className="room-grid-compact" style={{ display: 'grid', gridTemplateColumns: 'repeat(10, 1fr)', gap: '8px', marginBottom: '20px' }}>
         {roomCells.map((room, idx) => {
           const colors = getColor(room.status);
           return (
             <div
               key={idx}
+              className={`room-tile room-status-${room.status}`}
               title={`Room ${room.number} - ${room.status}`}
               style={{ padding: '8px 4px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px', background: colors.bg, color: colors.text, fontSize: '11px', fontWeight: '600', cursor: 'default' }}
             >
@@ -219,7 +217,7 @@ function RoomGrid({ rooms }) {
           );
         })}
       </div>
-      <div style={{ display: 'flex', gap: '20px', paddingTop: '14px', borderTop: '1px solid #f3f4f6' }}>
+      <div className="room-status-legend" style={{ display: 'flex', gap: '20px', paddingTop: '14px', borderTop: '1px solid #f3f4f6' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#6b7280' }}>
           <span style={{ width: '12px', height: '12px', borderRadius: '3px', background: '#4a3728' }}></span> Occupied
         </div>
@@ -269,7 +267,7 @@ function ReservationRadar({ bookings, size = 260 }) {
   const lastWeekPath = lastWeekPoints.map(p => `${p.x},${p.y}`).join(' ');
 
   return (
-    <div style={{ display: 'flex', justifyContent: 'center', position: 'relative' }}>
+    <div className="reservation-radar" style={{ display: 'flex', justifyContent: 'center', position: 'relative' }}>
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
         {gridPaths.map((pts, idx) => (
           <polygon key={idx} points={pts} fill="none" stroke="#d6d3d1" strokeWidth="1" />
@@ -320,12 +318,12 @@ function MiniCalendar() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
         <h3 style={{ margin: 0, fontSize: '13px', fontWeight: '700', color: '#1a1917' }}>{monthName}</h3>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px', textAlign: 'center' }}>
+      <div className="mini-calendar-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px', textAlign: 'center' }}>
         {['S','M','T','W','T','F','S'].map((d, i) => (
           <div key={i} style={{ fontSize: '9px', fontWeight: '600', color: '#9ca3af', padding: '4px 0' }}>{d}</div>
         ))}
         {cells.map((day, idx) => (
-          <div key={idx} style={{ fontSize: '11px', fontWeight: day === today.getDate() ? '700' : '400', color: day === today.getDate() ? '#fff' : day ? '#374151' : 'transparent', background: day === today.getDate() ? '#C9A84C' : 'transparent', borderRadius: '50%', width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto' }}>
+          <div className={`calendar-day ${day === today.getDate() ? 'is-today' : ''}`} key={idx} style={{ fontSize: '11px', fontWeight: day === today.getDate() ? '700' : '400', color: day === today.getDate() ? '#fff' : day ? '#374151' : 'transparent', background: day === today.getDate() ? '#C9A84C' : 'transparent', borderRadius: '50%', width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto' }}>
             {day || ''}
           </div>
         ))}

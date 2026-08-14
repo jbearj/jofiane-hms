@@ -165,18 +165,19 @@ function Departures() {
   };
 
   return (
-    <section className="admin-tab-content active">
+    <section className="admin-tab-content active employee-module departures-module">
       
       {/* PAGE HEADER[cite: 11] */}
-      <div className="page-header" style={{ marginBottom: '24px' }}>
+      <div className="page-header employee-page-header" style={{ marginBottom: '24px' }}>
         <div className="left">
           <h2>Departures & Check-Outs</h2>
           <p>Manage today's expected departures, final billing, and room turnovers.</p>
         </div>
-        <div className="right" style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <div style={{ display: 'flex', background: '#f3f4f6', borderRadius: '8px', padding: '4px', alignItems: 'center' }}>
+        <div className="right employee-page-actions" style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <div className="date-navigator" style={{ display: 'flex', background: '#f3f4f6', borderRadius: '8px', padding: '4px', alignItems: 'center' }}>
             <button 
-              className="btn btn-sm" 
+              className="btn btn-sm"
+              aria-label="Previous day"
               style={{ background: 'transparent', border: 'none', boxShadow: 'none', color: '#4b5563' }}
               onClick={() => setSelectedDate(prev => {
                 const d = new Date(prev); d.setDate(d.getDate() - 1); return d.toISOString().slice(0, 10);
@@ -191,7 +192,8 @@ function Departures() {
               style={{ padding: '4px 8px', fontSize: '13px', border: 'none', background: 'transparent', outline: 'none', fontWeight: '600', color: '#111827' }}
             />
             <button 
-              className="btn btn-sm" 
+              className="btn btn-sm"
+              aria-label="Next day"
               style={{ background: 'transparent', border: 'none', boxShadow: 'none', color: '#4b5563' }}
               onClick={() => setSelectedDate(prev => {
                 const d = new Date(prev); d.setDate(d.getDate() + 1); return d.toISOString().slice(0, 10);
@@ -209,7 +211,7 @@ function Departures() {
       {error && <div style={{ color: '#ef4444', marginBottom: '15px' }}>{error}</div>}
 
       {/* KPI METRICS GRID */}
-      <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px', marginBottom: '24px' }}>
+      <div className="kpi-grid operational-kpi-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px', marginBottom: '24px' }}>
         <div className="kpi-card" style={{ borderRadius: '12px', padding: '20px', border: '1px solid #eaeaea', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
           <span className="lbl" style={{ fontSize: '11px', color: '#6b7280', letterSpacing: '0.5px' }}>TOTAL EXPECTED</span>
           <span className="val" style={{ fontSize: '28px', color: '#111827', margin: '8px 0' }}>{isLoading ? '-' : departures.length}</span>
@@ -233,13 +235,13 @@ function Departures() {
       </div>
 
       {/* MAIN LIST PANEL */}
-      <div className="panel" style={{ borderRadius: '12px', border: '1px solid #eaeaea', boxShadow: '0 4px 6px rgba(0,0,0,0.02)' }}>
+      <div className="panel manifest-panel" style={{ borderRadius: '12px', border: '1px solid #eaeaea', boxShadow: '0 4px 6px rgba(0,0,0,0.02)' }}>
         
         {/* FILTERS[cite: 11] */}
-        <div className="panel-header" style={{ padding: '20px', borderBottom: '1px solid #eaeaea', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="panel-header manifest-toolbar" style={{ padding: '20px', borderBottom: '1px solid #eaeaea', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '600', color: '#111827' }}>Departure Manifest</h3>
           
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          <div className="manifest-filters" style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
             <select 
               value={statusFilter} 
               onChange={(e) => setStatusFilter(e.target.value)}
@@ -279,7 +281,7 @@ function Departures() {
         </div>
 
         {/* TABLE[cite: 11] */}
-        <div className="table-wrap" style={{ padding: '0' }}>
+        <div className="table-wrap manifest-table" style={{ padding: '0' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid #eaeaea' }}>
@@ -313,7 +315,7 @@ function Departures() {
                   const isCheckedOut = d.status === 'Checked-Out';
 
                   return (
-                    <tr key={d.id} style={{ 
+                    <tr className={`${d.vip ? 'priority-row' : ''} ${isCheckedOut ? 'completed-row' : ''}`.trim()} key={d.id} style={{
                       borderBottom: '1px solid #f3f4f6', 
                       background: d.vip ? '#fffdf0' : 'transparent', 
                       opacity: isCheckedOut ? 0.6 : 1, // Dim row if checked out[cite: 11]
@@ -327,21 +329,21 @@ function Departures() {
 
                       {/* ROOM[cite: 11] */}
                       <td style={{ padding: '16px 20px' }}>
-                        <span style={{ color: 'var(--gold, #c5a059)', fontWeight: 'bold', fontSize: '16px' }}>{d.roomNumber}</span>
-                        <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '2px' }}>{d.roomType}</div>
+                        <span className="room-number" style={{ color: 'var(--gold, #c5a059)', fontWeight: 'bold', fontSize: '16px' }}>{d.roomNumber}</span>
+                        <div className="secondary-table-text" style={{ fontSize: '11px', color: '#6b7280', marginTop: '2px' }}>{d.roomType}</div>
                       </td>
 
                       {/* GUEST INFO[cite: 11] */}
                       <td style={{ padding: '16px 20px' }}>
-                        <span style={{ fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px', color: '#111827', fontSize: '14px' }}>
+                        <span className="primary-table-text" style={{ fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px', color: '#111827', fontSize: '14px' }}>
                           {d.vip && <i className="fas fa-star" style={{ color: '#c5a059', fontSize: 12 }} title="VIP Guest"></i>}
                           {d.guestName}
                         </span>
-                        <span style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px', display: 'block' }}>
+                        <span className="secondary-table-text" style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px', display: 'block' }}>
                           {d.bookingId} • {d.adults}A {d.children > 0 ? `${d.children}C` : ''} 
                         </span>
                         {d.alerts.length > 0 && (
-                          <div style={{ fontSize: '11px', color: '#ef4444', marginTop: '4px', display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <div className="guest-alert" style={{ fontSize: '11px', color: '#ef4444', marginTop: '4px', display: 'flex', alignItems: 'center', gap: 4 }}>
                             <i className="fas fa-exclamation-circle"></i> {d.alerts[0]} {d.alerts.length > 1 ? `(+${d.alerts.length - 1})` : ''}
                           </div>
                         )}
@@ -349,15 +351,15 @@ function Departures() {
 
                       {/* TIME & BALANCE[cite: 11] */}
                       <td style={{ padding: '16px 20px' }}>
-                        <div style={{ fontWeight: '500', color: '#111827', fontSize: '13px' }}>
+                        <div className="primary-table-text" style={{ fontWeight: '500', color: '#111827', fontSize: '13px' }}>
                            {depDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
-                           {d.lateRequest && <span style={{ color: '#ea580c', fontSize: '11px', marginLeft: '6px' }}>(Late Request)</span>}
+                           {d.lateRequest && <span className="late-request" style={{ color: '#ea580c', fontSize: '11px', marginLeft: '6px' }}>(Late Request)</span>}
                         </div>
                         <div style={{ marginTop: '4px' }}>
                           {d.balance === 0 ? (
-                            <span style={{ color: '#10b981', fontWeight: '600', fontSize: '12px' }}>Settled</span>
+                            <span className="balance-settled" style={{ color: '#10b981', fontWeight: '600', fontSize: '12px' }}>Settled</span>
                           ) : (
-                            <span style={{ color: '#ef4444', fontWeight: '600', fontSize: '12px' }}>₱{d.balance.toLocaleString()} Due</span>
+                            <span className="balance-warning" style={{ color: '#ef4444', fontWeight: '600', fontSize: '12px' }}>₱{d.balance.toLocaleString()} Due</span>
                           )}
                         </div>
                       </td>

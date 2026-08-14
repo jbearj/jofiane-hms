@@ -190,21 +190,21 @@ function FrontDeskLog() {
   };
 
   return (
-    <section className="admin-tab-content active">
+    <section className="admin-tab-content active employee-module logbook-module">
 
       {/* PAGE HEADER */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '28px' }}>
+      <div className="page-header employee-page-header logbook-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '28px' }}>
         <div>
           <h2 style={{ margin: '0 0 4px 0', fontSize: '30px', fontWeight: '700', color: '#1f2937' }}>Front Desk Logbook</h2>
           <p style={{ margin: 0, fontSize: '14px', color: '#6b7280' }}>Track shift handovers, incidents, maintenance requests, and daily notes.</p>
         </div>
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <div style={{ display: 'flex', background: '#f9fafb', borderRadius: '8px', padding: '4px', alignItems: 'center', border: '1px solid #e5e7eb' }}>
-            <button onClick={() => setSelectedDate(prev => { const d = new Date(prev); d.setDate(d.getDate() - 1); return d.toISOString().slice(0, 10); })} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '6px 10px', fontSize: '14px', color: '#374151' }}>
+        <div className="employee-page-actions logbook-actions" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <div className="date-navigator" style={{ display: 'flex', background: '#f9fafb', borderRadius: '8px', padding: '4px', alignItems: 'center', border: '1px solid #e5e7eb' }}>
+            <button aria-label="Previous day" onClick={() => setSelectedDate(prev => { const d = new Date(prev); d.setDate(d.getDate() - 1); return d.toISOString().slice(0, 10); })} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '6px 10px', fontSize: '14px', color: '#374151' }}>
               <i className="fas fa-chevron-left"></i>
             </button>
             <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} style={{ border: 'none', background: 'transparent', fontSize: '13px', fontWeight: '600', outline: 'none', color: '#1f2937' }} />
-            <button onClick={() => setSelectedDate(prev => { const d = new Date(prev); d.setDate(d.getDate() + 1); return d.toISOString().slice(0, 10); })} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '6px 10px', fontSize: '14px', color: '#374151' }}>
+            <button aria-label="Next day" onClick={() => setSelectedDate(prev => { const d = new Date(prev); d.setDate(d.getDate() + 1); return d.toISOString().slice(0, 10); })} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '6px 10px', fontSize: '14px', color: '#374151' }}>
               <i className="fas fa-chevron-right"></i>
             </button>
           </div>
@@ -222,17 +222,17 @@ function FrontDeskLog() {
       </div>
 
       {/* KPI METRICS */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px', marginBottom: '28px' }}>
+      <div className="logbook-kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px', marginBottom: '28px' }}>
 
         {/* Open Issues */}
-        <div style={{ borderRadius: '12px', padding: '24px', background: '#fff', border: '1px solid #e5e7eb', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+        <div className="kpi-card logbook-kpi-card" style={{ borderRadius: '12px', padding: '24px', background: '#fff', border: '1px solid #e5e7eb', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
           <div style={{ fontSize: '11px', fontWeight: '700', color: '#78716c', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px' }}>Pending / Open</div>
           <div style={{ fontSize: '40px', fontWeight: '700', color: '#1a1a1a', marginBottom: '10px', lineHeight: '1' }}>{isLoading ? '--' : filteredEntries.filter(e => e.status === 'open').length}</div>
           <div style={{ fontSize: '13px', fontWeight: '500', color: '#dc2626' }}>Requires Attention</div>
         </div>
 
         {/* Resolved */}
-        <div style={{ borderRadius: '12px', padding: '24px', background: '#fff', border: '1px solid #e5e7eb', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+        <div className="kpi-card logbook-kpi-card" style={{ borderRadius: '12px', padding: '24px', background: '#fff', border: '1px solid #e5e7eb', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
           <div style={{ fontSize: '11px', fontWeight: '700', color: '#78716c', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px' }}>Resolved</div>
           <div style={{ fontSize: '40px', fontWeight: '700', color: '#1a1a1a', marginBottom: '10px', lineHeight: '1' }}>{isLoading ? '--' : filteredEntries.filter(e => e.status === 'resolved').length}</div>
           <div style={{ fontSize: '13px', fontWeight: '500', color: '#059669' }}>Completed</div>
@@ -241,10 +241,10 @@ function FrontDeskLog() {
       </div>
 
       {/* MAIN LOG PANEL */}
-      <div style={{ borderRadius: '10px', border: '1px solid #e5e7eb', padding: '24px', background: '#fff', boxShadow: '0 1px 2px rgba(0,0,0,0.04)' }}>
+      <div className="panel logbook-panel" style={{ borderRadius: '10px', border: '1px solid #e5e7eb', padding: '24px', background: '#fff', boxShadow: '0 1px 2px rgba(0,0,0,0.04)' }}>
 
         {/* Filters Bar */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center', marginBottom: '24px', paddingBottom: '20px', borderBottom: '1px solid #f3f4f6' }}>
+        <div className="logbook-filter-bar" style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center', marginBottom: '24px', paddingBottom: '20px', borderBottom: '1px solid #f3f4f6' }}>
           <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
             <i className="fas fa-search" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af', fontSize: '13px' }}></i>
             <input type="text" placeholder="Search entries..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} style={{ width: '100%', padding: '9px 12px 9px 34px', fontSize: '13px', borderRadius: '6px', border: '1px solid #e5e7eb', outline: 'none', color: '#374151', background: '#f9fafb' }} />
@@ -284,7 +284,7 @@ function FrontDeskLog() {
         {error && <div style={{ color: '#dc2626', fontSize: '13px', marginBottom: '16px', padding: '10px 14px', background: '#fef2f2', borderRadius: '6px', border: '1px solid #fecaca' }}>{error}</div>}
 
         {/* Log Feed */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        <div className="logbook-feed" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           {isLoading ? (
             <div style={{ textAlign: 'center', padding: '48px 20px', color: '#6b7280' }}>
               <i className="fas fa-spinner fa-spin" style={{ marginRight: '8px' }}></i> Loading logbook...
@@ -328,8 +328,8 @@ function FrontDeskLog() {
 
       {/* New Entry Modal */}
       {newEntryModal && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(2px)' }}>
-          <div style={{ width: 480, maxWidth: '92%', padding: '28px', borderRadius: '12px', background: '#fff', boxShadow: '0 20px 60px rgba(0,0,0,0.15)' }}>
+        <div className="modal-overlay logbook-modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(2px)' }}>
+          <div className="modal-content logbook-modal" style={{ width: 480, maxWidth: '92%', padding: '28px', borderRadius: '12px', background: '#fff', boxShadow: '0 20px 60px rgba(0,0,0,0.15)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: '#1f2937' }}>New Log Entry</h3>
               <button onClick={() => setNewEntryModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: '#9ca3af', padding: '4px' }}>
@@ -413,11 +413,11 @@ function LogEntryCard({ entry, onTogglePin, onDelete, onAddComment }) {
   const resolvedStyle = entry.status === 'resolved' ? { opacity: 0.55 } : {};
 
   return (
-    <div style={{ borderLeft: `4px solid ${colors.border}`, background: colors.bg, ...resolvedStyle, borderRadius: '8px', padding: '16px 20px', border: `1px solid #e5e7eb`, borderLeftWidth: '4px', borderLeftColor: colors.border, transition: 'box-shadow 0.15s ease' }}>
+    <div className="log-entry-card" style={{ borderLeft: `4px solid ${colors.border}`, background: colors.bg, ...resolvedStyle, borderRadius: '8px', padding: '16px 20px', border: `1px solid #e5e7eb`, borderLeftWidth: '4px', borderLeftColor: colors.border, transition: 'box-shadow 0.15s ease' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           {/* Meta row */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: '#6b7280', marginBottom: '8px', flexWrap: 'wrap' }}>
+          <div className="log-entry-meta" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: '#6b7280', marginBottom: '8px', flexWrap: 'wrap' }}>
             <span style={{ padding: '2px 8px', borderRadius: '4px', fontWeight: '700', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.4px', color: '#fff', background: colors.badge }}>
               {entry.priority}
             </span>
@@ -425,7 +425,7 @@ function LogEntryCard({ entry, onTogglePin, onDelete, onAddComment }) {
             <span style={{ color: '#d1d5db' }}>|</span>
             <span style={{ fontWeight: '500' }}>{entry.category}</span>
             {entry.isSystemGenerated && (
-              <span style={{ background: '#e5e7eb', color: '#374151', padding: '2px 8px', borderRadius: '4px', fontWeight: '600', fontSize: '10px' }}>SYSTEM</span>
+              <span className="log-system-badge" style={{ background: '#e5e7eb', color: '#374151', padding: '2px 8px', borderRadius: '4px', fontWeight: '600', fontSize: '10px' }}>SYSTEM</span>
             )}
             {entry.status === 'resolved' && (
               <span style={{ color: '#059669', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -442,7 +442,7 @@ function LogEntryCard({ entry, onTogglePin, onDelete, onAddComment }) {
 
           {/* Linked info */}
           {entry.linked && (
-            <div style={{ display: 'flex', gap: '14px', fontSize: '12px', color: '#0369a1', marginTop: '10px', fontWeight: '500' }}>
+            <div className="log-linked-info" style={{ display: 'flex', gap: '14px', fontSize: '12px', color: '#0369a1', marginTop: '10px', fontWeight: '500' }}>
               {entry.linked.guestName && (
                 <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                   <i className="fas fa-user" style={{ fontSize: '10px' }}></i> {entry.linked.guestName}
@@ -462,7 +462,7 @@ function LogEntryCard({ entry, onTogglePin, onDelete, onAddComment }) {
           )}
 
           {/* Footer meta */}
-          <div style={{ marginTop: '12px', fontSize: '11px', color: '#9ca3af', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          <div className="log-entry-footer-meta" style={{ marginTop: '12px', fontSize: '11px', color: '#9ca3af', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
             <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
               <i className="fas fa-user-circle" style={{ fontSize: '12px' }}></i> {entry.createdBy.name}
             </span>
@@ -471,7 +471,7 @@ function LogEntryCard({ entry, onTogglePin, onDelete, onAddComment }) {
               <i className="fas fa-eye" style={{ fontSize: '10px' }}></i> {entry.readBy.length} read
             </span>
             {entry.comments.length > 0 && (
-              <button onClick={() => setShowComments(!showComments)} style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', padding: 0, fontSize: '11px', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <button className="log-comment-toggle" onClick={() => setShowComments(!showComments)} style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', padding: 0, fontSize: '11px', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <i className="fas fa-comment" style={{ fontSize: '10px' }}></i> {entry.comments.length} comment{entry.comments.length > 1 ? 's' : ''}
               </button>
             )}
@@ -479,7 +479,7 @@ function LogEntryCard({ entry, onTogglePin, onDelete, onAddComment }) {
         </div>
 
         {/* Action Buttons */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginLeft: '16px' }}>
+        <div className="log-entry-actions" style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginLeft: '16px' }}>
           <button
             onClick={() => onTogglePin(entry.id)}
             title={entry.pinned ? 'Unpin' : 'Pin to top'}
