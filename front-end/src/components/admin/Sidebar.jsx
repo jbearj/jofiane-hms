@@ -10,11 +10,16 @@ const defaultAccordions = {
   reports: false
 };
 
-function Sidebar({ isCollapsed, setIsCollapsed, activeTab, setActiveTab, isDarkMode, setIsDarkMode }) {
+function Sidebar({ isCollapsed, setIsCollapsed, activeTab, setActiveTab, isDarkMode, setIsDarkMode, onLogout }) {
   const navMenuRef = useRef(null);
   const navScrollPositionRef = useRef(0);
   const transitionTimerRef = useRef(null);
+  const profileMenuRef = useRef(null);
+
   const [transitionPhase, setTransitionPhase] = useState('');
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
   const [expandedSections, setExpandedSections] = useState(() => {
     try {
       const saved = window.localStorage.getItem('admin-sidebar-accordions');
@@ -23,6 +28,19 @@ function Sidebar({ isCollapsed, setIsCollapsed, activeTab, setActiveTab, isDarkM
       return defaultAccordions;
     }
   });
+
+  // Isara ang popover kapag nag-click sa labas
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target)) {
+        setShowProfileMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   useEffect(() => {
     try {
@@ -53,6 +71,33 @@ function Sidebar({ isCollapsed, setIsCollapsed, activeTab, setActiveTab, isDarkM
 
   const toggleSection = (sectionId) => {
     setExpandedSections((current) => ({ ...current, [sectionId]: !current[sectionId] }));
+  };
+
+  const handleSettingsClick = () => {
+    setActiveTab('settings');
+    setShowProfileMenu(false);
+  };
+
+  const handleLogoutClick = () => {
+    setShowProfileMenu(false);
+    setShowLogoutConfirm(true); // Buksan ang confirmation modal
+  };
+
+  const confirmLogout = () => {
+    setShowLogoutConfirm(false);
+    try {
+      window.localStorage.removeItem('token');
+      window.localStorage.removeItem('user');
+      window.sessionStorage.clear();
+    } catch (error) {
+      console.error('Error clearing storage:', error);
+    }
+
+    if (typeof onLogout === 'function') {
+      onLogout();
+    } else {
+      window.location.href = '/login';
+    }
   };
 
   const menuItems = [
@@ -88,84 +133,317 @@ function Sidebar({ isCollapsed, setIsCollapsed, activeTab, setActiveTab, isDarkM
   ];
 
   return (
-    <aside className={`sidebar ${isCollapsed ? 'collapsed' : ''} ${transitionPhase}`}>
-      <div className="menu-toggle-container">
-        <button className={`menu-toggle-btn sidebar-menu-button ${!isCollapsed ? 'opened' : ''}`} onClick={handleSidebarToggle} title={isCollapsed ? 'Expand Menu' : 'Minimize Menu'} aria-label={isCollapsed ? 'Expand navigation' : 'Collapse navigation'} aria-expanded={!isCollapsed}>
-          <span className="sidebar-toggle-glyph" aria-hidden="true">
-            <span className="sidebar-toggle-line sidebar-toggle-line-top" />
-            <span className="sidebar-toggle-line sidebar-toggle-line-middle" />
-            <span className="sidebar-toggle-line sidebar-toggle-line-bottom" />
-          </span>
-        </button>
-      </div>
+    <>
+      <style>{`
+        /* Clean Utilities Container */
+        .sidebar-utilities {
+          padding: 8px 12px;
+          margin-bottom: 8px;
+        }
 
-      <div className="sidebar-brand">
-        <img src={logoFull} alt="Jofiane Logo" className="sidebar-logo sidebar-logo-full" />
-        <img src={logoMini} alt="" aria-hidden="true" className="sidebar-logo sidebar-logo-mini" />
-        <div className="brand-sub">Admin Console</div>
-      </div>
+        .theme-toggle-btn {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          width: 100%;
+          background: transparent;
+          border: none;
+          color: rgba(255, 255, 255, 0.85) !important;
+          cursor: pointer;
+          padding: 8px 12px;
+          border-radius: 8px;
+          transition: background-color 0.2s ease, color 0.2s ease;
+        }
 
-      <nav ref={navMenuRef} className="nav-menu no-scrollbar" onScroll={(event) => { navScrollPositionRef.current = event.currentTarget.scrollTop; }}>
-        {menuItems.map((item) => {
-          const hasSubItems = Boolean(item.subItems?.length);
-          const isExpanded = expandedSections[item.id];
-          const isActive = hasSubItems ? item.subItems.some((sub) => sub.id === activeTab) : activeTab === item.id;
-          return (
-            <div className="nav-item-group" key={item.id}>
-              {item.group && <div className="nav-section-label">{item.group}</div>}
-              <button className={`nav-link nav-parent-btn ${isActive ? 'active' : ''}`} onClick={() => {
-                if (!hasSubItems) return setActiveTab(item.id);
-                if (isCollapsed) {
-                  setIsCollapsed(false);
-                  setExpandedSections((current) => ({ ...current, [item.id]: true }));
-                } else toggleSection(item.id);
-              }} title={isCollapsed ? item.label : ''} aria-expanded={hasSubItems ? isExpanded : undefined}>
-                <div className="nav-link-main">
-                  <div className="nav-icon-wrapper">{item.icon}</div>
-                  <span className="nav-label">{item.label}</span>
-                </div>
-                {hasSubItems && <svg className={`nav-chevron ${isExpanded ? 'expanded' : ''}`} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25"><polyline points="9 18 15 12 9 6"/></svg>}
-              </button>
-              {hasSubItems && (
-                <div className={`nav-submenu-container ${isExpanded && !isCollapsed ? 'expanded' : ''}`} aria-hidden={!isCollapsed && !isExpanded}>
-                  {item.subItems.map((sub) => (
-                    <button key={sub.id} className={`nav-link ${activeTab === sub.id ? 'active' : ''}`} onClick={() => setActiveTab(sub.id)} tabIndex={isCollapsed || isExpanded ? 0 : -1}>
-                      {activeTab === sub.id && <span className="active-dot" />}
-                      <span>{sub.label}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </nav>
+        .theme-toggle-btn:hover {
+          background-color: rgba(255, 255, 255, 0.08);
+          color: #ffffff !important;
+        }
 
-      <div className="sidebar-utilities">
-        <button type="button" className="nav-link nav-parent-btn theme-toggle-btn" onClick={() => setIsDarkMode(!isDarkMode)} title={isCollapsed ? (isDarkMode ? 'Use light mode' : 'Use dark mode') : ''} aria-label={isDarkMode ? 'Use light mode' : 'Use dark mode'} aria-pressed={isDarkMode}>
-          <div className="nav-link-main nav-utility-content">
-            <div className="nav-icon-wrapper">
-              {isDarkMode ? <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.66 6.34l1.41-1.41"/></svg> : <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>}
-            </div>
-            <span className="nav-label">{isDarkMode ? 'Light mode' : 'Dark mode'}</span>
-          </div>
-          <span className={`theme-switch ${isDarkMode ? 'on' : ''}`} aria-hidden="true"><span /></span>
-        </button>
-        <button className={`nav-link nav-parent-btn ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => setActiveTab('settings')} title={isCollapsed ? 'Settings' : ''}>
-          <div className="nav-link-main"><div className="nav-icon-wrapper"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-2.82 1.18V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 7.18 19.7l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 3.17 14H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.3 7.18l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 10 3.17V3a2 2 0 0 1 4 0v.09A1.65 1.65 0 0 0 16.82 4.3l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 20.83 10H21a2 2 0 0 1 0 4h-.09A1.65 1.65 0 0 0 19.4 15z"/></svg></div><span className="nav-label">Settings</span></div>
-        </button>
-        <button className="nav-link nav-parent-btn" title={isCollapsed ? 'Log out' : ''}>
-          <div className="nav-link-main"><div className="nav-icon-wrapper"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5M21 12H9"/></svg></div><span className="nav-label">Log out</span></div>
-        </button>
-      </div>
+        .theme-toggle-content {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          font-size: 0.9rem;
+          font-weight: 500;
+        }
 
-      <div className="sidebar-footer">
-        <div className="user-badge">
-          <div className="avatar admin-avatar">A</div>
-          <div className="user-info"><div className="name">Admin</div><div className="role">General Manager</div></div>
+        /* Profile & Popover Layout */
+        .sidebar-footer {
+          position: relative;
+          padding: 12px;
+          border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .profile-popover {
+          position: absolute;
+          bottom: calc(100% + 8px);
+          left: 12px;
+          right: 12px;
+          background: #231d19;
+          border: 1px solid rgba(255, 255, 255, 0.15);
+          border-radius: 10px;
+          box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+          padding: 6px;
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          z-index: 999;
+        }
+
+        .popover-item {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          width: 100%;
+          padding: 10px 12px;
+          border: none;
+          background: transparent;
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: 0.88rem;
+          color: #e2e8f0;
+          text-align: left;
+          transition: background-color 0.2s ease;
+        }
+
+        .popover-item:hover {
+          background-color: rgba(255, 255, 255, 0.08);
+        }
+
+        .popover-item.logout-btn {
+          color: #f87171;
+        }
+
+        .popover-item.logout-btn:hover {
+          background-color: rgba(248, 113, 113, 0.15);
+        }
+
+        .user-badge {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 8px;
+          border-radius: 8px;
+          transition: background 0.2s ease;
+        }
+
+        .user-badge:hover {
+          background-color: rgba(255, 255, 255, 0.05);
+        }
+
+        /* Confirmation Modal Overlay & Box */
+        .logout-modal-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background-color: rgba(0, 0, 0, 0.65);
+          backdrop-filter: blur(4px);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 9999;
+        }
+
+        .logout-modal-card {
+          background-color: #1e1815;
+          border: 1px solid rgba(255, 255, 255, 0.15);
+          border-radius: 14px;
+          padding: 24px;
+          width: 90%;
+          max-width: 380px;
+          box-shadow: 0 20px 30px rgba(0, 0, 0, 0.6);
+          color: #ffffff;
+          text-align: center;
+        }
+
+        .logout-modal-title {
+          font-size: 1.2rem;
+          font-weight: 600;
+          margin-bottom: 8px;
+        }
+
+        .logout-modal-text {
+          font-size: 0.9rem;
+          color: #94a3b8;
+          margin-bottom: 20px;
+        }
+
+        .logout-modal-actions {
+          display: flex;
+          gap: 12px;
+          justify-content: center;
+        }
+
+        .modal-btn {
+          flex: 1;
+          padding: 10px 16px;
+          border-radius: 8px;
+          font-size: 0.9rem;
+          font-weight: 500;
+          cursor: pointer;
+          border: none;
+          transition: all 0.2s ease;
+        }
+
+        .modal-btn-cancel {
+          background-color: rgba(255, 255, 255, 0.08);
+          color: #e2e8f0;
+        }
+
+        .modal-btn-cancel:hover {
+          background-color: rgba(255, 255, 255, 0.15);
+        }
+
+        .modal-btn-confirm {
+          background-color: #ef4444;
+          color: #ffffff;
+        }
+
+        .modal-btn-confirm:hover {
+          background-color: #dc2626;
+        }
+      `}</style>
+
+      <aside className={`sidebar ${isCollapsed ? 'collapsed' : ''} ${transitionPhase}`}>
+        <div className="menu-toggle-container">
+          <button className={`menu-toggle-btn sidebar-menu-button ${!isCollapsed ? 'opened' : ''}`} onClick={handleSidebarToggle} title={isCollapsed ? 'Expand Menu' : 'Minimize Menu'} aria-label={isCollapsed ? 'Expand navigation' : 'Collapse navigation'} aria-expanded={!isCollapsed}>
+            <span className="sidebar-toggle-glyph" aria-hidden="true">
+              <span className="sidebar-toggle-line sidebar-toggle-line-top" />
+              <span className="sidebar-toggle-line sidebar-toggle-line-middle" />
+              <span className="sidebar-toggle-line sidebar-toggle-line-bottom" />
+            </span>
+          </button>
         </div>
-      </div>
-    </aside>
+
+        <div className="sidebar-brand">
+          <img src={logoFull} alt="Jofiane Logo" className="sidebar-logo sidebar-logo-full" />
+          <img src={logoMini} alt="" aria-hidden="true" className="sidebar-logo sidebar-logo-mini" />
+          <div className="brand-sub">Admin Console</div>
+        </div>
+
+        <nav ref={navMenuRef} className="nav-menu no-scrollbar" onScroll={(event) => { navScrollPositionRef.current = event.currentTarget.scrollTop; }}>
+          {menuItems.map((item) => {
+            const hasSubItems = Boolean(item.subItems?.length);
+            const isExpanded = expandedSections[item.id];
+            const isActive = hasSubItems ? item.subItems.some((sub) => sub.id === activeTab) : activeTab === item.id;
+            return (
+              <div className="nav-item-group" key={item.id}>
+                {item.group && <div className="nav-section-label">{item.group}</div>}
+                <button className={`nav-link nav-parent-btn ${isActive ? 'active' : ''}`} onClick={() => {
+                  if (!hasSubItems) return setActiveTab(item.id);
+                  if (isCollapsed) {
+                    setIsCollapsed(false);
+                    setExpandedSections((current) => ({ ...current, [item.id]: true }));
+                  } else toggleSection(item.id);
+                }} title={isCollapsed ? item.label : ''} aria-expanded={hasSubItems ? isExpanded : undefined}>
+                  <div className="nav-link-main">
+                    <div className="nav-icon-wrapper">{item.icon}</div>
+                    <span className="nav-label">{item.label}</span>
+                  </div>
+                  {hasSubItems && <svg className={`nav-chevron ${isExpanded ? 'expanded' : ''}`} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25"><polyline points="9 18 15 12 9 6"/></svg>}
+                </button>
+                {hasSubItems && (
+                  <div className={`nav-submenu-container ${isExpanded && !isCollapsed ? 'expanded' : ''}`} aria-hidden={!isCollapsed && !isExpanded}>
+                    {item.subItems.map((sub) => (
+                      <button key={sub.id} className={`nav-link ${activeTab === sub.id ? 'active' : ''}`} onClick={() => setActiveTab(sub.id)} tabIndex={isCollapsed || isExpanded ? 0 : -1}>
+                        {activeTab === sub.id && <span className="active-dot" />}
+                        <span>{sub.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </nav>
+
+        {/* UTILITIES - LIGHT / DARK MODE SWITCH ONLY */}
+        <div className="sidebar-utilities">
+          <button type="button" className="theme-toggle-btn" onClick={() => setIsDarkMode(!isDarkMode)} title={isCollapsed ? (isDarkMode ? 'Use light mode' : 'Use dark mode') : ''} aria-label={isDarkMode ? 'Use light mode' : 'Use dark mode'} aria-pressed={isDarkMode}>
+            <div className="theme-toggle-content">
+              <div className="nav-icon-wrapper" style={{ display: 'flex', alignItems: 'center' }}>
+                {isDarkMode ? <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.66 6.34l1.41-1.41"/></svg> : <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>}
+              </div>
+              <span className="nav-label">{isDarkMode ? 'Light mode' : 'Dark mode'}</span>
+            </div>
+            <span className={`theme-switch ${isDarkMode ? 'on' : ''}`} aria-hidden="true"><span /></span>
+          </button>
+        </div>
+
+        {/* USER PROFILE FOOTER WITH POPOVER */}
+        <div className="sidebar-footer" ref={profileMenuRef}>
+          {showProfileMenu && (
+            <div className="profile-popover">
+              <button 
+                type="button" 
+                className="popover-item"
+                onClick={handleSettingsClick}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="3" />
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                </svg>
+                <span>Settings</span>
+              </button>
+              
+              <button 
+                type="button" 
+                className="popover-item logout-btn"
+                onClick={handleLogoutClick}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                  <polyline points="16 17 21 12 16 7" />
+                  <line x1="21" y1="12" x2="9" y2="12" />
+                </svg>
+                <span>Log Out</span>
+              </button>
+            </div>
+          )}
+
+          <div 
+            className="user-badge"
+            onClick={() => setShowProfileMenu((prev) => !prev)}
+            style={{ cursor: 'pointer' }}
+          >
+            <div className="avatar admin-avatar">A</div>
+            <div className="user-info">
+              <div className="name">Admin</div>
+              <div className="role">General Manager</div>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      {/* LOGOUT CONFIRMATION MODAL */}
+      {showLogoutConfirm && (
+        <div className="logout-modal-overlay">
+          <div className="logout-modal-card">
+            <div className="logout-modal-title">Confirm Log Out</div>
+            <div className="logout-modal-text">Are you sure you want to log out?</div>
+            <div className="logout-modal-actions">
+              <button 
+                type="button" 
+                className="modal-btn modal-btn-cancel"
+                onClick={() => setShowLogoutConfirm(false)}
+              >
+                Cancel
+              </button>
+              <button 
+                type="button" 
+                className="modal-btn modal-btn-confirm"
+                onClick={confirmLogout}
+              >
+                Log Out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
