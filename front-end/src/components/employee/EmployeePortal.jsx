@@ -5,9 +5,29 @@ import BookingManagement from './BookingManagement';
 import Arrivals from './Arrivals';
 import InHouseGuests from './InHouseGuests'; 
 import Departures from './Departures';
-import FrontDeskLog from './FrontDeskLog';
+import FrontDeskLog from './FrontDeskLog'
+import HousekeepingStatus from '../admin/rooms/HousekeepingStatus';
 
-function EmployeePortal() {
+function EmployeePortal({employeeRole}) {
+  const frontDeskTabs = [
+  'dashboard',
+  'bookings',
+  'arrivals',
+  'inhouse',
+  'departures',
+  'logbook'
+  ];
+
+  const housekeepingTabs = [
+    'dashboard',
+    'housekeeping'
+  ];
+
+  const allowedTabs =
+    employeeRole === 'housekeeping'
+      ? housekeepingTabs
+      : frontDeskTabs;
+
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(() => {
@@ -28,34 +48,66 @@ function EmployeePortal() {
   }, [isDarkMode]);
 
   const renderContent = () => {
-    switch (activeTab) {
-      case 'dashboard':
-        return <Dashboard activeTab={activeTab} />;
-      case 'bookings':
-        return <main className="main-content employee-content"><BookingManagement /></main>;
-      case 'arrivals':
-        return <main className="main-content employee-content"><Arrivals /></main>;
-        
-      case 'inhouse': 
-        return <main className="main-content employee-content"><InHouseGuests /></main>;
 
-        case 'departures':
-         return <main className="main-content employee-content"><Departures /></main>;
+  if (!allowedTabs.includes(activeTab)) {
+    return <Dashboard activeTab="dashboard" />;
+  }
 
-        case 'logbook':
-          return <main className="main-content employee-content"><FrontDeskLog /></main>;
+  switch (activeTab) {
+    case 'dashboard':
+      return <Dashboard activeTab={activeTab} />;
 
+    case 'bookings':
+      return (
+        <main className="main-content employee-content">
+          <BookingManagement />
+        </main>
+      );
 
+    case 'arrivals':
+      return (
+        <main className="main-content employee-content">
+          <Arrivals />
+        </main>
+      );
 
-      default:
-        return <Dashboard activeTab={activeTab} />;
+    case 'inhouse':
+      return (
+        <main className="main-content employee-content">
+          <InHouseGuests />
+        </main>
+      );
 
-    }
-  };
+    case 'departures':
+      return (
+        <main className="main-content employee-content">
+          <Departures />
+        </main>
+      );
+
+    case 'logbook':
+      return (
+        <main className="main-content employee-content">
+          <FrontDeskLog />
+        </main>
+      );
+
+    case 'housekeeping':
+      return (
+        <main className="main-content employee-content">
+          <HousekeepingStatus />
+        </main>
+      );
+
+    default:
+      return <Dashboard activeTab="dashboard" />;
+  }
+};
 
   return (
     <div className={`portal-shell employee-portal-shell ${isCollapsed ? 'nav-collapsed' : ''} ${isDarkMode ? 'theme-dark' : 'theme-light'}`}>
       <Sidebar 
+        employeeRole={employeeRole}
         isCollapsed={isCollapsed}
         setIsCollapsed={setIsCollapsed}
         activeTab={activeTab}

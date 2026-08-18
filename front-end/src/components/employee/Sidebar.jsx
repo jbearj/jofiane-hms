@@ -3,7 +3,7 @@ import logoFull from '../../assets/Jofiane-logo.png';
 import logoMini from '../../assets/Jofiane-logo 2.png'; 
 import employee1 from '../../assets/employee1.jpeg';
 
-function Sidebar({ isCollapsed, setIsCollapsed, activeTab, setActiveTab, isDarkMode, setIsDarkMode, onLogout }) {
+function Sidebar({ employeeRole, isCollapsed, setIsCollapsed, activeTab, setActiveTab, isDarkMode, setIsDarkMode, onLogout }) {
   const navMenuRef = useRef(null);
   const navScrollPositionRef = useRef(0);
   const transitionTimerRef = useRef(null);
@@ -128,6 +128,7 @@ function Sidebar({ isCollapsed, setIsCollapsed, activeTab, setActiveTab, isDarkM
     }
   };
 
+
   const menuItems = [
     { 
       id: 'dashboard', 
@@ -186,8 +187,23 @@ function Sidebar({ isCollapsed, setIsCollapsed, activeTab, setActiveTab, isDarkM
         </svg>
       ),
       subItems: [
-        { id: 'roomrack', label: 'Room Rack / Plan' },
-        { id: 'housekeeping', label: 'Housekeeping' }
+          { id: 'roomrack', label: 'Room Rack / Plan' }
+        ]
+      },
+        {
+      id: 'housekeeping',
+      label: 'Housekeeping',
+      icon: (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M4 22h16" />
+          <path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18" />
+          <path d="M14 12v.01" strokeWidth="3" />
+        </svg>
+      ),
+      subItems: [
+        { id: 'housekeeping', label: 'Room Status' },
+        { id: 'cleaning-tasks', label: 'Cleaning Tasks' },
+        { id: 'maintenance', label: 'Maintenance Requests' }
       ]
     },
     {
@@ -207,6 +223,28 @@ function Sidebar({ isCollapsed, setIsCollapsed, activeTab, setActiveTab, isDarkM
       ]
     }
   ];
+
+  const visibleMenuItems = menuItems.filter((item) => {
+
+    if (employeeRole === 'frontdesk') {
+      return [
+        'dashboard',
+        'frontdesk',
+        'reservations',
+        'rooms',
+        'finance'
+      ].includes(item.id);
+    }
+
+    if (employeeRole === 'housekeeping') {
+      return [
+        'dashboard',
+        'housekeeping'
+      ].includes(item.id);
+    }
+
+    return false;
+  });
 
   return (
     <>
@@ -476,7 +514,7 @@ function Sidebar({ isCollapsed, setIsCollapsed, activeTab, setActiveTab, isDarkM
           className="nav-menu no-scrollbar"
           onScroll={(event) => { navScrollPositionRef.current = event.currentTarget.scrollTop; }}
         >
-          {menuItems.map((item) => {
+          {visibleMenuItems.map((item) => {
             const hasSubItems = item.subItems && item.subItems.length > 0;
             const isExpanded = expandedSections[item.id];
             

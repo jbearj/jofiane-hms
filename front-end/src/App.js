@@ -93,6 +93,7 @@ function App() {
   const [viewMode, setViewMode] = useState('admin'); // 'admin' or 'employee'
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [employeeRole, setEmployeeRole] = useState(null); // Store the role of the logged-in employee
   const [isAdminDarkMode, setIsAdminDarkMode] = useState(() => {
     if (typeof window === 'undefined') return false;
     const savedTheme = window.localStorage.getItem('jofiane-admin-theme');
@@ -111,7 +112,29 @@ function App() {
   }, []);
 
   const handleLoginSuccess = (role, formData) => {
-    setViewMode(role);
+    if (role === 'admin') {
+      setViewMode('admin');
+      setEmployeeRole(null);
+    } else {
+      const employee = employees.find(
+        (emp) => emp.email.toLowerCase() === formData.username.toLowerCase()
+      );
+
+      if (!employee) {
+        alert('Employee account not found.');
+        return;
+      }
+
+      let department = 'frontdesk';
+
+      if (employee.role.toLowerCase().includes('housekeeping')) {
+        department = 'housekeeping';
+      }
+
+      setEmployeeRole(department);
+      setViewMode('employee');
+    }
+
     setIsLoggedIn(true);
   };
   
@@ -199,7 +222,7 @@ function App() {
         >
           ← Switch to Admin View
         </button>
-        <EmployeePortal />
+        <EmployeePortal employeeRole={employeeRole} />
       </div>
     );
   }
