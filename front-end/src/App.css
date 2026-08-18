@@ -207,6 +207,7 @@ textarea {
 }
 
 .sidebar-brand {
+  display: none !important;
   padding: 40px 12px 30px 12px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   margin-bottom: 32px;
@@ -2355,7 +2356,7 @@ tr:last-child td {
   align-items: flex-end;
   justify-content: space-between;
   gap: 22px;
-  padding-right: 172px;
+  
 }
 
 .employee-dashboard-header .eyebrow {
@@ -3308,18 +3309,13 @@ tr:last-child td {
 
 /* Sidebar alignment and contrast */
 .employee-portal-shell .sidebar-brand::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  background: linear-gradient(180deg, rgba(10, 6, 4, 0.30), rgba(10, 6, 4, 0.08));
-  border: 1px solid rgba(255, 255, 255, 0.045);
-  border-radius: 13px;
+  display: none !important;
 }
 
 .employee-portal-shell .sidebar-brand > * {
-  position: relative;
-  z-index: 1;
+  border: none ;
+  background: transparent ;
+  box-shadow: none;
 }
 
 .employee-portal-shell .sidebar-logo-mini {
@@ -3728,7 +3724,7 @@ tr:last-child td {
   align-items: flex-end;
   gap: 18px;
   margin-bottom: 24px !important;
-  padding: 0 172px 0 2px;
+  padding: 0 0px 0 2px;
 }
 
 .employee-portal-shell .employee-page-header .left::before,
@@ -4012,7 +4008,9 @@ tr:last-child td {
 
 /* Logbook: actions first, feed second */
 .employee-portal-shell .logbook-header {
-  padding-right: 172px;
+  padding-top: 0px;
+  padding-right: 0px;
+  align-items: flex-end !important;
 }
 
 .employee-portal-shell .logbook-actions {
@@ -4167,6 +4165,7 @@ tr:last-child td {
   .employee-portal-shell .logbook-header,
   .employee-dashboard-header {
     padding: 0;
+    
   }
 
   .employee-portal-shell .panel,
