@@ -347,12 +347,32 @@ function Sidebar({ isCollapsed, setIsCollapsed, activeTab, setActiveTab, isDarkM
                 </button>
                 {hasSubItems && (
                   <div className={`nav-submenu-container ${isExpanded && !isCollapsed ? 'expanded' : ''}`} aria-hidden={!isCollapsed && !isExpanded}>
-                    {item.subItems.map((sub) => (
-                      <button key={sub.id} className={`nav-link ${activeTab === sub.id ? 'active' : ''}`} onClick={() => setActiveTab(sub.id)} tabIndex={isCollapsed || isExpanded ? 0 : -1}>
-                        {activeTab === sub.id && <span className="active-dot" />}
-                        <span>{sub.label}</span>
-                      </button>
-                    ))}
+                    {item.subItems.map((sub) => {
+                      const isSubActive = activeTab === sub.id;
+                      return (
+                        <button
+                          key={sub.id}
+                          className={`nav-link ${isSubActive ? 'active' : ''}`}
+                          onClick={() => setActiveTab(sub.id)}
+                          tabIndex={isCollapsed || isExpanded ? 0 : -1}
+                          style={{
+                            position: 'relative',
+                            display: 'flex',
+                            alignItems: 'center',
+                            padding: '6px 12px',
+                            minHeight: 'auto',
+                            fontSize: '0.9em',
+                            background: 'transparent',
+                            boxShadow: 'none'
+                          }}
+                        >
+                          {isSubActive && <span className="active-dot" />}
+                          <span style={{ fontWeight: isSubActive ? '600' : 'normal' }}>
+                            {sub.label}
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
               </div>

@@ -267,16 +267,6 @@ function Sidebar({ employeeRole, isCollapsed, setIsCollapsed, activeTab, setActi
           gap: 4px;
         }
 
-        .active-dot {
-          position: absolute;
-          left: -14.5px; 
-          top: 50%;
-          transform: translateY(-50%);
-          width: 6px;
-          height: 6px;
-          background-color: var(--gold, #c5a059); 
-          border-radius: 50%;
-        }
 
         .sidebar-utilities {
           padding: 8px 12px;
@@ -566,6 +556,8 @@ function Sidebar({ employeeRole, isCollapsed, setIsCollapsed, activeTab, setActi
                           tabIndex={isCollapsed || isExpanded ? 0 : -1}
                           style={{
                             position: 'relative',
+                            display: 'flex',
+                            alignItems: 'center',
                             padding: '6px 12px',
                             minHeight: 'auto',
                             fontSize: '0.9em',
