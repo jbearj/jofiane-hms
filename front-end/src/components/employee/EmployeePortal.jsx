@@ -7,6 +7,8 @@ import InHouseGuests from './InHouseGuests';
 import Departures from './Departures';
 import FrontDeskLog from './FrontDeskLog'
 import HousekeepingStatus from '../admin/rooms/HousekeepingStatus';
+import CleaningTasks from './CleaningTasks';
+import Maintenance from './Maintenance';
 
 function EmployeePortal({employeeRole}) {
   const frontDeskTabs = [
@@ -20,7 +22,9 @@ function EmployeePortal({employeeRole}) {
 
   const housekeepingTabs = [
     'dashboard',
-    'housekeeping'
+    'housekeeping',
+    'cleaning-tasks',
+    'maintenance'
   ];
 
   const allowedTabs =
@@ -96,6 +100,20 @@ function EmployeePortal({employeeRole}) {
       return (
         <main className="main-content employee-content">
           <HousekeepingStatus />
+        </main>
+      );
+
+    case 'cleaning-tasks':
+      return (
+        <main className="main-content employee-content">
+          <CleaningTasks />
+        </main>
+      );
+
+    case 'maintenance':
+      return (
+        <main className="main-content employee-content">
+          <Maintenance />
         </main>
       );
 
