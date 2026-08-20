@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
 function Employees({ employees, openModal }) {
+  const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
   const [viewingEmployee, setViewingEmployee] = useState(null);
@@ -20,9 +21,14 @@ function Employees({ employees, openModal }) {
   const uniqueStatuses = ['All', 'Active', 'On Leave', 'Terminated'];
 
   const filteredEmployees = employees.filter(emp => {
+    const q = searchQuery.trim().toLowerCase();
+    const matchSearch = !q
+      || (emp.name || '').toLowerCase().includes(q)
+      || (emp.email || '').toLowerCase().includes(q)
+      || (emp.role || '').toLowerCase().includes(q);
     const matchRole = roleFilter === 'All' || emp.role === roleFilter;
     const matchStatus = statusFilter === 'All' || emp.status === statusFilter;
-    return matchRole && matchStatus;
+    return matchSearch && matchRole && matchStatus;
   });
 
   const activeCount = employees.filter(e => e.status === 'Active').length;
@@ -209,32 +215,40 @@ function Employees({ employees, openModal }) {
         <div className="panel animation-fade-in">
           <div className="panel-header" style={{ borderBottom: '1px solid var(--border-light)', paddingBottom: '20px', marginBottom: '20px' }}>
             <h3>Staff Roster</h3>
-            {}
-          </div>
 
-          <div style={{ display: 'flex', gap: '20px', marginBottom: '25px', background: 'var(--bg-main)', padding: '15px', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', flex: 1 }}>
-              <label style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.05em' }}>Filter by Position</label>
-              <select className="floor-dropdown" style={{ width: '100%' }} value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)}>
+            {/* SEARCH + FILTERS */}
+            <div className="panel-toolbar">
+              <div className="panel-search">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                <input
+                  type="text"
+                  placeholder="Search by name, email, or position..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+
+              <select className="floor-dropdown" value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)}>
                 {uniqueRoles.map(role => (
-                  <option key={role} value={role}>{role}</option>
+                  <option key={role} value={role}>{role === 'All' ? 'All Positions' : role}</option>
                 ))}
               </select>
-            </div>
-            
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', flex: 1 }}>
-              <label style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.05em' }}>Filter by Status</label>
-              <select className="floor-dropdown" style={{ width: '100%' }} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-                {uniqueStatuses.map(status => (
-                  <option key={status} value={status}>{status}</option>
-                ))}
-              </select>
-            </div>
 
-            <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-              <button className="ledger-btn" onClick={() => { setRoleFilter('All'); setStatusFilter('All'); }}>
-                CLEAR FILTERS
-              </button>
+              <select className="floor-dropdown" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                {uniqueStatuses.map(status => (
+                  <option key={status} value={status}>{status === 'All' ? 'All Status' : status}</option>
+                ))}
+              </select>
+
+              {(searchQuery || roleFilter !== 'All' || statusFilter !== 'All') && (
+                <button
+                  className="ledger-btn"
+                  style={{ padding: '8px 14px' }}
+                  onClick={() => { setSearchQuery(''); setRoleFilter('All'); setStatusFilter('All'); }}
+                >
+                  CLEAR
+                </button>
+              )}
             </div>
           </div>
 

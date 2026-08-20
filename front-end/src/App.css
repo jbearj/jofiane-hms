@@ -149,7 +149,7 @@ textarea {
 /* Menu Toggle Layout */
 .menu-toggle-container {
   display: flex;
-  justify-content: flex-end; /* Aligns to the right by default */
+  justify-content: flex-end; 
   margin-bottom: 20px;
 }
 .menu-toggle-btn {
@@ -172,7 +172,7 @@ textarea {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 24px; /* Keeps all icons centered and identical in size */
+  width: 24px; 
   flex-shrink: 0;
 }
 
@@ -460,6 +460,7 @@ textarea {
   padding: 24px 28px;
   box-shadow: var(--shadow-sm);
   transition: var(--transition);
+  overflow: hidden;
 }
 .panel:hover {
   box-shadow: var(--shadow-md);
@@ -958,9 +959,13 @@ tr:last-child td {
 .modal-overlay {
   display: none;
   position: fixed;
-  inset: 0;
-  background: rgba(26, 25, 23, 0.6);
-  backdrop-filter: blur(6px);
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
   z-index: 1000;
   align-items: center;
   justify-content: center;
@@ -969,17 +974,42 @@ tr:last-child td {
 .modal-overlay.open {
   display: flex;
 }
+
+
+.admin-portal-shell .modal-overlay {
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: auto;
+  height: auto;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+}
+.admin-portal-shell.nav-collapsed .modal-overlay {
+  left: 0;
+}
+@media (max-width: 900px) {
+  .admin-portal-shell .modal-overlay,
+  .admin-portal-shell.nav-collapsed .modal-overlay {
+    left: 0;
+  }
+}
 .modal-content {
   background: var(--bg-card);
-  border-radius: var(--radius-lg);
+  border-radius: 12px;
   padding: 36px 40px;
   width: 100%;
   max-width: 560px;
   max-height: 90vh;
   overflow-y: auto;
-  box-shadow: var(--shadow-xl);
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.12),
+    0 24px 48px rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--border-light);
   position: relative;
-  animation: modalSlide 0.3s ease;
+  animation: modalSlide 0.25s ease;
 }
 @keyframes modalSlide {
   0% {
@@ -1297,7 +1327,7 @@ tr:last-child td {
 .cal-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  background: var(--border-light); /* Acts as border lines between cells */
+  background: var(--border-light); 
   gap: 1px; 
 }
 .cal-cell {
@@ -1313,7 +1343,7 @@ tr:last-child td {
   background: #FAF9F7;
 }
 .cal-cell.today {
-  background: #FFFDF7; /* Slight gold tint for today */
+  background: #FFFDF7; 
 }
 .cal-cell.today .cal-date {
   background: var(--gold);
@@ -1389,19 +1419,17 @@ tr:last-child td {
 
 /* Right Adjustable Sidebar */
 .resizer-wrapper {
-  width: 380px;         /* Default Width */
-  min-width: 280px;     /* Smallest it can go */
-  max-width: 600px;     /* Largest it can go */
-  resize: horizontal;   /* Enables dragging to resize */
-  overflow: auto;       /* Required for CSS resize to work */
-  
-  /* MAGIC TRICK: This pushes the grab handle to the BOTTOM-LEFT corner so you pull it to the left to make it wider! */
+  width: 380px;         
+  min-width: 280px;     
+  max-width: 600px;    
+  resize: horizontal;   
+  overflow: auto;       
+
   direction: rtl;       
   background: var(--bg-body);
-  padding-left: 5px;    /* Space so the drag handle doesn't overlap scrollbars */
+  padding-left: 5px;   
 }
 
-/* Reset the direction inside the sidebar so text reads normally */
 .sidebar-content-reset {
   direction: ltr; 
   display: flex;
@@ -1415,7 +1443,7 @@ tr:last-child td {
   flex-direction: column;
 }
 .notes-panel {
-  min-height: 250px; /* Ensures the text box doesn't get squished */
+  min-height: 250px; 
 }
 
 /* ============================================================
@@ -1542,7 +1570,6 @@ tr:last-child td {
   margin-bottom: 4px;
 }
 
-/* Booking Bars (Truncated for narrow columns) */
 .cal-booking {
   font-size: 8px;
   font-weight: 700;
@@ -1558,11 +1585,9 @@ tr:last-child td {
   filter: brightness(0.95);
 }
 
-/* Notes Textarea */
 .notes-textarea {
   flex: 1;
   width: 100%;
-  min-height: 120px; /* Minimum guaranteed space */
   border: 1px solid var(--border-light);
   border-radius: var(--radius-sm);
   background: #FFFDF9; 
@@ -1571,7 +1596,7 @@ tr:last-child td {
   font-size: 13px;
   line-height: 1.6;
   color: var(--text-primary);
-  resize: none; /* We disable textarea resize since the panel resizes it */
+  resize: none; 
   outline: none;
   transition: var(--transition);
 }
@@ -2345,6 +2370,13 @@ tr:last-child td {
   -webkit-backdrop-filter: blur(7px);
 }
 
+/* Ensure admin overlay covers the full content area with visible dimming */
+.admin-portal-shell .modal-overlay {
+  background: rgba(0, 0, 0, 0.5) !important;
+  backdrop-filter: blur(4px) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
+  z-index: 9999 !important;
+}
 .portal-shell .modal-content {
   border-radius: 22px;
   box-shadow: 0 30px 80px rgba(22, 13, 9, 0.30);
@@ -2569,15 +2601,14 @@ tr:last-child td {
 }
 
 .employee-portal-shell .main-content {
-  transform: translate3d(0, 0, 0);
-  backface-visibility: hidden;
+  transform: none;
+  backface-visibility: visible;
   transition:
     margin-left 0.6s cubic-bezier(0.4, 0, 0.2, 1),
     background-color 0.38s ease,
     color 0.38s ease !important;
 }
 
-/* The 56px track never changes, so the button cannot jump while collapsing. */
 .employee-portal-shell .menu-toggle-container,
 .employee-portal-shell .sidebar.collapsed .menu-toggle-container {
   width: var(--sidebar-icon-column) !important;
@@ -2649,7 +2680,6 @@ tr:last-child td {
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 
-/* Keep the complete dark-mode switch inside the expanded utility row. */
 .employee-portal-shell .sidebar:not(.collapsed) .sidebar-utilities {
   width: 100%;
   padding-inline: 4px !important;
@@ -2736,7 +2766,6 @@ tr:last-child td {
   }
 }
 
-/* Final rail centering correction: override the legacy 24px collapsed wrapper. */
 .employee-portal-shell .sidebar.collapsed .nav-icon-wrapper {
   width: var(--sidebar-icon-column) !important;
   min-width: var(--sidebar-icon-column);
@@ -4737,8 +4766,8 @@ tr:last-child td {
 
 .employee-portal-shell .main-content {
   margin-left: 298px;
-  transform: translate3d(0, 0, 0);
-  backface-visibility: hidden;
+  transform: none;
+  backface-visibility: visible;
   transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.3s ease, color 0.3s ease !important;
 }
 
@@ -5329,9 +5358,12 @@ tr:last-child td {
     url('./assets/login-bg.jpg') center / cover fixed;
 }
 
+
 .admin-portal-shell .main-content {
+  overflow: visible !important;
   min-width: 0;
-  padding: 28px 32px 44px;
+  padding: 5px 32px 44px;
+  transform: none !important;
 }
 
 .admin-portal-shell .admin-tab-content {
@@ -5417,6 +5449,7 @@ tr:last-child td {
 .admin-portal-shell .table-wrap {
   max-width: 100%;
   overflow: auto;
+  border-radius: 0 !important;
 }
 
 .admin-portal-shell table {
@@ -5425,8 +5458,9 @@ tr:last-child td {
 
 .admin-portal-shell thead th {
   color: var(--text-secondary) !important;
-  background: rgba(77, 61, 50, 0.08) !important;
+  background: transparent !important;
   letter-spacing: 0.045em;
+  padding: 14px 12px !important;
 }
 
 .admin-portal-shell tbody td {
@@ -5572,4 +5606,288 @@ tr:last-child td {
   .admin-portal-shell .kpi-card {
     padding: 18px !important;
   }
+}
+
+/* ============================================================
+   TABLE CARD TOOLBAR
+   Search + filters that live INSIDE a panel header, beside the
+   panel title, instead of in a separate page-level filter bar.
+   ============================================================ */
+.panel-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  margin-left: auto;
+}
+
+/* Search box */
+.panel-toolbar .panel-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.panel-toolbar .panel-search svg {
+  position: absolute;
+  left: 11px;
+  pointer-events: none;
+}
+.panel-toolbar .panel-search input {
+  width: 258px;
+  padding: 8px 12px 8px 33px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  background: var(--bg-input);
+  font-family: 'Montserrat', sans-serif;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-primary);
+  outline: none;
+  transition: var(--transition);
+}
+.panel-toolbar .panel-search input::placeholder {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+.panel-toolbar .panel-search input:hover,
+.panel-toolbar .panel-search input:focus {
+  border-color: var(--gold);
+  background: #fff;
+}
+
+/* Dropdown filters sitting in the toolbar */
+.panel-toolbar .floor-dropdown {
+  padding: 8px 10px;
+  font-size: 12.5px;
+}
+
+/* Inline checkbox / toggle filters */
+.panel-toolbar .panel-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.panel-toolbar .panel-toggle input {
+  accent-color: var(--gold);
+  cursor: pointer;
+}
+
+/* Muted record counts / helper text kept next to the filters */
+.panel-toolbar .panel-toolbar-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* Divider between filter clusters */
+.panel-toolbar .panel-toolbar-sep {
+  width: 1px;
+  height: 22px;
+  background: var(--border-light);
+}
+
+/* Let the toolbar take a full row of its own once it gets crowded */
+@media (max-width: 1240px) {
+  .panel-header .panel-toolbar {
+    width: 100%;
+    justify-content: flex-start;
+  }
+  .panel-toolbar .panel-search {
+    flex: 1 1 220px;
+  }
+  .panel-toolbar .panel-search input {
+    width: 100%;
+  }
+}
+
+@media (max-width: 680px) {
+  .panel-toolbar {
+    gap: 8px;
+  }
+  .panel-toolbar .panel-search {
+    flex: 1 1 100%;
+  }
+  .panel-toolbar .floor-dropdown {
+    flex: 1 1 calc(50% - 4px);
+  }
+}
+
+/* ============================================================
+   ACCESSIBILITY UTILITIES
+   ============================================================ */
+/* Visible to screen readers, hidden visually */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ============================================================
+   TRANSACTION HISTORY TABLE
+   ============================================================ */
+.txn-table {
+  min-width: 960px;
+}
+
+/* Headers never wrap onto two lines */
+.txn-table thead th {
+  white-space: nowrap;
+}
+
+/* IDs, dates, room numbers and amounts stay on one line */
+.txn-table td:nth-child(1),
+.txn-table td:nth-child(2),
+.txn-table td:nth-child(4),
+.txn-table td:nth-child(7),
+.txn-table td:nth-child(8) {
+  white-space: nowrap;
+}
+
+/* Amount reads as a figure, not body copy */
+.txn-table td:nth-child(7) {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Description is the flexible column: allow wrapping, keep it readable */
+.txn-table td:nth-child(5) .std-text {
+  white-space: normal;
+  line-height: 1.45;
+}
+
+/* ---- Clickable rows (open modal on click) ---- */
+.txn-table .txn-row {
+  cursor: pointer;
+  outline: none;
+}
+.txn-table .txn-row:hover {
+  background: #FAF9F7;
+}
+
+/* Keep table content clipped inside the rounded panel */
+.txn-panel {
+  overflow: hidden;
+  padding: 0;
+  border-radius: 8px;
+}
+.txn-panel .panel-header {
+  padding: 22px 28px 18px;
+  margin-bottom: 0;
+}
+.txn-panel .table-wrap {
+  padding: 0;
+}
+.txn-panel .txn-table {
+  min-width: 960px;
+}
+.txn-panel .txn-table th {
+  padding-top: 12px;
+  padding-bottom: 12px;
+  background: transparent;
+  border-bottom: 1px solid var(--border-light);
+}
+.txn-panel .txn-table th:first-child {
+  padding-left: 28px;
+}
+.txn-panel .txn-table th:last-child {
+  padding-right: 28px;
+}
+.txn-panel .txn-table td:first-child {
+  padding-left: 28px;
+}
+.txn-panel .txn-table td:last-child {
+  padding-right: 28px;
+}
+
+/* ---- Transaction Detail Modal ---- */
+.txn-detail-modal {
+  max-width: 520px;
+  padding: 32px 36px 28px;
+  border-radius: 12px;
+}
+.txn-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.txn-modal-header h3 {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.txn-modal-amount {
+  font-size: 32px;
+  font-weight: 800;
+  margin-bottom: 24px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+.txn-modal-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px 28px;
+  margin-bottom: 28px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--border-light);
+}
+.txn-modal-grid .full-width {
+  grid-column: 1 / -1;
+}
+.txn-modal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.txn-modal-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+.txn-modal-value {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+.txn-modal-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.txn-modal-actions .ledger-btn {
+  gap: 7px;
+}
+
+@media (max-width: 560px) {
+  .txn-detail-modal {
+    padding: 24px 20px;
+  }
+  .txn-modal-grid {
+    grid-template-columns: 1fr;
+  }
+  .txn-modal-amount {
+    font-size: 26px;
+  }
+}
+
+
+
+.employee-portal-shell .main-content {
+  transform: none !important;
+  will-change: margin-left;
 }

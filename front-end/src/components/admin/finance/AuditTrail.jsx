@@ -188,64 +188,61 @@ function AuditTrail() {
         </div>
       </div>
 
-      {/* FILTERS BAR */}
-      <div className="panel" style={{ padding: '16px 24px', marginBottom: '22px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
-
-          {/* Search */}
-          <div style={{ position: 'relative', flex: '1', minWidth: '200px' }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }}><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-            <input
-              type="text"
-              placeholder="Search by action, description, or user..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              style={{ width: '100%', padding: '10px 12px 10px 38px', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)', background: 'var(--bg-input)', fontSize: '13px' }}
-            />
-          </div>
-
-          {/* Period */}
-          <select className="floor-dropdown" value={filterPeriod} onChange={(e) => setFilterPeriod(e.target.value)}>
-            <option value="today">Today</option>
-            <option value="week">This Week</option>
-            <option value="month">This Month</option>
-          </select>
-
-          {/* Category */}
-          <select className="floor-dropdown" value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
-            <option value="all">All Categories</option>
-            <option value="day-close">Day Close</option>
-            <option value="rate-change">Rate Changes</option>
-            <option value="refund">Refunds</option>
-            <option value="void">Voids</option>
-            <option value="no-show">No-Shows</option>
-            <option value="adjustment">Adjustments</option>
-          </select>
-
-          {/* Status */}
-          <select className="floor-dropdown" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
-            <option value="all">All Status</option>
-            <option value="balanced">Balanced</option>
-            <option value="variance">Variance</option>
-            <option value="approved">Approved</option>
-            <option value="completed">Completed</option>
-          </select>
-
-          {/* User */}
-          <select className="floor-dropdown" value={filterUser} onChange={(e) => setFilterUser(e.target.value)}>
-            <option value="all">All Users</option>
-            {uniqueUsers.map(user => (
-              <option key={user} value={user}>{user}</option>
-            ))}
-          </select>
-        </div>
-      </div>
-
       {/* AUDIT LOG TIMELINE */}
       <div className="panel" style={{ padding: '28px 32px', opacity: isRefreshing ? 0.5 : 1, transition: 'opacity 0.2s ease' }}>
         <div className="panel-header" style={{ marginBottom: '20px' }}>
           <h3>Activity Log</h3>
-          <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{filteredLogs.length} entries</span>
+
+          {/* SEARCH + FILTERS */}
+          <div className="panel-toolbar">
+            {/* Search */}
+            <div className="panel-search">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              <input
+                type="text"
+                placeholder="Search by action, description, or user..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+
+            {/* Period */}
+            <select className="floor-dropdown" value={filterPeriod} onChange={(e) => setFilterPeriod(e.target.value)}>
+              <option value="today">Today</option>
+              <option value="week">This Week</option>
+              <option value="month">This Month</option>
+            </select>
+
+            {/* Category */}
+            <select className="floor-dropdown" value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
+              <option value="all">All Categories</option>
+              <option value="day-close">Day Close</option>
+              <option value="rate-change">Rate Changes</option>
+              <option value="refund">Refunds</option>
+              <option value="void">Voids</option>
+              <option value="no-show">No-Shows</option>
+              <option value="adjustment">Adjustments</option>
+            </select>
+
+            {/* Status */}
+            <select className="floor-dropdown" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+              <option value="all">All Status</option>
+              <option value="balanced">Balanced</option>
+              <option value="variance">Variance</option>
+              <option value="approved">Approved</option>
+              <option value="completed">Completed</option>
+            </select>
+
+            {/* User */}
+            <select className="floor-dropdown" value={filterUser} onChange={(e) => setFilterUser(e.target.value)}>
+              <option value="all">All Users</option>
+              {uniqueUsers.map(user => (
+                <option key={user} value={user}>{user}</option>
+              ))}
+            </select>
+
+            <span className="panel-toolbar-meta">{filteredLogs.length} entries</span>
+          </div>
         </div>
 
         {filteredLogs.length === 0 ? (

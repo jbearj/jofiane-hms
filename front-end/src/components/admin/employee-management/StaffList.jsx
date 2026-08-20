@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import employee1 from '../../../assets/employee1.jpeg';
 
 function StaffList() {
@@ -179,32 +180,29 @@ function StaffList() {
         </div>
       </div>
 
-      {/* FILTERS */}
-      <div className="panel" style={{ padding: '16px 24px', marginBottom: '22px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
-          <div style={{ position: 'relative', flex: '1', minWidth: '200px' }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }}><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-            <input
-              type="text"
-              placeholder="Search by name, role, or email..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              style={{ width: '100%', padding: '10px 12px 10px 38px', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)', background: 'var(--bg-input)', fontSize: '13px' }}
-            />
-          </div>
-          <select className="floor-dropdown" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
-            <option value="all">All Status</option>
-            <option value="Active">Active</option>
-            <option value="On Leave">On Leave</option>
-            <option value="Terminated">Terminated</option>
-          </select>
-        </div>
-      </div>
-
       {/* EMPLOYEE TABLE */}
       <div className="panel">
         <div className="panel-header">
           <h3>Employees ({filteredEmployees.length})</h3>
+
+          {/* SEARCH + FILTERS */}
+          <div className="panel-toolbar">
+            <div className="panel-search">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              <input
+                type="text"
+                placeholder="Search by name, role, or email..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+            <select className="floor-dropdown" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+              <option value="all">All Status</option>
+              <option value="Active">Active</option>
+              <option value="On Leave">On Leave</option>
+              <option value="Terminated">Terminated</option>
+            </select>
+          </div>
         </div>
         <div className="table-wrap">
           <table>
@@ -251,7 +249,7 @@ function StaffList() {
       </div>
 
       {/* EMPLOYEE PROFILE MODAL */}
-      {selectedEmployee && (
+      {selectedEmployee && createPortal(
         <ProfileModal
           employee={selectedEmployee}
           getStatusTag={getStatusTag}
@@ -259,17 +257,19 @@ function StaffList() {
           onDelete={() => handleDelete(selectedEmployee)}
           onStatusChange={(status) => handleStatusChange(selectedEmployee.id, status)}
           onClose={() => setSelectedEmployee(null)}
-        />
+        />,
+        document.body
       )}
 
       {/* ADD/EDIT MODAL */}
-      {showAddEdit && (
+      {showAddEdit && createPortal(
         <EmployeeFormModal
           employee={editingEmployee}
           departments={departments}
           onClose={() => { setShowAddEdit(false); setEditingEmployee(null); }}
           onSave={handleSave}
-        />
+        />,
+        document.body
       )}
     </section>
   );
@@ -282,7 +282,7 @@ function ProfileModal({ employee, getStatusTag, onEdit, onDelete, onStatusChange
   const [showCredentials, setShowCredentials] = useState(false);
 
   return (
-    <div className="modal-overlay open" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="modal-overlay open">
       <div className="modal-content" style={{ maxWidth: '560px' }}>
         <button className="modal-close" onClick={onClose}>&times;</button>
 
@@ -400,7 +400,7 @@ function EmployeeFormModal({ employee, departments, onClose, onSave }) {
   };
 
   return (
-    <div className="modal-overlay open" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="modal-overlay open">
       <div className="modal-content" style={{ maxWidth: '560px' }}>
         <button className="modal-close" onClick={onClose}>&times;</button>
         <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '6px' }}>

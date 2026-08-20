@@ -122,10 +122,11 @@ function Rooms() {
         {/* LEFT PANEL: GRID OR TABLE */}
         <div className="panel">
           {}
-          <div className="panel-header" style={{ marginBottom: 15, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div className="panel-header" style={{ marginBottom: 15 }}>
             <h3>Room Inventory</h3>
-            
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+
+            {/* SEARCH + VIEW SWITCH */}
+            <div className="panel-toolbar">
               {}
               <div className="btn-group" style={{ display: 'flex', background: '#eee', borderRadius: 6, padding: 2 }}>
                 <button
@@ -143,13 +144,15 @@ function Rooms() {
               </div>
 
               {/* SEARCH INPUT */}
-              <input
-                type="text"
-                placeholder="🔍 Search unit..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                style={{ padding: '6px 10px', fontSize: 12, borderRadius: 4, border: '1px solid #ccc' }}
-              />
+              <div className="panel-search">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                <input
+                  type="text"
+                  placeholder="Search unit or type..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
             </div>
           </div>
 

@@ -148,38 +148,6 @@ function ShiftSchedules() {
         </div>
       </div>
 
-      {/* WEEK NAVIGATION + FILTERS */}
-      <div className="panel" style={{ padding: '16px 24px', marginBottom: '22px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '14px' }}>
-
-          {/* Week nav */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <button className="btn btn-xs" onClick={() => setWeekOffset(prev => prev - 1)}>← Prev</button>
-            <span style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)', minWidth: '180px', textAlign: 'center' }}>{weekLabel}</span>
-            <button className="btn btn-xs" onClick={() => setWeekOffset(prev => prev + 1)}>Next →</button>
-            {weekOffset !== 0 && (
-              <button className="btn btn-xs" style={{ color: 'var(--gold)' }} onClick={() => setWeekOffset(0)}>Today</button>
-            )}
-          </div>
-
-          {/* Department filter + Legend */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <select className="floor-dropdown" value={filterDept} onChange={(e) => setFilterDept(e.target.value)}>
-              <option value="all">All Departments</option>
-              {departments.map(d => <option key={d} value={d}>{d}</option>)}
-            </select>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              {SHIFT_TYPES.map(s => (
-                <span key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', color: s.textColor }}>
-                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: s.dot }}></span>
-                  {s.label}
-                </span>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* COVERAGE ALERTS */}
       {(() => {
         const alerts = [];
@@ -208,6 +176,36 @@ function ShiftSchedules() {
 
       {/* SCHEDULE GRID */}
       <div className="panel" style={{ padding: '0', overflow: 'hidden' }}>
+
+        <div className="panel-header" style={{ padding: '16px 24px', margin: 0, borderBottom: '1px solid var(--border-light)' }}>
+          {/* Title + week nav */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+            <h3>Weekly Schedule</h3>
+            <button className="btn btn-xs" onClick={() => setWeekOffset(prev => prev - 1)}>← Prev</button>
+            <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)', minWidth: '170px', textAlign: 'center' }}>{weekLabel}</span>
+            <button className="btn btn-xs" onClick={() => setWeekOffset(prev => prev + 1)}>Next →</button>
+            {weekOffset !== 0 && (
+              <button className="btn btn-xs" style={{ color: 'var(--gold)' }} onClick={() => setWeekOffset(0)}>Today</button>
+            )}
+          </div>
+
+          {/* FILTERS + LEGEND */}
+          <div className="panel-toolbar">
+            <select className="floor-dropdown" value={filterDept} onChange={(e) => setFilterDept(e.target.value)}>
+              <option value="all">All Departments</option>
+              {departments.map(d => <option key={d} value={d}>{d}</option>)}
+            </select>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              {SHIFT_TYPES.map(s => (
+                <span key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', color: s.textColor }}>
+                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: s.dot }}></span>
+                  {s.label}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+
         <div style={{ overflowX: 'auto', width: '100%' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
             <thead>

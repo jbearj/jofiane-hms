@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 
 function Maintenance() {
   const [isLoading, setIsLoading] = useState(true);
@@ -225,45 +226,42 @@ function Maintenance() {
         </div>
       </div>
 
-      {/* FILTERS */}
-      <div className="panel" style={{ padding: '16px 24px', marginBottom: '22px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
-          <div style={{ position: 'relative', flex: '1', minWidth: '180px' }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }}><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-            <input
-              type="text"
-              placeholder="Search by ID, room, or issue..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              style={{ width: '100%', padding: '10px 12px 10px 38px', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)', background: 'var(--bg-input)', fontSize: '13px' }}
-            />
-          </div>
-          <select className="floor-dropdown" value={filterPriority} onChange={(e) => setFilterPriority(e.target.value)}>
-            <option value="all">All Priorities</option>
-            <option value="critical">Critical</option>
-            <option value="high">High</option>
-            <option value="medium">Medium</option>
-            <option value="low">Low</option>
-          </select>
-          <select className="floor-dropdown" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
-            <option value="all">All Status</option>
-            <option value="open">Open</option>
-            <option value="in-progress">In Progress</option>
-            <option value="completed">Completed</option>
-            <option value="deferred">Deferred</option>
-          </select>
-          <select className="floor-dropdown" value={filterTech} onChange={(e) => setFilterTech(e.target.value)}>
-            <option value="all">All Technicians</option>
-            {technicians.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
-            <option value="">Unassigned</option>
-          </select>
-        </div>
-      </div>
-
       {/* WORK ORDER TABLE */}
       <div className="panel">
         <div className="panel-header">
           <h3>Work Orders ({filteredOrders.length})</h3>
+
+          {/* SEARCH + FILTERS */}
+          <div className="panel-toolbar">
+            <div className="panel-search">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              <input
+                type="text"
+                placeholder="Search by ID, room, or issue..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+            <select className="floor-dropdown" value={filterPriority} onChange={(e) => setFilterPriority(e.target.value)}>
+              <option value="all">All Priorities</option>
+              <option value="critical">Critical</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+            <select className="floor-dropdown" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+              <option value="all">All Status</option>
+              <option value="open">Open</option>
+              <option value="in-progress">In Progress</option>
+              <option value="completed">Completed</option>
+              <option value="deferred">Deferred</option>
+            </select>
+            <select className="floor-dropdown" value={filterTech} onChange={(e) => setFilterTech(e.target.value)}>
+              <option value="all">All Technicians</option>
+              {technicians.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
+              <option value="">Unassigned</option>
+            </select>
+          </div>
         </div>
         <div className="table-wrap">
           <table>
@@ -319,7 +317,7 @@ function Maintenance() {
       </div>
 
       {/* WORK ORDER DETAIL / ACTION POPUP */}
-      {selectedOrder && (
+      {selectedOrder && createPortal(
         <OrderDetailModal
           order={selectedOrder}
           technicians={technicians}
@@ -334,16 +332,19 @@ function Maintenance() {
             setSelectedOrder({ ...selectedOrder, assignedTo: tech });
           }}
           onClose={() => setSelectedOrder(null)}
-        />
+        />,
+        document.body
       )}
+
       {/* NEW WORK ORDER MODAL */}
-      {showModal && (
+      {showModal && createPortal(
         <WorkOrderModal
           order={editingOrder}
           technicians={technicians}
           onClose={() => { setShowModal(false); setEditingOrder(null); }}
           onSave={handleSaveOrder}
-        />
+        />,
+        document.body
       )}
     </section>
   );
@@ -356,7 +357,7 @@ function OrderDetailModal({ order, technicians, getPriorityColor, getStatusLabel
   const pColor = getPriorityColor(order.priority);
 
   return (
-    <div className="modal-overlay open" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="modal-overlay open">
       <div className="modal-content" style={{ maxWidth: '540px' }}>
         <button className="modal-close" onClick={onClose}>&times;</button>
 
@@ -473,7 +474,7 @@ function WorkOrderModal({ order, technicians, onClose, onSave }) {
   };
 
   return (
-    <div className="modal-overlay open" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="modal-overlay open">
       <div className="modal-content" style={{ maxWidth: '500px' }}>
         <button className="modal-close" onClick={onClose}>&times;</button>
         <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '6px' }}>

@@ -7,13 +7,14 @@ function HousekeepingStatus() {
   const [staff, setStaff] = useState([]);
 
   // Filters
+  const [searchQuery, setSearchQuery] = useState('');
   const [filterFloor, setFilterFloor] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterStaff, setFilterStaff] = useState('all');
   const [showPriorityOnly, setShowPriorityOnly] = useState(false);
 
   useEffect(() => { fetchData(); }, []);
-  useEffect(() => { applyFilters(); }, [rooms, filterFloor, filterStatus, filterStaff, showPriorityOnly]);
+  useEffect(() => { applyFilters(); }, [rooms, searchQuery, filterFloor, filterStatus, filterStaff, showPriorityOnly]);
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -58,6 +59,14 @@ function HousekeepingStatus() {
 
   const applyFilters = () => {
     let result = [...rooms];
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(r =>
+        r.number.toLowerCase().includes(q) ||
+        r.type.toLowerCase().includes(q) ||
+        (r.assignedTo || '').toLowerCase().includes(q)
+      );
+    }
     if (filterFloor !== 'all') result = result.filter(r => r.floor === parseInt(filterFloor));
     if (filterStatus !== 'all') result = result.filter(r => r.cleanStatus === filterStatus);
     if (filterStaff !== 'all') result = result.filter(r => r.assignedTo === filterStaff);
@@ -130,15 +139,6 @@ function HousekeepingStatus() {
           <h2 style={{ fontSize: '28px', fontWeight: '700' }}>Housekeeping Status</h2>
           <p>Real-time cleanliness tracking</p>
         </div>
-        <div className="right">
-          <button
-            className={`btn btn-sm ${showPriorityOnly ? 'btn-gold' : ''}`}
-            onClick={() => setShowPriorityOnly(!showPriorityOnly)}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
-            Priority ({priorityCount})
-          </button>
-        </div>
       </div>
 
       {/* DAILY PROGRESS TRACKER */}
@@ -190,19 +190,40 @@ function HousekeepingStatus() {
         </div>
       </div>
 
-      {/* FILTERS */}
-      <div style={{ display: 'flex', gap: '12px', marginBottom: '22px', flexWrap: 'wrap' }}>
-        <select className="floor-dropdown" value={filterFloor} onChange={(e) => setFilterFloor(e.target.value)}>
-          <option value="all">All Floors</option>
-          {floors.map(f => <option key={f} value={f}>Floor {f}</option>)}
-        </select>
-        <select className="floor-dropdown" value={filterStaff} onChange={(e) => setFilterStaff(e.target.value)}>
-          <option value="all">All Staff</option>
-          {staff.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
-        </select>
+      {/* ROOM GRID */}
+      <div className="panel-header">
+        <h3>Room Status ({filteredRooms.length})</h3>
+
+        {/* SEARCH + FILTERS */}
+        <div className="panel-toolbar">
+          <div className="panel-search">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <input
+              type="text"
+              placeholder="Search room, type, or staff..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+          <select className="floor-dropdown" value={filterFloor} onChange={(e) => setFilterFloor(e.target.value)}>
+            <option value="all">All Floors</option>
+            {floors.map(f => <option key={f} value={f}>Floor {f}</option>)}
+          </select>
+          <select className="floor-dropdown" value={filterStaff} onChange={(e) => setFilterStaff(e.target.value)}>
+            <option value="all">All Staff</option>
+            {staff.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+          </select>
+          <label className="panel-toggle">
+            <input
+              type="checkbox"
+              checked={showPriorityOnly}
+              onChange={() => setShowPriorityOnly(!showPriorityOnly)}
+            />
+            Priority only ({priorityCount})
+          </label>
+        </div>
       </div>
 
-      {/* ROOM GRID */}
       {filteredRooms.length === 0 ? (
         <div className="panel" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
           No rooms match the current filters.

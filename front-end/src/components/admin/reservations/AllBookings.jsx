@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 
 function AllBookings() {
   const [isLoading, setIsLoading] = useState(true);
@@ -117,43 +118,43 @@ function AllBookings() {
         </div>
       </div>
 
-      {/* FILTERS */}
-      <div className="panel" style={{ padding: '16px 24px', marginBottom: '22px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
-          <div style={{ position: 'relative', flex: '1', minWidth: '180px' }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }}><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-            <input type="text" placeholder="Search by guest or booking ID..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={{ width: '100%', padding: '10px 12px 10px 38px', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)', background: 'var(--bg-input)', fontSize: '13px' }} />
-          </div>
-          <select className="floor-dropdown" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
-            <option value="all">All Status</option>
-            <option value="confirmed">Confirmed</option>
-            <option value="checked-in">Checked In</option>
-            <option value="checked-out">Checked Out</option>
-            <option value="no-show">No-Show</option>
-            <option value="cancelled">Cancelled</option>
-          </select>
-          <select className="floor-dropdown" value={filterSource} onChange={(e) => setFilterSource(e.target.value)}>
-            <option value="all">All Sources</option>
-            <option value="Direct">Direct</option>
-            <option value="Walk-in">Walk-in</option>
-            <option value="Booking.com">Booking.com</option>
-            <option value="Expedia">Expedia</option>
-            <option value="Agoda">Agoda</option>
-          </select>
-          <select className="floor-dropdown" value={filterRoomType} onChange={(e) => setFilterRoomType(e.target.value)}>
-            <option value="all">All Room Types</option>
-            <option value="Standard">Standard</option>
-            <option value="Deluxe">Deluxe</option>
-            <option value="Premium">Premium</option>
-            <option value="Suite">Suite</option>
-            <option value="Presidential">Presidential</option>
-          </select>
-        </div>
-      </div>
-
       {/* TABLE */}
       <div className="panel">
-        <div className="panel-header"><h3>Reservations ({filteredBookings.length})</h3></div>
+        <div className="panel-header">
+          <h3>Reservations ({filteredBookings.length})</h3>
+
+          {/* SEARCH + FILTERS */}
+          <div className="panel-toolbar">
+            <div className="panel-search">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              <input type="text" placeholder="Search by guest or booking ID..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+            </div>
+            <select className="floor-dropdown" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+              <option value="all">All Status</option>
+              <option value="confirmed">Confirmed</option>
+              <option value="checked-in">Checked In</option>
+              <option value="checked-out">Checked Out</option>
+              <option value="no-show">No-Show</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+            <select className="floor-dropdown" value={filterSource} onChange={(e) => setFilterSource(e.target.value)}>
+              <option value="all">All Sources</option>
+              <option value="Direct">Direct</option>
+              <option value="Walk-in">Walk-in</option>
+              <option value="Booking.com">Booking.com</option>
+              <option value="Expedia">Expedia</option>
+              <option value="Agoda">Agoda</option>
+            </select>
+            <select className="floor-dropdown" value={filterRoomType} onChange={(e) => setFilterRoomType(e.target.value)}>
+              <option value="all">All Room Types</option>
+              <option value="Standard">Standard</option>
+              <option value="Deluxe">Deluxe</option>
+              <option value="Premium">Premium</option>
+              <option value="Suite">Suite</option>
+              <option value="Presidential">Presidential</option>
+            </select>
+          </div>
+        </div>
         <div className="table-wrap">
           <table>
             <thead>
@@ -193,13 +194,15 @@ function AllBookings() {
       </div>
 
       {/* BOOKING DETAIL MODAL */}
-      {selectedBooking && (
-        <BookingDetailModal booking={selectedBooking} getStatusTag={getStatusTag} formatDate={formatDate} onClose={() => setSelectedBooking(null)} />
+      {selectedBooking && createPortal(
+        <BookingDetailModal booking={selectedBooking} getStatusTag={getStatusTag} formatDate={formatDate} onClose={() => setSelectedBooking(null)} />,
+        document.body
       )}
 
       {/* CREATE BOOKING MODAL */}
-      {showCreateModal && (
-        <CreateBookingModal onClose={() => setShowCreateModal(false)} onSave={handleCreateBooking} />
+      {showCreateModal && createPortal(
+        <CreateBookingModal onClose={() => setShowCreateModal(false)} onSave={handleCreateBooking} />,
+        document.body
       )}
     </section>
   );
@@ -208,7 +211,7 @@ function AllBookings() {
 /* BOOKING DETAIL MODAL */
 function BookingDetailModal({ booking, getStatusTag, formatDate, onClose }) {
   return (
-    <div className="modal-overlay open" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="modal-overlay open">
       <div className="modal-content" style={{ maxWidth: '520px' }}>
         <button className="modal-close" onClick={onClose}>&times;</button>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
@@ -271,7 +274,7 @@ function CreateBookingModal({ onClose, onSave }) {
   };
 
   return (
-    <div className="modal-overlay open" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="modal-overlay open">
       <div className="modal-content" style={{ maxWidth: '620px', maxHeight: '90vh', overflowY: 'auto' }}>
         <button className="modal-close" onClick={onClose}>&times;</button>
         <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '4px' }}>New Booking</h3>

@@ -91,28 +91,28 @@ function Cancellations() {
         </div>
       </div>
 
-      {/* FILTERS */}
-      <div className="panel" style={{ padding: '16px 24px', marginBottom: '22px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
-          <div style={{ position: 'relative', flex: '1', minWidth: '180px' }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }}><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-            <input type="text" placeholder="Search by guest or booking ID..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={{ width: '100%', padding: '10px 12px 10px 38px', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)', background: 'var(--bg-input)', fontSize: '13px' }} />
-          </div>
-          <select className="floor-dropdown" value={filterReason} onChange={(e) => setFilterReason(e.target.value)}>
-            <option value="all">All Reasons</option>
-            {reasons.map(r => <option key={r} value={r}>{r}</option>)}
-          </select>
-          <select className="floor-dropdown" value={filterPenalty} onChange={(e) => setFilterPenalty(e.target.value)}>
-            <option value="all">All Penalties</option>
-            <option value="applied">Penalty Applied</option>
-            <option value="waived">No Penalty</option>
-          </select>
-        </div>
-      </div>
-
       {/* TABLE */}
       <div className="panel">
-        <div className="panel-header"><h3>Cancelled Bookings ({filteredList.length})</h3></div>
+        <div className="panel-header">
+          <h3>Cancelled Bookings ({filteredList.length})</h3>
+
+          {/* SEARCH + FILTERS */}
+          <div className="panel-toolbar">
+            <div className="panel-search">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              <input type="text" placeholder="Search by guest or booking ID..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+            </div>
+            <select className="floor-dropdown" value={filterReason} onChange={(e) => setFilterReason(e.target.value)}>
+              <option value="all">All Reasons</option>
+              {reasons.map(r => <option key={r} value={r}>{r}</option>)}
+            </select>
+            <select className="floor-dropdown" value={filterPenalty} onChange={(e) => setFilterPenalty(e.target.value)}>
+              <option value="all">All Penalties</option>
+              <option value="applied">Penalty Applied</option>
+              <option value="waived">No Penalty</option>
+            </select>
+          </div>
+        </div>
         <div className="table-wrap">
           <table>
             <thead>

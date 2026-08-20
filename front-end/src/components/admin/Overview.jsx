@@ -109,18 +109,15 @@ function Overview() {
   return (
     <section className="admin-tab-content active">
       
-      {/* PAGE HEADER */}
-      <div style={{ marginBottom: '32px' }}>
-        <h2 style={{ fontSize: '28px', fontWeight: '700', color: 'var(--text-primary)', margin: '0 0 6px 0' }}>Executive Dashboard</h2>
-        <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>{today}</p>
-      </div>
-
-      {/* DATE FILTER BAR */}
-      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)', padding: '14px 24px', marginBottom: '22px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: 'var(--shadow-sm)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Period:</span>
-          <select 
-            className="floor-dropdown" 
+      {/* PAGE HEADER + PERIOD FILTER */}
+      <div className="page-header">
+        <div className="left">
+          <h2 style={{ fontSize: '28px', fontWeight: '700' }}>Executive Dashboard</h2>
+          <p>{today}</p>
+        </div>
+        <div className="right">
+          <select
+            className="floor-dropdown"
             style={{ minWidth: '140px' }}
             value={period}
             onChange={(e) => setPeriod(e.target.value)}
@@ -130,11 +127,11 @@ function Overview() {
             <option value="month">This Month</option>
             <option value="quarter">This Quarter</option>
           </select>
+          <button className="btn btn-sm btn-outline-gold" onClick={() => fetchDashboardData(period)}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+            Refresh
+          </button>
         </div>
-        <button className="btn btn-sm btn-outline-gold" onClick={() => fetchDashboardData(period)}>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
-          Refresh
-        </button>
       </div>
 
       {/* KPI ROW — 4 Cards */}

@@ -222,47 +222,44 @@ function RoomInventory() {
         </div>
       </div>
 
-      {/* FILTERS */}
-      <div className="panel" style={{ padding: '16px 24px', marginBottom: '22px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
-          {/* Search */}
-          <div style={{ position: 'relative', flex: '1', minWidth: '180px' }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }}><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-            <input
-              type="text"
-              placeholder="Search room number or type..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              style={{ width: '100%', padding: '10px 12px 10px 38px', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)', background: 'var(--bg-input)', fontSize: '13px' }}
-            />
-          </div>
-
-          {/* Floor */}
-          <select className="floor-dropdown" value={filterFloor} onChange={(e) => setFilterFloor(e.target.value)}>
-            <option value="all">All Floors</option>
-            {floors.map(f => <option key={f} value={f}>Floor {f}</option>)}
-          </select>
-
-          {/* Type */}
-          <select className="floor-dropdown" value={filterType} onChange={(e) => setFilterType(e.target.value)}>
-            <option value="all">All Types</option>
-            {roomTypes.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
-          </select>
-
-          {/* Status */}
-          <select className="floor-dropdown" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
-            <option value="all">All Status</option>
-            <option value="occupied">Occupied</option>
-            <option value="vacant">Vacant</option>
-            <option value="out-of-order">Out of Order</option>
-          </select>
-        </div>
-      </div>
-
       {/* ROOM TABLE */}
       <div className="panel">
         <div className="panel-header">
           <h3>Rooms ({filteredRooms.length})</h3>
+
+          {/* SEARCH + FILTERS */}
+          <div className="panel-toolbar">
+            {/* Search */}
+            <div className="panel-search">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              <input
+                type="text"
+                placeholder="Search room number or type..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+
+            {/* Floor */}
+            <select className="floor-dropdown" value={filterFloor} onChange={(e) => setFilterFloor(e.target.value)}>
+              <option value="all">All Floors</option>
+              {floors.map(f => <option key={f} value={f}>Floor {f}</option>)}
+            </select>
+
+            {/* Type */}
+            <select className="floor-dropdown" value={filterType} onChange={(e) => setFilterType(e.target.value)}>
+              <option value="all">All Types</option>
+              {roomTypes.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
+            </select>
+
+            {/* Status */}
+            <select className="floor-dropdown" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+              <option value="all">All Status</option>
+              <option value="occupied">Occupied</option>
+              <option value="vacant">Vacant</option>
+              <option value="out-of-order">Out of Order</option>
+            </select>
+          </div>
         </div>
         <div className="table-wrap">
           <table>

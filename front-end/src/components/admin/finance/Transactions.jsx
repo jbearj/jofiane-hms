@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 
 function Transactions() {
   const [isLoading, setIsLoading] = useState(true);
@@ -12,6 +13,9 @@ function Transactions() {
   const [filterMethod, setFilterMethod] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterType, setFilterType] = useState('all');
+
+  // Transaction detail modal (replaces inline row actions)
+  const [viewingTxn, setViewingTxn] = useState(null);
 
   // Modals
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -145,6 +149,18 @@ function Transactions() {
     ));
   };
 
+  const toggleRow = (txnId) => {
+    const txn = filteredTransactions.find(t => t.id === txnId);
+    setViewingTxn(txn || null);
+  };
+
+  // Escape key closes the detail modal
+  const handleRowKeyDown = (e) => {
+    if (e.key === 'Escape' && viewingTxn) {
+      setViewingTxn(null);
+    }
+  };
+
   const formatDate = (dateStr) => {
     const d = new Date(dateStr);
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -231,88 +247,97 @@ function Transactions() {
         </div>
       </div>
 
-      {/* FILTERS BAR */}
-      <div className="panel" style={{ padding: '16px 24px', marginBottom: '22px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
-
-          {/* Search */}
-          <div style={{ position: 'relative', flex: '1', minWidth: '200px' }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }}><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-            <input
-              type="text"
-              placeholder="Search by guest, room, or TXN ID..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              style={{ width: '100%', padding: '10px 12px 10px 38px', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)', background: 'var(--bg-input)', fontSize: '13px' }}
-            />
-          </div>
-
-          {/* Period */}
-          <select className="floor-dropdown" value={filterPeriod} onChange={(e) => setFilterPeriod(e.target.value)}>
-            <option value="today">Today</option>
-            <option value="week">This Week</option>
-            <option value="month">This Month</option>
-            <option value="year">This Year</option>
-          </select>
-
-          {/* Method */}
-          <select className="floor-dropdown" value={filterMethod} onChange={(e) => setFilterMethod(e.target.value)}>
-            <option value="all">All Methods</option>
-            <option value="cash">Cash</option>
-            <option value="credit-card">Credit Card</option>
-            <option value="bank-transfer">Bank Transfer</option>
-            <option value="room-charge">Room Charge</option>
-          </select>
-
-          {/* Status */}
-          <select className="floor-dropdown" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
-            <option value="all">All Status</option>
-            <option value="completed">Completed</option>
-            <option value="pending">Pending</option>
-            <option value="voided">Voided</option>
-          </select>
-
-          {/* Type */}
-          <select className="floor-dropdown" value={filterType} onChange={(e) => setFilterType(e.target.value)}>
-            <option value="all">All Types</option>
-            <option value="charge">Charge</option>
-            <option value="refund">Refund</option>
-            <option value="void">Void</option>
-          </select>
-        </div>
-      </div>
-
       {/* TRANSACTIONS TABLE */}
-      <div className="panel">
+      <div className="panel txn-panel">
         <div className="panel-header">
-          <h3>Transaction History</h3>
-          <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{filteredTransactions.length} records</span>
+          <h3>Transaction History ({filteredTransactions.length})</h3>
+
+          {/* SEARCH + FILTERS */}
+          <div className="panel-toolbar">
+            {/* Search */}
+            <div className="panel-search">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              <input
+                type="text"
+                placeholder="Search guest, room, or TXN ID"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+
+            {/* Period */}
+            <select className="floor-dropdown" value={filterPeriod} onChange={(e) => setFilterPeriod(e.target.value)}>
+              <option value="today">Today</option>
+              <option value="week">This Week</option>
+              <option value="month">This Month</option>
+              <option value="year">This Year</option>
+            </select>
+
+            {/* Method */}
+            <select className="floor-dropdown" value={filterMethod} onChange={(e) => setFilterMethod(e.target.value)}>
+              <option value="all">All Methods</option>
+              <option value="cash">Cash</option>
+              <option value="credit-card">Credit Card</option>
+              <option value="bank-transfer">Bank Transfer</option>
+              <option value="room-charge">Room Charge</option>
+            </select>
+
+            {/* Status */}
+            <select className="floor-dropdown" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+              <option value="all">All Status</option>
+              <option value="completed">Completed</option>
+              <option value="pending">Pending</option>
+              <option value="voided">Voided</option>
+            </select>
+
+            {/* Type */}
+            <select className="floor-dropdown" value={filterType} onChange={(e) => setFilterType(e.target.value)}>
+              <option value="all">All Types</option>
+              <option value="charge">Charge</option>
+              <option value="refund">Refund</option>
+              <option value="void">Void</option>
+            </select>
+          </div>
         </div>
         <div className="table-wrap">
-          <table>
+          <table className="txn-table">
+            <colgroup>
+              <col style={{ width: '104px' }} />
+              <col style={{ width: '112px' }} />
+              <col style={{ width: '152px' }} />
+              <col style={{ width: '68px' }} />
+              <col />
+              <col style={{ width: '140px' }} />
+              <col style={{ width: '104px' }} />
+              <col style={{ width: '112px' }} />
+            </colgroup>
             <thead>
               <tr>
                 <th>TXN ID</th>
                 <th>Date</th>
                 <th>Guest</th>
-                <th>Room</th>
+                <th style={{ textAlign: 'center' }}>Room</th>
                 <th>Description</th>
                 <th>Method</th>
                 <th style={{ textAlign: 'right' }}>Amount</th>
                 <th>Status</th>
-                <th style={{ textAlign: 'center' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {filteredTransactions.length === 0 ? (
                 <tr>
-                  <td colSpan="9" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+                  <td colSpan="8" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
                     No transactions found matching your filters.
                   </td>
                 </tr>
               ) : (
                 filteredTransactions.map((txn) => (
-                  <tr key={txn.id} className="table-row-hover">
+                  <tr
+                    key={txn.id}
+                    className="table-row-hover txn-row"
+                    onClick={() => setViewingTxn(txn)}
+                    style={{ cursor: 'pointer' }}
+                  >
                     <td>
                       <span className="guest-name">{txn.id}</span>
                     </td>
@@ -323,7 +348,7 @@ function Transactions() {
                     <td>
                       <span className="guest-name">{txn.guest}</span>
                     </td>
-                    <td>
+                    <td style={{ textAlign: 'center' }}>
                       <span className="std-text">{txn.room}</span>
                     </td>
                     <td>
@@ -339,26 +364,6 @@ function Transactions() {
                       </span>
                     </td>
                     <td>{getStatusTag(txn.status)}</td>
-                    <td style={{ textAlign: 'center' }}>
-                      <div className="action-links" style={{ justifyContent: 'center' }}>
-                        {txn.status === 'completed' && txn.type === 'charge' && (
-                          <button
-                            className="action-link link-edit"
-                            onClick={() => { setSelectedTransaction(txn); setShowRefundModal(true); }}
-                          >
-                            Refund
-                          </button>
-                        )}
-                        {txn.status !== 'voided' && (
-                          <button
-                            className="action-link link-delete"
-                            onClick={() => handleVoid(txn)}
-                          >
-                            Void
-                          </button>
-                        )}
-                      </div>
-                    </td>
                   </tr>
                 ))
               )}
@@ -368,20 +373,37 @@ function Transactions() {
       </div>
 
       {/* RECORD PAYMENT MODAL */}
-      {showPaymentModal && (
+      {showPaymentModal && createPortal(
         <RecordPaymentModal
           onClose={() => setShowPaymentModal(false)}
           onSave={handleRecordPayment}
-        />
+        />,
+        document.body
       )}
 
       {/* REFUND MODAL */}
-      {showRefundModal && selectedTransaction && (
+      {showRefundModal && selectedTransaction && createPortal(
         <RefundModal
           transaction={selectedTransaction}
           onClose={() => { setShowRefundModal(false); setSelectedTransaction(null); }}
           onRefund={handleRefund}
-        />
+        />,
+        document.body
+      )}
+
+      {/* TRANSACTION DETAIL MODAL */}
+      {viewingTxn && createPortal(
+        <TransactionDetailModal
+          transaction={viewingTxn}
+          onClose={() => setViewingTxn(null)}
+          onRefund={(txn) => { setViewingTxn(null); setSelectedTransaction(txn); setShowRefundModal(true); }}
+          onVoid={(txn) => { setViewingTxn(null); handleVoid(txn); }}
+          formatDate={formatDate}
+          formatTime={formatTime}
+          formatAmount={formatAmount}
+          getStatusTag={getStatusTag}
+        />,
+        document.body
       )}
     </section>
   );
@@ -410,7 +432,7 @@ function RecordPaymentModal({ onClose, onSave }) {
   };
 
   return (
-    <div className="modal-overlay open" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="modal-overlay open">
       <div className="modal-content" style={{ maxWidth: '500px' }}>
         <button className="modal-close" onClick={onClose}>&times;</button>
         <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '6px' }}>Record Payment</h3>
@@ -489,7 +511,7 @@ function RefundModal({ transaction, onClose, onRefund }) {
   };
 
   return (
-    <div className="modal-overlay open" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="modal-overlay open">
       <div className="modal-content" style={{ maxWidth: '460px' }}>
         <button className="modal-close" onClick={onClose}>&times;</button>
         <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '6px' }}>Issue Refund</h3>
@@ -528,3 +550,88 @@ function RefundModal({ transaction, onClose, onRefund }) {
 }
 
 export default Transactions;
+
+/* ============================================================
+   TRANSACTION DETAIL MODAL
+   Shows full info + Refund / Void actions when a row is clicked
+   ============================================================ */
+function TransactionDetailModal({ transaction: txn, onClose, onRefund, onVoid, formatDate, formatTime, formatAmount, getStatusTag }) {
+  const canRefund = txn.status === 'completed' && txn.type === 'charge';
+  const canVoid = txn.status !== 'voided';
+
+  return (
+    <div className="modal-overlay open">
+      <div className="modal-content txn-detail-modal">
+        <button className="modal-close" onClick={onClose}>&times;</button>
+
+        {/* Title */}
+        <div className="txn-modal-header">
+          <h3>Transaction Details</h3>
+          {getStatusTag(txn.status)}
+        </div>
+
+        {/* Amount hero */}
+        <div className="txn-modal-amount" style={{ color: txn.amount < 0 ? 'var(--status-occ)' : 'var(--text-primary)' }}>
+          {txn.amount < 0 ? '−' : ''}₱{Math.abs(txn.amount).toLocaleString()}
+        </div>
+
+        {/* Fact grid */}
+        <div className="txn-modal-grid">
+          <div className="txn-modal-field">
+            <span className="txn-modal-label">Reference</span>
+            <span className="txn-modal-value">{txn.id}</span>
+          </div>
+          <div className="txn-modal-field">
+            <span className="txn-modal-label">Date & Time</span>
+            <span className="txn-modal-value">{formatDate(txn.date)} · {formatTime(txn.date)}</span>
+          </div>
+          <div className="txn-modal-field">
+            <span className="txn-modal-label">Guest</span>
+            <span className="txn-modal-value">{txn.guest}</span>
+          </div>
+          <div className="txn-modal-field">
+            <span className="txn-modal-label">Room</span>
+            <span className="txn-modal-value">{txn.room}</span>
+          </div>
+          <div className="txn-modal-field full-width">
+            <span className="txn-modal-label">Description</span>
+            <span className="txn-modal-value">{txn.description}</span>
+          </div>
+          <div className="txn-modal-field">
+            <span className="txn-modal-label">Payment Method</span>
+            <span className="txn-modal-value">{txn.method}</span>
+          </div>
+          <div className="txn-modal-field">
+            <span className="txn-modal-label">Detail</span>
+            <span className="txn-modal-value">{txn.methodDetail || '—'}</span>
+          </div>
+          <div className="txn-modal-field">
+            <span className="txn-modal-label">Type</span>
+            <span className="txn-modal-value" style={{ textTransform: 'capitalize' }}>{txn.type}</span>
+          </div>
+          <div className="txn-modal-field">
+            <span className="txn-modal-label">Status</span>
+            <span className="txn-modal-value" style={{ textTransform: 'capitalize' }}>{txn.status}</span>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="txn-modal-actions">
+          {canRefund && (
+            <button className="ledger-btn" onClick={() => onRefund(txn)}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+              Issue Refund
+            </button>
+          )}
+          {canVoid && (
+            <button className="ledger-btn btn-danger" onClick={() => onVoid(txn)}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg>
+              Void Transaction
+            </button>
+          )}
+          <button className="ledger-btn" style={{ marginLeft: 'auto' }} onClick={onClose}>Close</button>
+        </div>
+      </div>
+    </div>
+  );
+}
