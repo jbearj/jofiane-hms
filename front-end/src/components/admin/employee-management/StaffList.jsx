@@ -127,12 +127,7 @@ function StaffList() {
           <h2 style={{ fontSize: '28px', fontWeight: '700' }}>Staff List</h2>
           <p>Employee directory and HR management</p>
         </div>
-        <div className="right">
-          <button className="btn btn-sm btn-gold" onClick={handleAdd}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-            Add Employee
-          </button>
-        </div>
+        {/* Button removed from here and moved to the panel-toolbar below */}
       </div>
 
       {/* SUMMARY BAR */}
@@ -185,7 +180,7 @@ function StaffList() {
         <div className="panel-header">
           <h3>Employees ({filteredEmployees.length})</h3>
 
-          {/* SEARCH + FILTERS */}
+          {/* SEARCH + FILTERS + ADD BUTTON */}
           <div className="panel-toolbar">
             <div className="panel-search">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
@@ -202,6 +197,12 @@ function StaffList() {
               <option value="On Leave">On Leave</option>
               <option value="Terminated">Terminated</option>
             </select>
+            
+            {/* Added button right here */}
+            <button className="btn btn-sm btn-gold" onClick={handleAdd}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              Add Employee
+            </button>
           </div>
         </div>
         <div className="table-wrap">

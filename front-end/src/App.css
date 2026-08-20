@@ -64,6 +64,8 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   min-height: 100vh;
+
+ overscroll-behavior: none;
 }
 
 h1,
@@ -319,6 +321,8 @@ textarea {
   background: var(--bg-body);
   margin-left: 260px;
   transition: margin-left 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+
+ 
 }
 
 /* ============================================================
@@ -5346,23 +5350,31 @@ tr:last-child td {
 .admin-portal-shell {
   min-height: 100vh;
   color: var(--text-primary);
-  background:
-    linear-gradient(135deg, rgba(255, 252, 246, 0.94), rgba(244, 237, 226, 0.88)),
-    url('./assets/login-bg.jpg') center / cover fixed;
+  background: url('./assets/login-bg.jpg') center / cover fixed;
   transition: color 0.35s ease, background-color 0.35s ease;
 }
 
-.admin-portal-shell.theme-dark {
+.admin-portal-shell::before {
   background:
-    linear-gradient(135deg, rgba(42, 34, 29, 0.96), rgba(29, 24, 21, 0.95)),
-    url('./assets/login-bg.jpg') center / cover fixed;
+    radial-gradient(circle at 78% 2%, rgba(201, 168, 76, 0.16), transparent 32%),
+    linear-gradient(135deg, rgba(250, 247, 240, 0.88), rgba(235, 226, 214, 0.85)) !important;
+}
+
+.admin-portal-shell.theme-dark {
+  background: url('./assets/login-bg.jpg') center / cover fixed;
+}
+
+.admin-portal-shell.theme-dark::before {
+  background:
+    radial-gradient(circle at 78% 2%, rgba(218, 188, 103, 0.13), transparent 34%),
+    linear-gradient(135deg, rgba(42, 34, 29, 0.92), rgba(29, 24, 21, 0.90)) !important;
 }
 
 
 .admin-portal-shell .main-content {
   overflow: visible !important;
   min-width: 0;
-  padding: 5px 32px 44px;
+  padding: 40px 32px 44px;
   transform: none !important;
 }
 
@@ -5485,7 +5497,7 @@ tr:last-child td {
   min-height: 40px;
   color: var(--text-primary) !important;
   background: rgba(255, 255, 255, 0.46) !important;
-  border-color: var(--employee-border) !important;
+  border: 1px solid rgba(111, 83, 61, 0.22) !important;
   border-radius: 10px !important;
 }
 
@@ -5495,6 +5507,7 @@ tr:last-child td {
 .admin-portal-shell.theme-dark .floor-dropdown {
   color-scheme: dark;
   background: rgba(255, 255, 255, 0.065) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
 }
 
 .admin-portal-shell input:focus,

@@ -21,6 +21,9 @@ function Transactions() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showRefundModal, setShowRefundModal] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState(null);
+  
+  // Export Dropdown State
+  const [showExportMenu, setShowExportMenu] = useState(false);
 
   useEffect(() => {
     fetchTransactions();
@@ -207,20 +210,6 @@ function Transactions() {
           <h2 style={{ fontSize: '28px', fontWeight: '700' }}>Transactions</h2>
           <p>Daily operational ledger</p>
         </div>
-        <div className="right">
-          <button className="btn btn-sm" onClick={() => handleExport('csv')}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-            Export CSV
-          </button>
-          <button className="btn btn-sm" onClick={() => handleExport('pdf')}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
-            Export PDF
-          </button>
-          <button className="btn btn-sm btn-gold" onClick={() => setShowPaymentModal(true)}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-            Record Payment
-          </button>
-        </div>
       </div>
 
       {/* KPI CARDS */}
@@ -249,56 +238,108 @@ function Transactions() {
 
       {/* TRANSACTIONS TABLE */}
       <div className="panel txn-panel">
-        <div className="panel-header">
-          <h3>Transaction History ({filteredTransactions.length})</h3>
+        
+        {/* REDESIGNED HEADER TOOLBAR */}
+        <div className="panel-header" style={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: '16px', padding: '20px 24px', margin: 0, borderBottom: '1px solid var(--border-light)' }}>
+          
+          {/* ROW 1: Title */}
+          <div style={{ textAlign: 'left', width: '100%' }}>
+            <h3 style={{ margin: 0, fontSize: '18px' }}>Transaction History ({filteredTransactions.length})</h3>
+          </div>
 
-          {/* SEARCH + FILTERS */}
-          <div className="panel-toolbar">
-            {/* Search */}
-            <div className="panel-search">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          {/* ROW 2: Tools (Search, Filters, Actions) */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
+            
+            {/* LEFT CLUSTER: Search Bar */}
+            <div className="panel-search" style={{ flex: '1 1 260px', maxWidth: '340px', position: 'relative', display: 'flex', alignItems: 'center' }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ position: 'absolute', left: '12px', pointerEvents: 'none' }}><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
               <input
                 type="text"
                 placeholder="Search guest, room, or TXN ID"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                style={{ width: '100%', paddingLeft: '36px' }}
               />
             </div>
 
-            {/* Period */}
-            <select className="floor-dropdown" value={filterPeriod} onChange={(e) => setFilterPeriod(e.target.value)}>
-              <option value="today">Today</option>
-              <option value="week">This Week</option>
-              <option value="month">This Month</option>
-              <option value="year">This Year</option>
-            </select>
+            {/* RIGHT CLUSTER: Filters + Actions */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginLeft: 'auto' }}>
+              
+              <select className="floor-dropdown" value={filterPeriod} onChange={(e) => setFilterPeriod(e.target.value)}>
+                <option value="today">Today</option>
+                <option value="week">This Week</option>
+                <option value="month">This Month</option>
+                <option value="year">This Year</option>
+              </select>
 
-            {/* Method */}
-            <select className="floor-dropdown" value={filterMethod} onChange={(e) => setFilterMethod(e.target.value)}>
-              <option value="all">All Methods</option>
-              <option value="cash">Cash</option>
-              <option value="credit-card">Credit Card</option>
-              <option value="bank-transfer">Bank Transfer</option>
-              <option value="room-charge">Room Charge</option>
-            </select>
+              <select className="floor-dropdown" value={filterMethod} onChange={(e) => setFilterMethod(e.target.value)}>
+                <option value="all">All Methods</option>
+                <option value="cash">Cash</option>
+                <option value="credit-card">Credit Card</option>
+                <option value="bank-transfer">Bank Transfer</option>
+                <option value="room-charge">Room Charge</option>
+              </select>
 
-            {/* Status */}
-            <select className="floor-dropdown" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
-              <option value="all">All Status</option>
-              <option value="completed">Completed</option>
-              <option value="pending">Pending</option>
-              <option value="voided">Voided</option>
-            </select>
+              <select className="floor-dropdown" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+                <option value="all">All Status</option>
+                <option value="completed">Completed</option>
+                <option value="pending">Pending</option>
+                <option value="voided">Voided</option>
+              </select>
 
-            {/* Type */}
-            <select className="floor-dropdown" value={filterType} onChange={(e) => setFilterType(e.target.value)}>
-              <option value="all">All Types</option>
-              <option value="charge">Charge</option>
-              <option value="refund">Refund</option>
-              <option value="void">Void</option>
-            </select>
+              <select className="floor-dropdown" value={filterType} onChange={(e) => setFilterType(e.target.value)}>
+                <option value="all">All Types</option>
+                <option value="charge">Charge</option>
+                <option value="refund">Refund</option>
+                <option value="void">Void</option>
+              </select>
+
+              <div style={{ width: '1px', height: '24px', background: 'var(--border-light)', margin: '0 4px' }}></div>
+
+              {/* Dropdown Export Button */}
+              <div style={{ position: 'relative' }}>
+                <button className="btn btn-sm" onClick={() => setShowExportMenu(!showExportMenu)}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                  Export
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: '4px' }}><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </button>
+
+                {showExportMenu && (
+                  <div style={{
+                    position: 'absolute', top: '100%', right: 0, marginTop: '6px',
+                    background: 'var(--bg-card)', border: '1px solid var(--border-light)',
+                    borderRadius: 'var(--radius-sm)', boxShadow: 'var(--shadow-md)',
+                    zIndex: 50, display: 'flex', flexDirection: 'column', minWidth: '130px',
+                    overflow: 'hidden'
+                  }}>
+                    <button
+                      style={{ padding: '10px 14px', background: 'transparent', border: 'none', borderBottom: '1px solid var(--border-light)', textAlign: 'left', cursor: 'pointer', fontSize: '12px', color: 'var(--text-primary)', fontFamily: 'inherit' }}
+                      onClick={() => { handleExport('csv'); setShowExportMenu(false); }}
+                      onMouseEnter={(e) => e.target.style.background = 'rgba(201, 168, 76, 0.1)'}
+                      onMouseLeave={(e) => e.target.style.background = 'transparent'}
+                    >
+                      Export as CSV
+                    </button>
+                    <button
+                      style={{ padding: '10px 14px', background: 'transparent', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: '12px', color: 'var(--text-primary)', fontFamily: 'inherit' }}
+                      onClick={() => { handleExport('pdf'); setShowExportMenu(false); }}
+                      onMouseEnter={(e) => e.target.style.background = 'rgba(201, 168, 76, 0.1)'}
+                      onMouseLeave={(e) => e.target.style.background = 'transparent'}
+                    >
+                      Export as PDF
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <button className="btn btn-sm btn-gold" onClick={() => setShowPaymentModal(true)}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                Record Payment
+              </button>
+            </div>
           </div>
         </div>
+        
         <div className="table-wrap">
           <table className="txn-table">
             <colgroup>

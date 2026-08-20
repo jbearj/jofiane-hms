@@ -135,17 +135,6 @@ function ShiftSchedules() {
           <h2 style={{ fontSize: '28px', fontWeight: '700' }}>Shift Schedules</h2>
           <p>Weekly staff scheduling board</p>
         </div>
-        <div className="right">
-          {pendingSwaps.length > 0 && (
-            <span style={{ fontSize: '11px', fontWeight: '700', padding: '5px 12px', background: '#fef3c7', color: '#92400e', borderRadius: '20px' }}>
-              {pendingSwaps.length} swap request{pendingSwaps.length > 1 ? 's' : ''}
-            </span>
-          )}
-          <button className="btn btn-sm btn-outline-gold" onClick={() => window.print()}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
-            Print
-          </button>
-        </div>
       </div>
 
       {/* COVERAGE ALERTS */}
@@ -177,33 +166,65 @@ function ShiftSchedules() {
       {/* SCHEDULE GRID */}
       <div className="panel" style={{ padding: '0', overflow: 'hidden' }}>
 
-        <div className="panel-header" style={{ padding: '16px 24px', margin: 0, borderBottom: '1px solid var(--border-light)' }}>
-          {/* Title + week nav */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-            <h3>Weekly Schedule</h3>
-            <button className="btn btn-xs" onClick={() => setWeekOffset(prev => prev - 1)}>← Prev</button>
-            <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)', minWidth: '170px', textAlign: 'center' }}>{weekLabel}</span>
-            <button className="btn btn-xs" onClick={() => setWeekOffset(prev => prev + 1)}>Next →</button>
-            {weekOffset !== 0 && (
-              <button className="btn btn-xs" style={{ color: 'var(--gold)' }} onClick={() => setWeekOffset(0)}>Today</button>
-            )}
+        {/* REDESIGNED HEADER TOOLBAR */}
+        <div className="panel-header" style={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: '16px', padding: '20px 24px', margin: 0, borderBottom: '1px solid var(--border-light)' }}>
+          
+          {/* ROW 1: Title */}
+          <div style={{ textAlign: 'left', width: '100%' }}>
+            <h3 style={{ margin: 0, fontSize: '18px' }}>Weekly Schedule</h3>
           </div>
 
-          {/* FILTERS + LEGEND */}
-          <div className="panel-toolbar">
-            <select className="floor-dropdown" value={filterDept} onChange={(e) => setFilterDept(e.target.value)}>
-              <option value="all">All Departments</option>
-              {departments.map(d => <option key={d} value={d}>{d}</option>)}
-            </select>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              {SHIFT_TYPES.map(s => (
-                <span key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', color: s.textColor }}>
-                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: s.dot }}></span>
-                  {s.label}
+          {/* ROW 2: Tools (Navigation, Filters, Actions) */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
+            
+            {/* LEFT CLUSTER: Nav + Filters + Legend */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '24px', flexWrap: 'wrap' }}>
+              
+              {/* Navigation */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <button className="btn btn-xs" onClick={() => setWeekOffset(prev => prev - 1)}>← Prev</button>
+                <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)', minWidth: '150px', textAlign: 'center', whiteSpace: 'nowrap' }}>{weekLabel}</span>
+                <button className="btn btn-xs" onClick={() => setWeekOffset(prev => prev + 1)}>Next →</button>
+                {weekOffset !== 0 && (
+                  <button className="btn btn-xs" style={{ color: 'var(--gold)' }} onClick={() => setWeekOffset(0)}>Today</button>
+                )}
+              </div>
+
+              {/* Subtle Divider */}
+              <div style={{ width: '1px', height: '24px', background: 'var(--border-light)' }}></div>
+
+              {/* Filters & Legend */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                <select className="floor-dropdown" value={filterDept} onChange={(e) => setFilterDept(e.target.value)}>
+                  <option value="all">All Departments</option>
+                  {departments.map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+                <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
+                  {SHIFT_TYPES.map(s => (
+                    <span key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: s.textColor, fontWeight: '500' }}>
+                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: s.dot }}></span>
+                      {s.label}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+            </div>
+
+            {/* RIGHT CLUSTER: Swap requests + Print button */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginLeft: 'auto' }}>
+              {pendingSwaps.length > 0 && (
+                <span style={{ display: 'inline-flex', alignItems: 'center', fontSize: '11px', fontWeight: '700', padding: '6px 14px', background: '#fef3c7', color: '#92400e', borderRadius: '20px' }}>
+                  {pendingSwaps.length} swap request{pendingSwaps.length > 1 ? 's' : ''}
                 </span>
-              ))}
+              )}
+              <button className="btn btn-sm btn-outline-gold" style={{ display: 'inline-flex', alignItems: 'center', padding: '6px 14px' }} onClick={() => window.print()}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                Print
+              </button>
             </div>
           </div>
+
         </div>
 
         <div style={{ overflowX: 'auto', width: '100%' }}>
