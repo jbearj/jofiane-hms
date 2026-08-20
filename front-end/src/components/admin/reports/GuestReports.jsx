@@ -72,12 +72,6 @@ function GuestReports() {
           <p>Guest demographics, behavior, and loyalty</p>
         </div>
         <div className="right">
-          <select className="floor-dropdown" value={period} onChange={(e) => setPeriod(e.target.value)}>
-            <option value="weekly">Weekly</option>
-            <option value="monthly">Monthly</option>
-            <option value="quarterly">Quarterly</option>
-          </select>
-          <button className="btn btn-sm btn-outline-gold" onClick={() => alert('Exporting guest report...')}>Export</button>
         </div>
       </div>
 
@@ -90,6 +84,14 @@ function GuestReports() {
           <div><div style={{ fontSize: '18px', fontWeight: '700', color: 'var(--gold)' }}>{kpis.returning}</div><div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Returning</div></div>
           <div><div style={{ fontSize: '18px', fontWeight: '700' }}>{kpis.avgSpend.toLocaleString()}</div><div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Avg Spend</div></div>
           <div><div style={{ fontSize: '18px', fontWeight: '700', color: 'var(--status-vac)' }}>{kpis.returnRate}%</div><div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Return Rate</div></div>
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <select className="floor-dropdown" value={period} onChange={(e) => setPeriod(e.target.value)}>
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+              <option value="quarterly">Quarterly</option>
+            </select>
+            <button className="btn btn-sm btn-outline-gold" onClick={() => alert('Exporting guest report...')}>Export</button>
+          </div>
         </div>
       </div>
 

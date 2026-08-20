@@ -11,6 +11,7 @@ const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 function ShiftSchedules() {
   const [isLoading, setIsLoading] = useState(true);
+  const [isNavigating, setIsNavigating] = useState(false);
   const [employees, setEmployees] = useState([]);
   const [schedule, setSchedule] = useState({});
   const [swapRequests, setSwapRequests] = useState([]);
@@ -40,7 +41,11 @@ function ShiftSchedules() {
   const weekLabel = `${weekDates[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${weekDates[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
 
   const fetchSchedule = async () => {
-    setIsLoading(true);
+    if (!employees.length) {
+      setIsLoading(true);
+    } else {
+      setIsNavigating(true);
+    }
     try {
       // TODO: Replace with actual API call
       // const res = await fetch(`http://localhost:8080/api/admin/shifts?weekOffset=${weekOffset}`);
@@ -90,6 +95,7 @@ function ShiftSchedules() {
       console.error('Failed to fetch schedule:', err);
     } finally {
       setIsLoading(false);
+      setIsNavigating(false);
     }
   };
 
@@ -227,7 +233,7 @@ function ShiftSchedules() {
 
         </div>
 
-        <div style={{ overflowX: 'auto', width: '100%' }}>
+        <div style={{ overflowX: 'auto', width: '100%', opacity: isNavigating ? 0.5 : 1, transition: 'opacity 0.2s ease' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
             <thead>
               <tr>

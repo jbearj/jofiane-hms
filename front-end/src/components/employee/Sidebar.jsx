@@ -3,7 +3,7 @@ import logoFull from '../../assets/Jofiane-logo.png';
 import logoMini from '../../assets/Jofiane-logo 2.png'; 
 import employee1 from '../../assets/employee1.jpeg';
 
-function Sidebar({ employeeRole, isCollapsed, setIsCollapsed, activeTab, setActiveTab, isDarkMode, setIsDarkMode, onLogout }) {
+function Sidebar({ employeeRole, employee, isCollapsed, setIsCollapsed, activeTab, setActiveTab, isDarkMode, setIsDarkMode, onLogout }) {
   const navMenuRef = useRef(null);
   const navScrollPositionRef = useRef(0);
   const transitionTimerRef = useRef(null);
@@ -579,35 +579,6 @@ function Sidebar({ employeeRole, isCollapsed, setIsCollapsed, activeTab, setActi
           })}
         </nav>
 
-        {/* UTILITIES - LIGHT / DARK MODE TOGGLE */}
-        <div className="sidebar-utilities">
-          <button
-            type="button"
-            className="theme-toggle-btn"
-            onClick={() => setIsDarkMode(!isDarkMode)}
-            title={isCollapsed ? (isDarkMode ? 'Use light mode' : 'Use dark mode') : ''}
-            aria-label={isDarkMode ? 'Use light mode' : 'Use dark mode'}
-            aria-pressed={isDarkMode}
-          >
-            <div className="theme-toggle-content">
-              <div className="nav-icon-wrapper" style={{ display: 'flex', alignItems: 'center' }}>
-                {isDarkMode ? (
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="4" />
-                    <path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.66 6.34l1.41-1.41" />
-                  </svg>
-                ) : (
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-                  </svg>
-                )}
-              </div>
-              <span className="nav-label">{isDarkMode ? 'Light mode' : 'Dark mode'}</span>
-            </div>
-            <span className={`theme-switch ${isDarkMode ? 'on' : ''}`} aria-hidden="true"><span /></span>
-          </button>
-        </div>
-
         {/* USER PROFILE FOOTER WITH POPOVER */}
         <div className="sidebar-footer" ref={profileMenuRef}>
           {showProfileMenu && (
@@ -644,10 +615,10 @@ function Sidebar({ employeeRole, isCollapsed, setIsCollapsed, activeTab, setActi
             onClick={() => setShowProfileMenu((prev) => !prev)}
             style={{ cursor: 'pointer' }}
           >
-            <img src={employee1} alt="Ana Buenaflor" style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} />
+            <img src={employee?.photo || employee1} alt={employee?.name || 'Employee'} style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} />
             <div className="user-info">
-              <div className="name" style={{ color: '#ffffff', fontWeight: 'bold' }}>Ana Buenaflor</div>
-              <div className="role" style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Front Desk Officer</div>
+              <div className="name" style={{ color: '#ffffff', fontWeight: 'bold' }}>{employee?.name || 'Employee'}</div>
+              <div className="role" style={{ fontSize: '0.8rem', color: '#94a3b8' }}>{employee?.role || 'Staff'}</div>
             </div>
           </div>
         </div>

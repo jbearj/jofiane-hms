@@ -141,7 +141,7 @@ textarea {
   z-index: 100;
   
   /* Smooth transition for collapsing */
-  transition: width 0.3s cubic-bezier(0.22, 1, 0.36, 1), padding 0.3s ease; 
+  transition: width 0.2s cubic-bezier(0.22, 1, 0.36, 1), padding 0.2s ease; 
 }
 
 /* ============================================================
@@ -3050,9 +3050,11 @@ tr:last-child td {
 
 .employee-portal-shell .sidebar-footer .user-badge img {
   justify-self: center;
-  width: 34px !important;
-  height: 34px !important;
-  margin: 0;
+  width: 36px !important;
+  height: 36px !important;
+  min-width: 36px;
+  border-radius: 50%;
+  object-fit: cover;
 }
 
 .employee-portal-shell .sidebar-footer .user-info {
@@ -3554,9 +3556,9 @@ tr:last-child td {
 }
 
 .employee-portal-shell .sidebar.collapsed .sidebar-footer img {
-  flex: 0 0 34px;
-  width: 34px !important;
-  height: 34px !important;
+  flex: 0 0 36px;
+  width: 36px !important;
+  height: 36px !important;
 }
 
 /* Dark KPI cards must scan instantly. */
@@ -4953,6 +4955,11 @@ tr:last-child td {
 .employee-portal-shell .sidebar.collapsed .sidebar-footer .user-badge {
   display: grid !important;
   align-items: center !important;
+  gap: 12px;
+}
+
+.employee-portal-shell .sidebar:not(.collapsed) .sidebar-footer .user-badge {
+  grid-template-columns: 48px minmax(0, 1fr) !important;
 }
 
 .employee-portal-shell .sidebar.collapsed .sidebar-footer .user-badge {
@@ -5235,7 +5242,7 @@ tr:last-child td {
 }
 
 .employee-portal-shell .sidebar-footer .user-badge {
-  padding-left: 0 !important;
+  padding-left: 12px !important;
   padding-right: 10px !important;
 }
 
@@ -5428,6 +5435,10 @@ tr:last-child td {
   gap: 16px;
 }
 
+.admin-portal-shell .page-header {
+  padding-right: 0;
+}
+
 .admin-portal-shell h1,
 .admin-portal-shell h2,
 .admin-portal-shell h3,
@@ -5470,14 +5481,28 @@ tr:last-child td {
 
 .admin-portal-shell thead th {
   color: var(--text-secondary) !important;
-  background: transparent !important;
+  background: rgba(201, 168, 76, 0.3) !important;
   letter-spacing: 0.045em;
   padding: 14px 12px !important;
+  border-bottom: 1px solid rgba(201, 168, 76, 0.25) !important;
+  border-right: 1px solid var(--border-light) !important;
+  vertical-align: middle !important;
+  text-align: center !important;
+}
+
+.admin-portal-shell thead th:last-child {
+  border-right: none !important;
 }
 
 .admin-portal-shell tbody td {
   color: var(--text-primary) !important;
-  border-color: var(--employee-border) !important;
+  border-bottom: 1px solid var(--border-light) !important;
+  border-right: 1px solid var(--border-light) !important;
+  vertical-align: middle !important;
+}
+
+.admin-portal-shell tbody td:last-child {
+  border-right: none !important;
 }
 
 .admin-portal-shell tbody tr {
@@ -5532,7 +5557,7 @@ tr:last-child td {
 
 .admin-portal-shell .btn-gold,
 .admin-portal-shell .btn-primary {
-  color: #2b2118 !important;
+  color: #fff !important;
   background: linear-gradient(135deg, #e5ca73, #c9a84c) !important;
   border-color: rgba(128, 94, 24, 0.22) !important;
   box-shadow: 0 8px 18px rgba(120, 87, 25, 0.16);
@@ -5554,6 +5579,11 @@ tr:last-child td {
   width: 36px;
   height: 36px;
   min-width: 36px;
+  min-height: 36px;
+  max-height: 36px;
+  aspect-ratio: 1;
+  align-self: center;
+  margin-left: 8px;
   display: grid;
   place-items: center;
   color: #3a2b20;
@@ -5565,10 +5595,71 @@ tr:last-child td {
 
 .admin-portal-shell .sidebar-footer .user-badge {
   grid-template-columns: 56px minmax(0, 1fr);
+  padding: 10px 12px;
+  min-height: 56px;
+  align-items: center;
+  overflow: visible;
 }
 
 .admin-portal-shell .sidebar.collapsed .admin-avatar {
   justify-self: center;
+  margin-left: 0;
+  margin-inline: auto;
+}
+
+.admin-portal-shell .sidebar.collapsed .sidebar-footer .user-badge {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 0;
+  grid-template-columns: unset;
+}
+
+.admin-portal-shell .sidebar.collapsed .sidebar-footer {
+  display: flex;
+  justify-content: center;
+  padding: 12px 0;
+  overflow: visible;
+}
+
+.admin-portal-shell .sidebar.collapsed .sidebar-footer .profile-popover,
+.employee-portal-shell .sidebar.collapsed .sidebar-footer .profile-popover {
+  position: absolute;
+  bottom: 0;
+  left: 100%;
+  top: auto;
+  transform: none;
+  min-width: 180px;
+  white-space: nowrap;
+  z-index: 9999;
+  margin-left: 8px;
+}
+
+.portal-shell .sidebar.collapsed .sidebar-footer {
+  overflow: visible !important;
+}
+
+.portal-shell .sidebar.collapsed {
+  overflow: visible !important;
+  z-index: 100;
+  contain: none !important;
+}
+
+.admin-portal-shell .sidebar.collapsed .sidebar-utilities {
+  display: flex;
+  justify-content: center;
+  padding: 8px 0;
+}
+
+.admin-portal-shell .sidebar.collapsed .theme-toggle-btn {
+  justify-content: center;
+  padding: 8px;
+  width: auto;
+}
+
+.admin-portal-shell .sidebar.collapsed .theme-toggle-btn .nav-label,
+.admin-portal-shell .sidebar.collapsed .theme-toggle-btn .theme-switch {
+  display: none;
 }
 
 .admin-portal-shell.theme-dark .modal-overlay {

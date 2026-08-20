@@ -9,22 +9,25 @@ import FrontDeskLog from './FrontDeskLog'
 import HousekeepingStatus from '../admin/rooms/HousekeepingStatus';
 import CleaningTasks from './CleaningTasks';
 import Maintenance from './Maintenance';
+import EmployeeSettings from './Settings';
 
-function EmployeePortal({employeeRole}) {
+function EmployeePortal({employeeRole, employee}) {
   const frontDeskTabs = [
   'dashboard',
   'bookings',
   'arrivals',
   'inhouse',
   'departures',
-  'logbook'
+  'logbook',
+  'settings'
   ];
 
   const housekeepingTabs = [
     'dashboard',
     'housekeeping',
     'cleaning-tasks',
-    'maintenance'
+    'maintenance',
+    'settings'
   ];
 
   const allowedTabs =
@@ -54,12 +57,12 @@ function EmployeePortal({employeeRole}) {
   const renderContent = () => {
 
   if (!allowedTabs.includes(activeTab)) {
-    return <Dashboard activeTab="dashboard" />;
+    return <Dashboard activeTab="dashboard" employee={employee} />;
   }
 
   switch (activeTab) {
     case 'dashboard':
-      return <Dashboard activeTab={activeTab} />;
+      return <Dashboard activeTab={activeTab} employee={employee} />;
 
     case 'bookings':
       return (
@@ -117,8 +120,11 @@ function EmployeePortal({employeeRole}) {
         </main>
       );
 
+    case 'settings':
+      return <EmployeeSettings isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} employee={employee} />;
+
     default:
-      return <Dashboard activeTab="dashboard" />;
+      return <Dashboard activeTab="dashboard" employee={employee} />;
   }
 };
 
@@ -126,6 +132,7 @@ function EmployeePortal({employeeRole}) {
     <div className={`portal-shell employee-portal-shell ${isCollapsed ? 'nav-collapsed' : ''} ${isDarkMode ? 'theme-dark' : 'theme-light'}`}>
       <Sidebar 
         employeeRole={employeeRole}
+        employee={employee}
         isCollapsed={isCollapsed}
         setIsCollapsed={setIsCollapsed}
         activeTab={activeTab}

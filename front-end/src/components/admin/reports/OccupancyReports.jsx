@@ -70,12 +70,6 @@ function OccupancyReports() {
           <p>Room fill rate trends and forecasting</p>
         </div>
         <div className="right">
-          <select className="floor-dropdown" value={period} onChange={(e) => setPeriod(e.target.value)}>
-            <option value="weekly">Weekly</option>
-            <option value="monthly">Monthly</option>
-            <option value="quarterly">Quarterly</option>
-          </select>
-          <button className="btn btn-sm btn-outline-gold" onClick={() => alert('Exporting occupancy report...')}>Export</button>
         </div>
       </div>
 
@@ -91,6 +85,14 @@ function OccupancyReports() {
           <div><div style={{ fontSize: '18px', fontWeight: '700' }}>{kpis.alos}</div><div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Avg Length of Stay</div></div>
           <div><div style={{ fontSize: '18px', fontWeight: '700', color: 'var(--status-vac)' }}>{kpis.peakDay}</div><div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Peak Day</div></div>
           <div><div style={{ fontSize: '18px', fontWeight: '700', color: 'var(--status-occ)' }}>{kpis.lowDay}</div><div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Low Day</div></div>
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <select className="floor-dropdown" value={period} onChange={(e) => setPeriod(e.target.value)}>
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+              <option value="quarterly">Quarterly</option>
+            </select>
+            <button className="btn btn-sm btn-outline-gold" onClick={() => alert('Exporting occupancy report...')}>Export</button>
+          </div>
         </div>
       </div>
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-function Dashboard() {
+function Dashboard({ employee }) {
   const [isLoading, setIsLoading] = useState(true);
   const [stats, setStats] = useState(null);
   const [recentActivity, setRecentActivity] = useState([]);
@@ -61,7 +61,7 @@ function Dashboard() {
         <div className="employee-dashboard-header" style={{ marginBottom: '32px' }}>
           <div>
             <span className="eyebrow">Front desk command center</span>
-            <h2 style={{ fontSize: '30px', fontWeight: '700', color: '#1a1917', margin: '0 0 6px 0' }}>Good day, Ana</h2>
+            <h2 style={{ fontSize: '30px', fontWeight: '700', color: '#1a1917', margin: '0 0 6px 0' }}>Good day, {employee?.name?.split(' ')[0] || 'there'}</h2>
             <p style={{ margin: 0, fontSize: '14px', color: '#6b7280' }}>{todayDate}</p>
           </div>
           <div className="shift-status" aria-label="Current shift status">

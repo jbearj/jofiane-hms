@@ -79,13 +79,6 @@ function FinancialReports() {
           <p>Revenue, expenses, and profit summary</p>
         </div>
         <div className="right">
-          <select className="floor-dropdown" value={period} onChange={(e) => setPeriod(e.target.value)}>
-            <option value="weekly">Weekly</option>
-            <option value="monthly">Monthly</option>
-            <option value="quarterly">Quarterly</option>
-          </select>
-          <button className="btn btn-sm" onClick={() => alert('Exporting financial report...')}>Export CSV</button>
-          <button className="btn btn-sm btn-outline-gold" onClick={() => window.print()}>Print</button>
         </div>
       </div>
 
@@ -97,8 +90,15 @@ function FinancialReports() {
           <div><div style={{ fontSize: '18px', fontWeight: '700', color: 'var(--status-occ)' }}>{kpis.totalExpenses.toLocaleString()}</div><div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Expenses</div></div>
           <div><div style={{ fontSize: '18px', fontWeight: '700' }}>{kpis.netProfit.toLocaleString()}</div><div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Net Profit</div></div>
           <div><div style={{ fontSize: '18px', fontWeight: '700', color: 'var(--gold)' }}>{kpis.profitMargin}%</div><div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Margin</div></div>
-          <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Outstanding: <span style={{ fontWeight: '700', color: '#b45309' }}>{outstanding.total.toLocaleString()}</span> ({outstanding.count} folios)</div>
+            <select className="floor-dropdown" value={period} onChange={(e) => setPeriod(e.target.value)}>
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+              <option value="quarterly">Quarterly</option>
+            </select>
+            <button className="btn btn-sm" onClick={() => alert('Exporting financial report...')}>Export CSV</button>
+            <button className="btn btn-sm btn-outline-gold" onClick={() => window.print()}>Print</button>
           </div>
         </div>
       </div>

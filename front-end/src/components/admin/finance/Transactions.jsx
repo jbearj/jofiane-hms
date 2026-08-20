@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 
 function Transactions() {
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [transactions, setTransactions] = useState([]);
   const [filteredTransactions, setFilteredTransactions] = useState([]);
   const [kpis, setKpis] = useState(null);
@@ -34,7 +35,11 @@ function Transactions() {
   }, [transactions, searchQuery, filterMethod, filterStatus, filterType]);
 
   const fetchTransactions = async () => {
-    setIsLoading(true);
+    if (!kpis) {
+      setIsLoading(true);
+    } else {
+      setIsRefreshing(true);
+    }
     try {
       // TODO: Replace with actual API call
       // const res = await fetch(`http://localhost:8080/api/admin/transactions?period=${filterPeriod}`);
@@ -67,6 +72,7 @@ function Transactions() {
       console.error('Failed to fetch transactions:', err);
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false);
     }
   };
 
@@ -213,7 +219,7 @@ function Transactions() {
       </div>
 
       {/* KPI CARDS */}
-      <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', marginBottom: '22px' }}>
+      <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', marginBottom: '22px', opacity: isRefreshing ? 0.5 : 1, transition: 'opacity 0.2s ease' }}>
         <div className="kpi-card">
           <span className="lbl">TOTAL INCOME</span>
           <span className="val">{kpis.totalIncome.toLocaleString()}</span>
@@ -240,15 +246,15 @@ function Transactions() {
       <div className="panel txn-panel">
         
         {/* REDESIGNED HEADER TOOLBAR */}
-        <div className="panel-header" style={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: '16px', padding: '20px 24px', margin: 0, borderBottom: '1px solid var(--border-light)' }}>
+        <div className="panel-header" style={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: '10px', padding: '16px 24px', margin: 0, borderBottom: '1px solid var(--border-light)' }}>
           
           {/* ROW 1: Title */}
           <div style={{ textAlign: 'left', width: '100%' }}>
-            <h3 style={{ margin: 0, fontSize: '18px' }}>Transaction History ({filteredTransactions.length})</h3>
+            <h3 style={{ margin: 0, fontSize: '16px' }}>Transaction History ({filteredTransactions.length})</h3>
           </div>
 
           {/* ROW 2: Tools (Search, Filters, Actions) */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
             
             {/* LEFT CLUSTER: Search Bar */}
             <div className="panel-search" style={{ flex: '1 1 260px', maxWidth: '340px', position: 'relative', display: 'flex', alignItems: 'center' }}>
@@ -263,7 +269,7 @@ function Transactions() {
             </div>
 
             {/* RIGHT CLUSTER: Filters + Actions */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginLeft: 'auto' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginLeft: 'auto' }}>
               
               <select className="floor-dropdown" value={filterPeriod} onChange={(e) => setFilterPeriod(e.target.value)}>
                 <option value="today">Today</option>
@@ -340,7 +346,7 @@ function Transactions() {
           </div>
         </div>
         
-        <div className="table-wrap">
+        <div className="table-wrap" style={{ opacity: isRefreshing ? 0.5 : 1, transition: 'opacity 0.2s ease' }}>
           <table className="txn-table">
             <colgroup>
               <col style={{ width: '104px' }} />

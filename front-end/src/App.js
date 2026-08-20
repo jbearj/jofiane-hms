@@ -16,6 +16,7 @@ import OtaChannels from './components/admin/reservations/OtaChannels';
 import OccupancyReports from './components/admin/reports/OccupancyReports';
 import FinancialReports from './components/admin/reports/FinancialReports';
 import GuestReports from './components/admin/reports/GuestReports';
+import Settings from './components/admin/Settings';
 import Rooms from './components/admin/rooms/Rooms';
 import Employees from './components/admin/employee-management/Employees';
 import EmployeeModal from './components/admin/employee-management/EmployeeModal';
@@ -91,9 +92,15 @@ function App() {
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [viewMode, setViewMode] = useState('admin'); // 'admin' or 'employee'
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    const saved = window.localStorage.getItem('jofiane-sidebar-collapsed');
+    if (saved !== null) return JSON.parse(saved);
+    return typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 900px)').matches;
+  });
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [employeeRole, setEmployeeRole] = useState(null); // Store the role of the logged-in employee
+  const [loggedInEmployee, setLoggedInEmployee] = useState(null); // Store the logged-in employee object
   const [isAdminDarkMode, setIsAdminDarkMode] = useState(() => {
     if (typeof window === 'undefined') return false;
     const savedTheme = window.localStorage.getItem('jofiane-admin-theme');
@@ -107,7 +114,8 @@ function App() {
 
   useEffect(() => {
     if (typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 900px)').matches) {
-      setIsCollapsed(true);
+      const saved = window.localStorage.getItem('jofiane-sidebar-collapsed');
+      if (saved === null) setIsCollapsed(true);
     }
   }, []);
 
@@ -132,6 +140,7 @@ function App() {
       }
 
       setEmployeeRole(department);
+      setLoggedInEmployee(employee);
       setViewMode('employee');
     }
 
@@ -202,6 +211,8 @@ function App() {
         return <FinancialReports />;
       case 'guest-reports':
         return <GuestReports />;
+      case 'settings':
+        return <Settings isDarkMode={isAdminDarkMode} setIsDarkMode={setIsAdminDarkMode} sidebarCollapsed={isCollapsed} setSidebarCollapsed={setIsCollapsed} />;
       default:
         return <Overview setActiveTab={setActiveTab} />;
     }
@@ -222,7 +233,7 @@ function App() {
         >
           ← Switch to Admin View
         </button>
-        <EmployeePortal employeeRole={employeeRole} />
+        <EmployeePortal employeeRole={employeeRole} employee={loggedInEmployee} />
       </div>
     );
   }
