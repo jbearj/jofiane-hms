@@ -5003,7 +5003,7 @@ tr:last-child td {
     position: absolute;
     z-index: 40;
     top: 0;
-    left: 68px;
+    left: calc(100% + 4px);
     width: 205px;
     max-height: 320px !important;
     margin: 0 !important;
@@ -5020,6 +5020,15 @@ tr:last-child td {
     pointer-events: none;
     transform: translateX(-8px) scale(0.98);
     transition: opacity 0.16s ease, transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), visibility 0s linear 0.2s !important;
+  }
+
+  .employee-portal-shell .sidebar.collapsed .nav-submenu-container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -12px;
+    width: 12px;
+    height: 100%;
   }
 
   .employee-portal-shell .sidebar.collapsed .nav-item-group:hover .nav-submenu-container,
