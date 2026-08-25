@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-function Dashboard({ employee }) {
+function Dashboard({ employee, setActiveTab }) {
   const [isLoading, setIsLoading] = useState(true);
   const [stats, setStats] = useState(null);
   const [recentActivity, setRecentActivity] = useState([]);
@@ -72,15 +72,15 @@ function Dashboard({ employee }) {
 
         {/* Operational snapshot */}
         <div className="employee-kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
-          <KpiCard label="PENDING ARRIVALS" value={stats.arrivals.pending} sub={`${stats.arrivals.total} expected today`} subColor="#9f6f16" tone="warning" icon="fa-arrow-right-to-bracket" iconBg="#f7edcf" iconColor="#8c6a27" />
-          <KpiCard label="PENDING DEPARTURES" value={stats.departures.pending} sub={`${stats.departures.balanceDue} with balance due`} subColor="#a84b3e" tone="alert" icon="fa-arrow-right-from-bracket" iconBg="#f7e2dc" iconColor="#a84b3e" />
-          <KpiCard label="IN-HOUSE GUESTS" value={stats.inHouse.total} sub={`${stats.inHouse.balanceOutstanding} with balance`} subColor="#62544d" icon="fa-bed" iconBg="#e9e3dc" iconColor="#4a3728" />
-          <KpiCard label="OCCUPANCY RATE" value={`${occupancyRate}%`} sub={`${stats.rooms.occupied} of ${stats.rooms.total} rooms`} subColor="#357653" icon="fa-chart-pie" iconBg="#dceee4" iconColor="#357653" />
+          <KpiCard label="PENDING ARRIVALS" value={stats.arrivals.pending} sub={`${stats.arrivals.total} expected today`} subColor="#9f6f16" tone="warning" icon="fa-arrow-right-to-bracket" iconBg="#f7edcf" iconColor="#8c6a27" onClick={() => setActiveTab('arrivals')} />
+          <KpiCard label="PENDING DEPARTURES" value={stats.departures.pending} sub={`${stats.departures.balanceDue} with balance due`} subColor="#a84b3e" tone="alert" icon="fa-arrow-right-from-bracket" iconBg="#f7e2dc" iconColor="#a84b3e" onClick={() => setActiveTab('departures')} />
+          <KpiCard label="IN-HOUSE GUESTS" value={stats.inHouse.total} sub={`${stats.inHouse.balanceOutstanding} with balance`} subColor="#62544d" icon="fa-bed" iconBg="#e9e3dc" iconColor="#4a3728" onClick={() => setActiveTab('inhouse')} />
+          <KpiCard label="OCCUPANCY RATE" value={`${occupancyRate}%`} sub={`${stats.rooms.occupied} of ${stats.rooms.total} rooms`} subColor="#357653" icon="fa-chart-pie" iconBg="#dceee4" iconColor="#357653" onClick={() => setActiveTab('roomrack')} />
         </div>
 
         {/* Today's primary workflows */}
         <div className="employee-operations-grid">
-          <div className="employee-glass-card operations-card arrivals-card" style={{ background: '#fff', borderRadius: '12px', border: '1px solid #edebe7', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+          <div className="employee-glass-card operations-card arrivals-card dashboard-link-card" onClick={() => setActiveTab('arrivals')} onKeyDown={(event) => event.key === 'Enter' && setActiveTab('arrivals')} role="link" tabIndex="0" aria-label="Open Front Desk Arrivals" style={{ background: '#fff', borderRadius: '12px', border: '1px solid #edebe7', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                 <div><span className="card-eyebrow">Today</span><h3 style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: '#1a1917' }}>Arrivals</h3></div>
                 <span style={{ fontSize: '11px', fontWeight: '600', color: '#b45309', background: '#fef3c7', padding: '4px 10px', borderRadius: '20px' }}>{stats.arrivals.pending} pending</span>
@@ -92,7 +92,7 @@ function Dashboard({ employee }) {
               </div>
           </div>
 
-          <div className="employee-glass-card operations-card departures-card" style={{ background: '#fff', borderRadius: '12px', border: '1px solid #edebe7', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+          <div className="employee-glass-card operations-card departures-card dashboard-link-card" onClick={() => setActiveTab('departures')} onKeyDown={(event) => event.key === 'Enter' && setActiveTab('departures')} role="link" tabIndex="0" aria-label="Open Front Desk Departures" style={{ background: '#fff', borderRadius: '12px', border: '1px solid #edebe7', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                 <div><span className="card-eyebrow">Today</span><h3 style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: '#1a1917' }}>Departures</h3></div>
                 <span style={{ fontSize: '11px', fontWeight: '600', color: '#b91c1c', background: '#fee2e2', padding: '4px 10px', borderRadius: '20px' }}>{stats.departures.pending} overdue</span>
@@ -107,7 +107,7 @@ function Dashboard({ employee }) {
 
         {/* Live room operations */}
         <div className="employee-workspace-grid">
-          <div className="employee-glass-card room-status-card" style={{ background: '#fff', borderRadius: '12px', border: '1px solid #edebe7', padding: '28px 32px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+          <div className="employee-glass-card room-status-card dashboard-link-card" onClick={() => setActiveTab('roomrack')} onKeyDown={(event) => event.key === 'Enter' && setActiveTab('roomrack')} role="link" tabIndex="0" aria-label="Open Room Rack and Plan" style={{ background: '#fff', borderRadius: '12px', border: '1px solid #edebe7', padding: '28px 32px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '29px' }}>
               <div><span className="card-eyebrow">Live inventory</span><h3 style={{ margin: 0, fontSize: '16px', fontWeight: '700', color: '#1a1917' }}>Room Status</h3></div>
               <span style={{ fontSize: '12px', color: '#9ca3af' }}>{stats.rooms.total} rooms</span>
@@ -115,7 +115,7 @@ function Dashboard({ employee }) {
             <RoomGrid rooms={stats.rooms} />
           </div>
 
-          <div className="employee-glass-card activity-card" style={{ background: '#fff', borderRadius: '12px', border: '1px solid #edebe7', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+          <div className="employee-glass-card activity-card dashboard-link-card" onClick={() => setActiveTab('logbook')} onKeyDown={(event) => event.key === 'Enter' && setActiveTab('logbook')} role="link" tabIndex="0" aria-label="Open Front Desk Log" style={{ background: '#fff', borderRadius: '12px', border: '1px solid #edebe7', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
                 <div className="card-section-heading"><span className="card-eyebrow">Live feed</span><h3 style={{ margin: '0 0 16px 0', fontSize: '15px', fontWeight: '700', color: '#1a1917' }}>Recent Activity</h3></div>
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                   {recentActivity.map((item) => (
@@ -135,7 +135,7 @@ function Dashboard({ employee }) {
 
         {/* Planning and reservation context */}
         <div className="employee-insights-grid">
-          <div className="employee-glass-card reservations-card" style={{ background: '#fff', borderRadius: '12px', border: '1px solid #edebe7', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+          <div className="employee-glass-card reservations-card dashboard-link-card" onClick={() => setActiveTab('bookings')} onKeyDown={(event) => event.key === 'Enter' && setActiveTab('bookings')} role="link" tabIndex="0" aria-label="Open Booking Management" style={{ background: '#fff', borderRadius: '12px', border: '1px solid #edebe7', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
               <div><span className="card-eyebrow">Booking mix</span><h3 style={{ margin: 0, fontSize: '13px', fontWeight: '700', color: '#1a1917' }}>Reservations</h3></div>
             </div>
@@ -145,7 +145,7 @@ function Dashboard({ employee }) {
             </div>
             <ReservationRadar bookings={stats.bookings} size={180} />
           </div>
-          <div className="employee-glass-card calendar-card" style={{ background: '#fff', borderRadius: '12px', border: '1px solid #edebe7', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+          <div className="employee-glass-card calendar-card dashboard-link-card" onClick={() => setActiveTab('bookings')} onKeyDown={(event) => event.key === 'Enter' && setActiveTab('bookings')} role="link" tabIndex="0" aria-label="Open reservation calendar in Booking Management" style={{ background: '#fff', borderRadius: '12px', border: '1px solid #edebe7', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
             <MiniCalendar />
           </div>
         </div>
@@ -157,9 +157,9 @@ function Dashboard({ employee }) {
 
 /* Sub-Components */
 
-function KpiCard({ label, value, sub, subColor, tone = 'neutral', icon, iconBg, iconColor }) {
+function KpiCard({ label, value, sub, subColor, tone = 'neutral', icon, iconBg, iconColor, onClick }) {
   return (
-    <div className="employee-glass-card employee-kpi-card" style={{ background: '#fff', borderRadius: '12px', border: '1px solid #edebe7', padding: '22px 24px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+    <button type="button" className="employee-glass-card employee-kpi-card dashboard-link-card" onClick={onClick} aria-label={`Open ${label.toLowerCase()}`} style={{ background: '#fff', borderRadius: '12px', border: '1px solid #edebe7', padding: '22px 24px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', textAlign: 'left', font: 'inherit' }}>
       <div className="employee-kpi-heading" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
         <span style={{ fontSize: '11px', fontWeight: '700', color: '#78716c', textTransform: 'uppercase', letterSpacing: '0.6px' }}>{label}</span>
         <span style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px', background: iconBg, color: iconColor, fontSize: '13px' }}>
@@ -168,7 +168,7 @@ function KpiCard({ label, value, sub, subColor, tone = 'neutral', icon, iconBg, 
       </div>
       <div style={{ fontSize: '32px', fontWeight: '700', color: '#1a1917', lineHeight: '1', marginBottom: '8px' }}>{value}</div>
       <div className={`employee-kpi-sub tone-${tone}`} style={{ fontSize: '12px', fontWeight: '500', color: subColor }}>{sub}</div>
-    </div>
+    </button>
   );
 }
 

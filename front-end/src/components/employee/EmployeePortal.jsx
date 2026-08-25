@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Sidebar from './Sidebar';
 import Dashboard from './Dashboard';
 import BookingManagement from './BookingManagement';
@@ -10,6 +10,10 @@ import HousekeepingStatus from '../admin/rooms/HousekeepingStatus';
 import CleaningTasks from './CleaningTasks';
 import Maintenance from './Maintenance';
 import EmployeeSettings from './Settings';
+import WalkIn from './WalkIn';
+import RoomRack from './RoomRack';
+import Transactions from '../admin/finance/Transactions';
+import AuditTrail from '../admin/finance/AuditTrail';
 
 function EmployeePortal({employeeRole, employee}) {
   const frontDeskTabs = [
@@ -19,6 +23,10 @@ function EmployeePortal({employeeRole, employee}) {
   'inhouse',
   'departures',
   'logbook',
+  'walkin',
+  'roomrack',
+  'transactions',
+  'nightaudit',
   'settings'
   ];
 
@@ -36,6 +44,9 @@ function EmployeePortal({employeeRole, employee}) {
       : frontDeskTabs;
 
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [displayedTab, setDisplayedTab] = useState('dashboard');
+  const [transitionPhase, setTransitionPhase] = useState('idle');
+  const pageTransitionTimerRef = useRef(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(() => {
     if (typeof window === 'undefined') return false;
@@ -54,15 +65,51 @@ function EmployeePortal({employeeRole, employee}) {
     window.localStorage.setItem('jofiane-employee-theme', isDarkMode ? 'dark' : 'light');
   }, [isDarkMode]);
 
+  useEffect(() => () => {
+    if (pageTransitionTimerRef.current) {
+      window.clearTimeout(pageTransitionTimerRef.current);
+    }
+  }, []);
+
+  const navigateToTab = (nextTab) => {
+    if (nextTab === activeTab) return;
+
+    const prefersReducedMotion = typeof window.matchMedia === 'function'
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    setActiveTab(nextTab);
+
+    if (pageTransitionTimerRef.current) {
+      window.clearTimeout(pageTransitionTimerRef.current);
+    }
+
+    if (prefersReducedMotion) {
+      setDisplayedTab(nextTab);
+      setTransitionPhase('idle');
+      return;
+    }
+
+    setTransitionPhase('leaving');
+    pageTransitionTimerRef.current = window.setTimeout(() => {
+      setDisplayedTab(nextTab);
+      setTransitionPhase('entering');
+
+      pageTransitionTimerRef.current = window.setTimeout(() => {
+        setTransitionPhase('idle');
+        pageTransitionTimerRef.current = null;
+      }, 300);
+    }, 140);
+  };
+
   const renderContent = () => {
 
-  if (!allowedTabs.includes(activeTab)) {
-    return <Dashboard activeTab="dashboard" employee={employee} />;
+  if (!allowedTabs.includes(displayedTab)) {
+    return <Dashboard activeTab="dashboard" employee={employee} setActiveTab={navigateToTab} />;
   }
 
-  switch (activeTab) {
+  switch (displayedTab) {
     case 'dashboard':
-      return <Dashboard activeTab={activeTab} employee={employee} />;
+      return <Dashboard activeTab={displayedTab} employee={employee} setActiveTab={navigateToTab} />;
 
     case 'bookings':
       return (
@@ -99,6 +146,34 @@ function EmployeePortal({employeeRole, employee}) {
         </main>
       );
 
+    case 'walkin':
+      return (
+        <main className="main-content employee-content">
+          <WalkIn onViewBooking={() => navigateToTab('bookings')} />
+        </main>
+      );
+
+    case 'roomrack':
+      return (
+        <main className="main-content employee-content">
+          <RoomRack />
+        </main>
+      );
+
+    case 'transactions':
+      return (
+        <main className="main-content employee-content">
+          <Transactions />
+        </main>
+      );
+
+    case 'nightaudit':
+      return (
+        <main className="main-content employee-content">
+          <AuditTrail />
+        </main>
+      );
+
     case 'housekeeping':
       return (
         <main className="main-content employee-content">
@@ -124,19 +199,19 @@ function EmployeePortal({employeeRole, employee}) {
       return <EmployeeSettings isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} employee={employee} />;
 
     default:
-      return <Dashboard activeTab="dashboard" employee={employee} />;
+      return <Dashboard activeTab="dashboard" employee={employee} setActiveTab={navigateToTab} />;
   }
 };
 
   return (
-    <div className={`portal-shell employee-portal-shell ${isCollapsed ? 'nav-collapsed' : ''} ${isDarkMode ? 'theme-dark' : 'theme-light'}`}>
+    <div className={`portal-shell employee-portal-shell page-transition-${transitionPhase} ${isCollapsed ? 'nav-collapsed' : ''} ${isDarkMode ? 'theme-dark' : 'theme-light'}`}>
       <Sidebar 
         employeeRole={employeeRole}
         employee={employee}
         isCollapsed={isCollapsed}
         setIsCollapsed={setIsCollapsed}
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={navigateToTab}
         isDarkMode={isDarkMode}
         setIsDarkMode={setIsDarkMode}
       />

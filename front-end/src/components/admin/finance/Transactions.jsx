@@ -208,7 +208,7 @@ function Transactions() {
   }
 
   return (
-    <section className="admin-tab-content active">
+    <section className="admin-tab-content active transaction-module">
 
       {/* PAGE HEADER */}
       <div className="page-header">
@@ -219,23 +219,23 @@ function Transactions() {
       </div>
 
       {/* KPI CARDS */}
-      <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', marginBottom: '22px', opacity: isRefreshing ? 0.5 : 1, transition: 'opacity 0.2s ease' }}>
-        <div className="kpi-card">
+      <div className="kpi-grid txn-kpi-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', marginBottom: '22px', opacity: isRefreshing ? 0.5 : 1, transition: 'opacity 0.2s ease' }}>
+        <div className="kpi-card txn-kpi income">
           <span className="lbl">TOTAL INCOME</span>
           <span className="val">{kpis.totalIncome.toLocaleString()}</span>
           <span className="sub">This {filterPeriod}</span>
         </div>
-        <div className="kpi-card">
+        <div className="kpi-card txn-kpi expenses">
           <span className="lbl">TOTAL EXPENSES</span>
           <span className="val">{kpis.totalExpenses.toLocaleString()}</span>
           <span className="sub">Refunds & adjustments</span>
         </div>
-        <div className="kpi-card">
+        <div className="kpi-card txn-kpi net">
           <span className="lbl">NET REVENUE</span>
           <span className="val" style={{ color: 'var(--status-vac)' }}>{kpis.netRevenue.toLocaleString()}</span>
           <span className="sub">After deductions</span>
         </div>
-        <div className="kpi-card">
+        <div className="kpi-card txn-kpi outstanding">
           <span className="lbl">OUTSTANDING</span>
           <span className="val" style={{ color: '#b45309' }}>{kpis.outstanding.toLocaleString()}</span>
           <span className="sub">Pending collection</span>
@@ -406,7 +406,7 @@ function Transactions() {
                       <span className="guest-sub">{txn.methodDetail}</span>
                     </td>
                     <td style={{ textAlign: 'right' }}>
-                      <span style={{ fontWeight: '700', fontSize: '14px', color: txn.amount < 0 ? 'var(--status-occ)' : 'var(--text-primary)' }}>
+                      <span className={`txn-amount ${txn.amount < 0 ? 'negative' : 'positive'}`}>
                         {formatAmount(txn.amount)}
                       </span>
                     </td>
@@ -618,7 +618,7 @@ function TransactionDetailModal({ transaction: txn, onClose, onRefund, onVoid, f
         </div>
 
         {/* Amount hero */}
-        <div className="txn-modal-amount" style={{ color: txn.amount < 0 ? 'var(--status-occ)' : 'var(--text-primary)' }}>
+        <div className={`txn-modal-amount ${txn.amount < 0 ? 'negative' : 'positive'}`}>
           {txn.amount < 0 ? '−' : ''}₱{Math.abs(txn.amount).toLocaleString()}
         </div>
 
