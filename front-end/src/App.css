@@ -4654,6 +4654,38 @@ tr:last-child td {
   border-color: var(--employee-line);
 }
 
+.employee-portal-shell .table-wrap {
+  border-radius: 0 !important;
+  border: 1px solid rgba(111, 83, 61, 0.14) !important;
+}
+
+.employee-portal-shell .table-wrap table,
+.employee-portal-shell .table-wrap thead th,
+.employee-portal-shell .table-wrap tbody td {
+  border-radius: 0 !important;
+}
+
+.employee-portal-shell .table-wrap thead th {
+  padding: 14px 12px !important;
+  vertical-align: middle !important;
+  background: rgba(201, 168, 76, 0.3) !important;
+  border-bottom: 1px solid rgba(201, 168, 76, 0.25) !important;
+  border-right: 1px solid rgba(111, 83, 61, 0.12) !important;
+}
+
+.employee-portal-shell .table-wrap thead th:last-child {
+  border-right: none !important;
+}
+
+.employee-portal-shell .table-wrap tbody td {
+  border-bottom: 1px solid rgba(111, 83, 61, 0.12) !important;
+  border-right: 1px solid rgba(111, 83, 61, 0.12) !important;
+}
+
+.employee-portal-shell .table-wrap tbody td:last-child {
+  border-right: none !important;
+}
+
 .employee-portal-shell.theme-dark thead th {
   color: #c9bcae !important;
   background: rgba(27, 21, 18, 0.88) !important;
