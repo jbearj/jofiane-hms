@@ -203,7 +203,10 @@ function Sidebar({ employeeRole, employee, isCollapsed, setIsCollapsed, activeTa
       subItems: [
         { id: 'housekeeping', label: 'Room Status' },
         { id: 'cleaning-tasks', label: 'Cleaning Tasks' },
-        { id: 'maintenance', label: 'Maintenance Requests' }
+        { id: 'guest-requests', label: 'Guest Requests' },
+        { id: 'lost-found', label: 'Lost & Found' },
+        { id: 'maintenance', label: 'Maintenance Requests' },
+        { id: 'housekeeping-logs', label: 'Housekeeping Log' }
       ]
     },
     {

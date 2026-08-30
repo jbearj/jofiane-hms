@@ -57,7 +57,14 @@ const Maintenance = () => {
       priority: formData.priority,
       reportedBy: 'Current Employee',
       status: 'Pending',
-      date: 'Aug 18, 2026'
+      date: new Date().toLocaleDateString(
+        'en-US',
+        {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric'
+        }
+      )
     };
 
     setRequests([...requests, newRequest]);
@@ -72,231 +79,382 @@ const Maintenance = () => {
     setShowForm(false);
   };
 
+  const getPriorityClass = (priority) => {
+    if (priority === 'High') {
+      return 'status-tag tag-danger';
+    }
+
+    if (priority === 'Medium') {
+      return 'status-tag tag-warning';
+    }
+
+    return 'status-tag tag-success';
+  };
+
+  const getStatusClass = (status) => {
+    if (status === 'Completed') {
+      return 'status-tag tag-success';
+    }
+
+    if (status === 'In Progress') {
+      return 'status-tag tag-gold';
+    }
+
+    return 'status-tag tag-warning';
+  };
+
+  const totalRequests = requests.length;
+
+  const pendingRequests = requests.filter(
+    (item) => item.status === 'Pending'
+  ).length;
+
+  const inProgressRequests = requests.filter(
+    (item) => item.status === 'In Progress'
+  ).length;
+
+  const completedRequests = requests.filter(
+    (item) => item.status === 'Completed'
+  ).length;
+
   return (
-    <div style={styles.page}>
+    <section className="admin-tab-content active housekeeping-module">
 
-      <div style={styles.header}>
-
+      <div
+        className="employee-dashboard-header"
+        style={{ marginBottom: '28px' }}
+      >
         <div>
-          <h1 style={styles.title}>
+          <h2
+            style={{
+              fontSize: '28px',
+              fontWeight: '700',
+              color: 'var(--text-primary)',
+              margin: '0 0 6px 0'
+            }}
+          >
             Maintenance Requests
-          </h1>
+          </h2>
 
-          <p style={styles.subtitle}>
+          <p
+            style={{
+              margin: 0,
+              fontSize: '14px',
+              color: 'var(--text-secondary)'
+            }}
+          >
             Report and monitor room maintenance issues.
           </p>
         </div>
 
         <button
-          style={styles.addButton}
+          className="btn btn-gold"
           onClick={() => setShowForm(true)}
         >
           + Report Maintenance
         </button>
-
       </div>
 
-      <div style={styles.stats}>
+      <div
+        className="kpi-grid"
+        style={{
+          gridTemplateColumns: 'repeat(4, 1fr)',
+          marginBottom: '22px'
+        }}
+      >
+        <div className="kpi-card">
+          <span
+            className="lbl"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            TOTAL REQUESTS
+          </span>
 
-        <div style={styles.statCard}>
-          <div style={styles.statNumber}>
-            {requests.length}
-          </div>
+          <span
+            className="val"
+            style={{ color: 'var(--text-primary)' }}
+          >
+            {totalRequests}
+          </span>
 
-          <div style={styles.statLabel}>
-            Total Requests
-          </div>
+          <span
+            className="sub"
+            style={{ color: 'var(--text-secondary)' }}
+          >
+            Maintenance reports
+          </span>
         </div>
 
-        <div style={styles.statCard}>
-          <div style={styles.statNumber}>
-            {requests.filter(
-              (item) => item.status === 'Pending'
-            ).length}
-          </div>
+        <div className="kpi-card">
+          <span
+            className="lbl"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            PENDING
+          </span>
 
-          <div style={styles.statLabel}>
-            Pending
-          </div>
+          <span
+            className="val"
+            style={{ color: 'var(--text-primary)' }}
+          >
+            {pendingRequests}
+          </span>
+
+          <span
+            className="sub"
+            style={{ color: 'var(--text-secondary)' }}
+          >
+            Waiting for action
+          </span>
         </div>
 
-        <div style={styles.statCard}>
-          <div style={styles.statNumber}>
-            {requests.filter(
-              (item) => item.status === 'In Progress'
-            ).length}
-          </div>
+        <div className="kpi-card">
+          <span
+            className="lbl"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            IN PROGRESS
+          </span>
 
-          <div style={styles.statLabel}>
-            In Progress
-          </div>
+          <span
+            className="val"
+            style={{ color: 'var(--text-primary)' }}
+          >
+            {inProgressRequests}
+          </span>
+
+          <span
+            className="sub"
+            style={{ color: 'var(--text-secondary)' }}
+          >
+            Currently being repaired
+          </span>
         </div>
 
-        <div style={styles.statCard}>
-          <div style={styles.statNumber}>
-            {requests.filter(
-              (item) => item.status === 'Completed'
-            ).length}
-          </div>
+        <div className="kpi-card">
+          <span
+            className="lbl"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            COMPLETED
+          </span>
 
-          <div style={styles.statLabel}>
-            Completed
-          </div>
+          <span
+            className="val"
+            style={{ color: 'var(--text-primary)' }}
+          >
+            {completedRequests}
+          </span>
+
+          <span
+            className="sub"
+            style={{ color: 'var(--text-secondary)' }}
+          >
+            Resolved requests
+          </span>
         </div>
-
       </div>
 
-      <div style={styles.tableCard}>
-
-        <div style={styles.tableHeader}>
-          <h2 style={styles.sectionTitle}>
+      <div
+        className="panel"
+        style={{
+          padding: 0,
+          overflow: 'hidden'
+        }}
+      >
+        <div
+          className="panel-header"
+          style={{
+            padding: '20px 24px',
+            margin: 0,
+            borderBottom: '1px solid var(--border-light)'
+          }}
+        >
+          <h3
+            style={{
+              margin: 0,
+              color: 'var(--text-primary)'
+            }}
+          >
             Maintenance Requests
-          </h2>
+          </h3>
         </div>
 
-        <div style={styles.tableWrapper}>
-
-          <table style={styles.table}>
-
+        <div className="table-wrap">
+          <table>
             <thead>
               <tr>
-                <th style={styles.th}>Room</th>
-                <th style={styles.th}>Issue</th>
-                <th style={styles.th}>Priority</th>
-                <th style={styles.th}>Reported By</th>
-                <th style={styles.th}>Status</th>
-                <th style={styles.th}>Date</th>
+                <th>Room</th>
+                <th>Issue</th>
+                <th>Priority</th>
+                <th>Reported By</th>
+                <th>Status</th>
+                <th>Date</th>
               </tr>
             </thead>
 
             <tbody>
-
               {requests.map((request) => (
-
-                <tr key={request.id}>
-
-                  <td style={styles.td}>
-                    <strong style={styles.roomText}>
+                <tr
+                  key={request.id}
+                  className="table-row-hover"
+                >
+                  <td>
+                    <strong
+                      style={{
+                        color: 'var(--text-primary)'
+                      }}
+                    >
                       Room {request.room}
                     </strong>
                   </td>
 
-                  <td style={styles.td}>
+                  <td
+                    style={{
+                      color: 'var(--text-secondary)'
+                    }}
+                  >
                     {request.issue}
                   </td>
 
-                  <td style={styles.td}>
+                  <td>
                     <span
-                      style={getPriorityStyle(
-                        request.priority
-                      )}
+                      className={getPriorityClass(request.priority)}
                     >
                       {request.priority}
                     </span>
                   </td>
 
-                  <td style={styles.td}>
+                  <td
+                    style={{
+                      color: 'var(--text-secondary)'
+                    }}
+                  >
                     {request.reportedBy}
                   </td>
 
-                  <td style={styles.td}>
+                  <td>
                     <span
-                      style={getStatusStyle(
-                        request.status
-                      )}
+                      className={getStatusClass(request.status)}
                     >
                       {request.status}
                     </span>
                   </td>
 
-                  <td style={styles.td}>
+                  <td
+                    style={{
+                      color: 'var(--text-secondary)'
+                    }}
+                  >
                     {request.date}
                   </td>
-
                 </tr>
-
               ))}
-
             </tbody>
-
           </table>
-
         </div>
-
       </div>
 
       {showForm && (
+        <div
+          className="modal-overlay open"
+          onClick={() => setShowForm(false)}
+        >
+          <div
+            className="modal-content"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: '440px' }}
+          >
+            <button
+              className="modal-close"
+              onClick={() => setShowForm(false)}
+            >
+              ×
+            </button>
 
-        <div style={styles.modalOverlay}>
-
-          <div style={styles.modal}>
-
-            <h2 style={styles.modalTitle}>
+            <h3
+              style={{
+                marginBottom: '6px',
+                color: 'var(--text-primary)'
+              }}
+            >
               Report Maintenance
-            </h2>
+            </h3>
+
+            <p
+              style={{
+                fontSize: '12px',
+                color: 'var(--text-secondary)',
+                marginBottom: '20px'
+              }}
+            >
+              Record a room maintenance issue.
+            </p>
 
             <form onSubmit={handleSubmit}>
+              <div className="form-group">
+                <label>Room Number</label>
 
-              <label style={styles.label}>
-                Room Number
-              </label>
+                <input
+                  type="text"
+                  name="room"
+                  value={formData.room}
+                  onChange={handleChange}
+                  placeholder="Example: 205"
+                  required
+                />
+              </div>
 
-              <input
-                type="text"
-                name="room"
-                value={formData.room}
-                onChange={handleChange}
-                placeholder="Example: 205"
-                required
-                style={styles.input}
-              />
+              <div className="form-group">
+                <label>Issue</label>
 
-              <label style={styles.label}>
-                Issue
-              </label>
+                <input
+                  type="text"
+                  name="issue"
+                  value={formData.issue}
+                  onChange={handleChange}
+                  placeholder="Example: Aircon not working"
+                  required
+                />
+              </div>
 
-              <input
-                type="text"
-                name="issue"
-                value={formData.issue}
-                onChange={handleChange}
-                placeholder="Example: Aircon not working"
-                required
-                style={styles.input}
-              />
+              <div className="form-group">
+                <label>Priority</label>
 
-              <label style={styles.label}>
-                Priority
-              </label>
+                <select
+                  name="priority"
+                  value={formData.priority}
+                  onChange={handleChange}
+                >
+                  <option value="Low">Low</option>
+                  <option value="Medium">Medium</option>
+                  <option value="High">High</option>
+                </select>
+              </div>
 
-              <select
-                name="priority"
-                value={formData.priority}
-                onChange={handleChange}
-                style={styles.input}
+              <div className="form-group">
+                <label>Description</label>
+
+                <textarea
+                  name="description"
+                  value={formData.description}
+                  onChange={handleChange}
+                  placeholder="Describe the problem..."
+                  style={{ minHeight: '90px' }}
+                />
+              </div>
+
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'flex-end',
+                  gap: '10px',
+                  marginTop: '20px'
+                }}
               >
-                <option value="Low">Low</option>
-                <option value="Medium">Medium</option>
-                <option value="High">High</option>
-              </select>
-
-              <label style={styles.label}>
-                Description
-              </label>
-
-              <textarea
-                name="description"
-                value={formData.description}
-                onChange={handleChange}
-                placeholder="Describe the problem..."
-                style={styles.textarea}
-              />
-
-              <div style={styles.modalButtons}>
-
                 <button
                   type="button"
-                  style={styles.cancelButton}
+                  className="btn"
                   onClick={() => setShowForm(false)}
                 >
                   Cancel
@@ -304,289 +462,18 @@ const Maintenance = () => {
 
                 <button
                   type="submit"
-                  style={styles.submitButton}
+                  className="btn btn-gold"
                 >
                   Submit Request
                 </button>
-
               </div>
-
             </form>
-
           </div>
-
         </div>
-
       )}
 
-    </div>
+    </section>
   );
-};
-
-const getPriorityStyle = (priority) => {
-
-  if (priority === 'High') {
-    return {
-      ...styles.badge,
-      background: '#fde4e4',
-      color: '#c62828'
-    };
-  }
-
-  if (priority === 'Medium') {
-    return {
-      ...styles.badge,
-      background: '#fff1c9',
-      color: '#9a7415'
-    };
-  }
-
-  return {
-    ...styles.badge,
-    background: '#dff5e8',
-    color: '#247a4b'
-  };
-};
-
-const getStatusStyle = (status) => {
-
-  if (status === 'Completed') {
-    return {
-      ...styles.badge,
-      background: '#dff5e8',
-      color: '#247a4b'
-    };
-  }
-
-  if (status === 'In Progress') {
-    return {
-      ...styles.badge,
-      background: '#e1ecff',
-      color: '#3267b1'
-    };
-  }
-
-  return {
-    ...styles.badge,
-    background: '#fff1c9',
-    color: '#9a7415'
-  };
-};
-
-const styles = {
-
-  page: {
-    padding: '30px',
-    color: '#332720',
-    minHeight: '100%',
-    boxSizing: 'border-box'
-  },
-
-  header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '25px'
-  },
-
-  title: {
-    margin: 0,
-    fontSize: '28px',
-    fontWeight: '700',
-    color: '#2f241e'
-  },
-
-  subtitle: {
-    marginTop: '6px',
-    color: '#766b63',
-    fontSize: '14px'
-  },
-
-  addButton: {
-    padding: '12px 18px',
-    border: 'none',
-    borderRadius: '9px',
-    background: '#c9a84c',
-    color: '#2f241e',
-    fontWeight: '700',
-    cursor: 'pointer',
-    boxShadow: '0 4px 12px rgba(80, 55, 25, 0.15)'
-  },
-
-  stats: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(4, 1fr)',
-    gap: '15px',
-    marginBottom: '25px'
-  },
-
-  statCard: {
-    background: 'rgba(255, 253, 249, 0.96)',
-    border: '1px solid #e6dbce',
-    borderRadius: '14px',
-    padding: '20px',
-    boxShadow: '0 5px 18px rgba(70, 45, 25, 0.08)'
-  },
-
-  statNumber: {
-    fontSize: '26px',
-    fontWeight: '700',
-    color: '#b38b2f'
-  },
-
-  statLabel: {
-    marginTop: '5px',
-    color: '#766b63',
-    fontSize: '13px'
-  },
-
-  tableCard: {
-    background: 'rgba(255, 253, 249, 0.97)',
-    border: '1px solid #e6dbce',
-    borderRadius: '14px',
-    overflow: 'hidden',
-    boxShadow: '0 6px 20px rgba(70, 45, 25, 0.08)'
-  },
-
-  tableHeader: {
-    padding: '20px',
-    borderBottom: '1px solid #eadfd3',
-    background: '#fffaf3'
-  },
-
-  sectionTitle: {
-    margin: 0,
-    fontSize: '18px',
-    color: '#332720',
-    fontWeight: '700'
-  },
-
-  tableWrapper: {
-    overflowX: 'auto'
-  },
-
-  table: {
-    width: '100%',
-    borderCollapse: 'collapse'
-  },
-
-  th: {
-    textAlign: 'left',
-    padding: '14px 20px',
-    color: '#9b7625',
-    background: '#f7f0e6',
-    fontSize: '11px',
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: '0.5px'
-  },
-
-  td: {
-    padding: '16px 20px',
-    borderTop: '1px solid #eee5db',
-    fontSize: '13px',
-    color: '#4b4039',
-    background: 'rgba(255, 253, 249, 0.92)'
-  },
-
-  roomText: {
-    color: '#332720'
-  },
-
-  badge: {
-    display: 'inline-block',
-    padding: '6px 10px',
-    borderRadius: '20px',
-    fontSize: '11px',
-    fontWeight: '700'
-  },
-
-  modalOverlay: {
-    position: 'fixed',
-    inset: 0,
-    background: 'rgba(35, 25, 18, 0.55)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 1000
-  },
-
-  modal: {
-    width: '420px',
-    background: '#fffaf4',
-    borderRadius: '16px',
-    padding: '25px',
-    border: '1px solid #e5d6c5',
-    boxShadow: '0 20px 50px rgba(40, 25, 15, 0.25)'
-  },
-
-  modalTitle: {
-    marginTop: 0,
-    marginBottom: '20px',
-    color: '#332720',
-    fontSize: '20px'
-  },
-
-  label: {
-    display: 'block',
-    marginBottom: '6px',
-    marginTop: '14px',
-    fontSize: '12px',
-    fontWeight: '600',
-    color: '#6f5a49'
-  },
-
-  input: {
-    width: '100%',
-    padding: '11px',
-    boxSizing: 'border-box',
-    borderRadius: '7px',
-    border: '1px solid #d9cbbb',
-    background: '#ffffff',
-    color: '#332720',
-    outline: 'none',
-    fontSize: '13px'
-  },
-
-  textarea: {
-    width: '100%',
-    height: '80px',
-    padding: '11px',
-    boxSizing: 'border-box',
-    borderRadius: '7px',
-    border: '1px solid #d9cbbb',
-    background: '#ffffff',
-    color: '#332720',
-    resize: 'none',
-    outline: 'none',
-    fontSize: '13px'
-  },
-
-  modalButtons: {
-    display: 'flex',
-    justifyContent: 'flex-end',
-    gap: '10px',
-    marginTop: '20px'
-  },
-
-  cancelButton: {
-    padding: '10px 15px',
-    borderRadius: '7px',
-    border: '1px solid #d8cbbb',
-    background: '#ffffff',
-    color: '#5d5148',
-    cursor: 'pointer'
-  },
-
-  submitButton: {
-    padding: '10px 15px',
-    borderRadius: '7px',
-    border: 'none',
-    background: '#c9a84c',
-    color: '#2f241e',
-    fontWeight: '700',
-    cursor: 'pointer'
-  }
 };
 
 export default Maintenance;

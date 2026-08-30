@@ -14,6 +14,10 @@ import WalkIn from './WalkIn';
 import RoomRack from './RoomRack';
 import Transactions from '../admin/finance/Transactions';
 import AuditTrail from '../admin/finance/AuditTrail';
+import HousekeepingDashboard from './HousekeepingDashboard';
+import GuestRequests from './GuestRequests';
+import HousekeepingLogs from './HousekeepingLogs';
+import LostAndFound from './LostAndFound';
 
 function EmployeePortal({employeeRole, employee}) {
   const frontDeskTabs = [
@@ -34,7 +38,10 @@ function EmployeePortal({employeeRole, employee}) {
     'dashboard',
     'housekeeping',
     'cleaning-tasks',
+    'guest-requests',
+    'lost-found',
     'maintenance',
+    'housekeeping-logs',
     'settings'
   ];
 
@@ -104,12 +111,29 @@ function EmployeePortal({employeeRole, employee}) {
   const renderContent = () => {
 
   if (!allowedTabs.includes(displayedTab)) {
-    return <Dashboard activeTab="dashboard" employee={employee} setActiveTab={navigateToTab} />;
+    if (employeeRole === 'housekeeping') {
+      return (
+        <HousekeepingDashboard employee={employee} setActiveTab={navigateToTab}/>
+      );
+    }
+
+    return (
+      <Dashboard activeTab="dashboard" employee={employee} setActiveTab={navigateToTab}/>
+    );
   }
 
   switch (displayedTab) {
     case 'dashboard':
-      return <Dashboard activeTab={displayedTab} employee={employee} setActiveTab={navigateToTab} />;
+      if (employeeRole === 'housekeeping') {
+        return (
+          <HousekeepingDashboard employee={employee} setActiveTab={navigateToTab}/>
+        );
+      }
+
+      return (
+        <Dashboard activeTab={displayedTab} employee={employee} setActiveTab={navigateToTab}
+        />
+      );
 
     case 'bookings':
       return (
@@ -187,6 +211,17 @@ function EmployeePortal({employeeRole, employee}) {
           <CleaningTasks />
         </main>
       );
+    
+    case 'guest-requests':
+      return (
+        <GuestRequests />
+      );
+
+    case 'lost-found':
+      return (
+        <LostAndFound />
+      );
+
 
     case 'maintenance':
       return (
@@ -195,11 +230,24 @@ function EmployeePortal({employeeRole, employee}) {
         </main>
       );
 
+    case 'housekeeping-logs':
+      return (
+        <HousekeepingLogs />
+      );
+
     case 'settings':
       return <EmployeeSettings isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} employee={employee} />;
 
     default:
-      return <Dashboard activeTab="dashboard" employee={employee} setActiveTab={navigateToTab} />;
+      if (employeeRole === 'housekeeping') {
+        return (
+          <HousekeepingDashboard employee={employee} etActiveTab={navigateToTab}/>
+        );
+      }
+
+      return (
+        <Dashboard activeTab="dashboard" employee={employee} setActiveTab={navigateToTab}/>
+      );
   }
 };
 

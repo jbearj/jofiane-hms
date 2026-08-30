@@ -78,227 +78,401 @@ const CleaningTasks = () => {
     );
   };
 
-  return (
-    <div style={styles.page}>
+  const getPriorityClass = (priority) => {
+    if (priority === 'High') {
+      return 'status-tag tag-danger';
+    }
 
-      <div style={styles.header}>
+    if (priority === 'Medium') {
+      return 'status-tag tag-warning';
+    }
+
+    return 'status-tag tag-success';
+  };
+
+  const getStatusClass = (status) => {
+    if (status === 'Completed') {
+      return 'status-tag tag-success';
+    }
+
+    if (status === 'In Progress') {
+      return 'status-tag tag-gold';
+    }
+
+    return 'status-tag tag-warning';
+  };
+
+  const totalTasks = tasks.length;
+
+  const pendingTasks = tasks.filter(
+    (task) => task.status === 'Pending'
+  ).length;
+
+  const inProgressTasks = tasks.filter(
+    (task) => task.status === 'In Progress'
+  ).length;
+
+  const completedTasks = tasks.filter(
+    (task) => task.status === 'Completed'
+  ).length;
+
+  return (
+    <section className="admin-tab-content active housekeeping-module">
+
+      <div
+        className="employee-dashboard-header"
+        style={{ marginBottom: '28px' }}
+      >
         <div>
-          <h1 style={styles.title}>Cleaning Tasks</h1>
-          <p style={styles.subtitle}>
+          <h2
+            style={{
+              fontSize: '28px',
+              fontWeight: '700',
+              color: 'var(--text-primary)',
+              margin: '0 0 6px 0'
+            }}
+          >
+            Cleaning Tasks
+          </h2>
+
+          <p
+            style={{
+              margin: 0,
+              fontSize: '14px',
+              color: 'var(--text-secondary)'
+            }}
+          >
             Manage and monitor housekeeping cleaning tasks.
           </p>
         </div>
 
         <button
-          style={styles.addButton}
+          className="btn btn-gold"
           onClick={() => setShowForm(true)}
         >
           + Add Cleaning Task
         </button>
       </div>
 
-      <div style={styles.stats}>
+      <div
+        className="kpi-grid"
+        style={{
+          gridTemplateColumns: 'repeat(4, 1fr)',
+          marginBottom: '22px'
+        }}
+      >
+        <div className="kpi-card">
+          <span
+            className="lbl"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            TOTAL TASKS
+          </span>
 
-        <div style={styles.statCard}>
-          <div style={styles.statNumber}>
-            {tasks.length}
-          </div>
-          <div style={styles.statLabel}>
-            Total Tasks
-          </div>
+          <span
+            className="val"
+            style={{ color: 'var(--text-primary)' }}
+          >
+            {totalTasks}
+          </span>
+
+          <span
+            className="sub"
+            style={{ color: 'var(--text-secondary)' }}
+          >
+            Housekeeping assignments
+          </span>
         </div>
 
-        <div style={styles.statCard}>
-          <div style={styles.statNumber}>
-            {tasks.filter((task) => task.status === 'Pending').length}
-          </div>
-          <div style={styles.statLabel}>
-            Pending
-          </div>
+        <div className="kpi-card">
+          <span
+            className="lbl"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            PENDING
+          </span>
+
+          <span
+            className="val"
+            style={{ color: 'var(--text-primary)' }}
+          >
+            {pendingTasks}
+          </span>
+
+          <span
+            className="sub"
+            style={{ color: 'var(--text-secondary)' }}
+          >
+            Waiting to be started
+          </span>
         </div>
 
-        <div style={styles.statCard}>
-          <div style={styles.statNumber}>
-            {tasks.filter((task) => task.status === 'In Progress').length}
-          </div>
-          <div style={styles.statLabel}>
-            In Progress
-          </div>
+        <div className="kpi-card">
+          <span
+            className="lbl"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            IN PROGRESS
+          </span>
+
+          <span
+            className="val"
+            style={{ color: 'var(--text-primary)' }}
+          >
+            {inProgressTasks}
+          </span>
+
+          <span
+            className="sub"
+            style={{ color: 'var(--text-secondary)' }}
+          >
+            Currently being handled
+          </span>
         </div>
 
-        <div style={styles.statCard}>
-          <div style={styles.statNumber}>
-            {tasks.filter((task) => task.status === 'Completed').length}
-          </div>
-          <div style={styles.statLabel}>
-            Completed
-          </div>
-        </div>
+        <div className="kpi-card">
+          <span
+            className="lbl"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            COMPLETED
+          </span>
 
+          <span
+            className="val"
+            style={{ color: 'var(--text-primary)' }}
+          >
+            {completedTasks}
+          </span>
+
+          <span
+            className="sub"
+            style={{ color: 'var(--text-secondary)' }}
+          >
+            Finished cleaning tasks
+          </span>
+        </div>
       </div>
 
-      <div style={styles.tableCard}>
-
-        <div style={styles.tableHeader}>
-          <h2 style={styles.sectionTitle}>
+      <div
+        className="panel"
+        style={{
+          padding: 0,
+          overflow: 'hidden'
+        }}
+      >
+        <div
+          className="panel-header"
+          style={{
+            padding: '20px 24px',
+            margin: 0,
+            borderBottom: '1px solid var(--border-light)'
+          }}
+        >
+          <h3
+            style={{
+              margin: 0,
+              color: 'var(--text-primary)'
+            }}
+          >
             Cleaning Task List
-          </h2>
+          </h3>
         </div>
 
-        <div style={styles.tableWrapper}>
-
-          <table style={styles.table}>
-
+        <div className="table-wrap">
+          <table>
             <thead>
               <tr>
-                <th style={styles.th}>Room</th>
-                <th style={styles.th}>Task</th>
-                <th style={styles.th}>Assigned To</th>
-                <th style={styles.th}>Priority</th>
-                <th style={styles.th}>Status</th>
-                <th style={styles.th}>Action</th>
+                <th>Room</th>
+                <th>Task</th>
+                <th>Assigned To</th>
+                <th>Priority</th>
+                <th>Status</th>
+                <th>Action</th>
               </tr>
             </thead>
 
             <tbody>
-
               {tasks.map((task) => (
-
-                <tr key={task.id}>
-
-                  <td style={styles.td}>
-                    <strong style={styles.roomText}>
+                <tr
+                  key={task.id}
+                  className="table-row-hover"
+                >
+                  <td>
+                    <strong
+                      style={{
+                        color: 'var(--text-primary)'
+                      }}
+                    >
                       Room {task.room}
                     </strong>
                   </td>
 
-                  <td style={styles.td}>
+                  <td
+                    style={{
+                      color: 'var(--text-secondary)'
+                    }}
+                  >
                     {task.task}
                   </td>
 
-                  <td style={styles.td}>
+                  <td
+                    style={{
+                      color: 'var(--text-secondary)'
+                    }}
+                  >
                     {task.assignedTo}
                   </td>
 
-                  <td style={styles.td}>
-                    <span style={getPriorityStyle(task.priority)}>
+                  <td>
+                    <span
+                      className={getPriorityClass(task.priority)}
+                    >
                       {task.priority}
                     </span>
                   </td>
 
-                  <td style={styles.td}>
-                    <span style={getStatusStyle(task.status)}>
+                  <td>
+                    <span
+                      className={getStatusClass(task.status)}
+                    >
                       {task.status}
                     </span>
                   </td>
 
-                  <td style={styles.td}>
-
-                    {task.status !== 'Completed' && (
+                  <td>
+                    {task.status !== 'Completed' ? (
                       <button
-                        style={styles.completeButton}
+                        className="btn btn-xs btn-gold"
                         onClick={() =>
-                          updateStatus(task.id, 'Completed')
+                          updateStatus(
+                            task.id,
+                            'Completed'
+                          )
                         }
                       >
                         Complete
                       </button>
-                    )}
-
-                    {task.status === 'Completed' && (
-                      <span style={styles.doneText}>
+                    ) : (
+                      <span
+                        style={{
+                          fontSize: '11px',
+                          fontWeight: '700',
+                          color: '#79c996'
+                        }}
+                      >
                         Done
                       </span>
                     )}
-
                   </td>
-
                 </tr>
-
               ))}
-
             </tbody>
-
           </table>
-
         </div>
-
       </div>
 
       {showForm && (
+        <div
+          className="modal-overlay open"
+          onClick={() => setShowForm(false)}
+        >
+          <div
+            className="modal-content"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: '440px' }}
+          >
+            <button
+              className="modal-close"
+              onClick={() => setShowForm(false)}
+            >
+              ×
+            </button>
 
-        <div style={styles.modalOverlay}>
-
-          <div style={styles.modal}>
-
-            <h2 style={styles.modalTitle}>
+            <h3
+              style={{
+                marginBottom: '6px',
+                color: 'var(--text-primary)'
+              }}
+            >
               Add Cleaning Task
-            </h2>
+            </h3>
+
+            <p
+              style={{
+                fontSize: '12px',
+                color: 'var(--text-secondary)',
+                marginBottom: '20px'
+              }}
+            >
+              Create a new housekeeping cleaning assignment.
+            </p>
 
             <form onSubmit={handleSubmit}>
+              <div className="form-group">
+                <label>Room Number</label>
 
-              <label style={styles.label}>
-                Room Number
-              </label>
+                <input
+                  type="text"
+                  name="room"
+                  value={formData.room}
+                  onChange={handleChange}
+                  placeholder="Example: 205"
+                  required
+                />
+              </div>
 
-              <input
-                type="text"
-                name="room"
-                value={formData.room}
-                onChange={handleChange}
-                placeholder="Example: 205"
-                required
-                style={styles.input}
-              />
+              <div className="form-group">
+                <label>Cleaning Task</label>
 
-              <label style={styles.label}>
-                Cleaning Task
-              </label>
+                <input
+                  type="text"
+                  name="task"
+                  value={formData.task}
+                  onChange={handleChange}
+                  placeholder="Example: Room Cleaning"
+                  required
+                />
+              </div>
 
-              <input
-                type="text"
-                name="task"
-                value={formData.task}
-                onChange={handleChange}
-                placeholder="Example: Room Cleaning"
-                required
-                style={styles.input}
-              />
+              <div className="form-group">
+                <label>Assigned To</label>
 
-              <label style={styles.label}>
-                Assigned To
-              </label>
+                <input
+                  type="text"
+                  name="assignedTo"
+                  value={formData.assignedTo}
+                  onChange={handleChange}
+                  placeholder="Employee name"
+                  required
+                />
+              </div>
 
-              <input
-                type="text"
-                name="assignedTo"
-                value={formData.assignedTo}
-                onChange={handleChange}
-                placeholder="Employee name"
-                required
-                style={styles.input}
-              />
+              <div className="form-group">
+                <label>Priority</label>
 
-              <label style={styles.label}>
-                Priority
-              </label>
+                <select
+                  name="priority"
+                  value={formData.priority}
+                  onChange={handleChange}
+                >
+                  <option value="Low">Low</option>
+                  <option value="Medium">Medium</option>
+                  <option value="High">High</option>
+                </select>
+              </div>
 
-              <select
-                name="priority"
-                value={formData.priority}
-                onChange={handleChange}
-                style={styles.input}
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'flex-end',
+                  gap: '10px',
+                  marginTop: '20px'
+                }}
               >
-                <option value="Low">Low</option>
-                <option value="Medium">Medium</option>
-                <option value="High">High</option>
-              </select>
-
-              <div style={styles.modalButtons}>
-
                 <button
                   type="button"
-                  style={styles.cancelButton}
+                  className="btn"
                   onClick={() => setShowForm(false)}
                 >
                   Cancel
@@ -306,292 +480,18 @@ const CleaningTasks = () => {
 
                 <button
                   type="submit"
-                  style={styles.submitButton}
+                  className="btn btn-gold"
                 >
                   Add Task
                 </button>
-
               </div>
-
             </form>
-
           </div>
-
         </div>
-
       )}
 
-    </div>
+    </section>
   );
-};
-
-const getPriorityStyle = (priority) => {
-
-  if (priority === 'High') {
-    return {
-      ...styles.badge,
-      background: '#fde4e4',
-      color: '#c62828'
-    };
-  }
-
-  if (priority === 'Medium') {
-    return {
-      ...styles.badge,
-      background: '#fff1c9',
-      color: '#9a7415'
-    };
-  }
-
-  return {
-    ...styles.badge,
-    background: '#dff5e8',
-    color: '#247a4b'
-  };
-};
-
-const getStatusStyle = (status) => {
-
-  if (status === 'Completed') {
-    return {
-      ...styles.badge,
-      background: '#dff5e8',
-      color: '#247a4b'
-    };
-  }
-
-  if (status === 'In Progress') {
-    return {
-      ...styles.badge,
-      background: '#e1ecff',
-      color: '#3267b1'
-    };
-  }
-
-  return {
-    ...styles.badge,
-    background: '#fff1c9',
-    color: '#9a7415'
-  };
-};
-
-const styles = {
-
-  page: {
-    padding: '30px',
-    color: '#332720',
-    minHeight: '100%',
-    boxSizing: 'border-box'
-  },
-
-  header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '25px'
-  },
-
-  title: {
-    margin: 0,
-    fontSize: '28px',
-    fontWeight: '700',
-    color: '#2f241e'
-  },
-
-  subtitle: {
-    marginTop: '6px',
-    color: '#766b63',
-    fontSize: '14px'
-  },
-
-  addButton: {
-    padding: '12px 18px',
-    border: 'none',
-    borderRadius: '9px',
-    background: '#c9a84c',
-    color: '#2f241e',
-    fontWeight: '700',
-    cursor: 'pointer',
-    boxShadow: '0 4px 12px rgba(80, 55, 25, 0.15)'
-  },
-
-  stats: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(4, 1fr)',
-    gap: '15px',
-    marginBottom: '25px'
-  },
-
-  statCard: {
-    background: 'rgba(255, 253, 249, 0.96)',
-    border: '1px solid #e6dbce',
-    borderRadius: '14px',
-    padding: '20px',
-    boxShadow: '0 5px 18px rgba(70, 45, 25, 0.08)'
-  },
-
-  statNumber: {
-    fontSize: '26px',
-    fontWeight: '700',
-    color: '#b38b2f'
-  },
-
-  statLabel: {
-    marginTop: '5px',
-    color: '#766b63',
-    fontSize: '13px'
-  },
-
-  tableCard: {
-    background: 'rgba(255, 253, 249, 0.97)',
-    border: '1px solid #e6dbce',
-    borderRadius: '14px',
-    overflow: 'hidden',
-    boxShadow: '0 6px 20px rgba(70, 45, 25, 0.08)'
-  },
-
-  tableHeader: {
-    padding: '20px',
-    borderBottom: '1px solid #eadfd3',
-    background: '#fffaf3'
-  },
-
-  sectionTitle: {
-    margin: 0,
-    fontSize: '18px',
-    color: '#332720',
-    fontWeight: '700'
-  },
-
-  tableWrapper: {
-    overflowX: 'auto'
-  },
-
-  table: {
-    width: '100%',
-    borderCollapse: 'collapse'
-  },
-
-  th: {
-    textAlign: 'left',
-    padding: '14px 20px',
-    color: '#9b7625',
-    background: '#f7f0e6',
-    fontSize: '11px',
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: '0.5px'
-  },
-
-  td: {
-    padding: '16px 20px',
-    borderTop: '1px solid #eee5db',
-    fontSize: '13px',
-    color: '#4b4039',
-    background: 'rgba(255, 253, 249, 0.92)'
-  },
-
-  roomText: {
-    color: '#332720'
-  },
-
-  badge: {
-    display: 'inline-block',
-    padding: '6px 10px',
-    borderRadius: '20px',
-    fontSize: '11px',
-    fontWeight: '700'
-  },
-
-  completeButton: {
-    padding: '8px 13px',
-    border: 'none',
-    borderRadius: '7px',
-    background: '#c9a84c',
-    color: '#2f241e',
-    fontSize: '11px',
-    fontWeight: '700',
-    cursor: 'pointer'
-  },
-
-  doneText: {
-    fontSize: '11px',
-    fontWeight: '700',
-    color: '#247a4b'
-  },
-
-  modalOverlay: {
-    position: 'fixed',
-    inset: 0,
-    background: 'rgba(35, 25, 18, 0.55)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 1000
-  },
-
-  modal: {
-    width: '420px',
-    background: '#fffaf4',
-    borderRadius: '16px',
-    padding: '25px',
-    border: '1px solid #e5d6c5',
-    boxShadow: '0 20px 50px rgba(40, 25, 15, 0.25)'
-  },
-
-  modalTitle: {
-    marginTop: 0,
-    marginBottom: '20px',
-    color: '#332720',
-    fontSize: '20px'
-  },
-
-  label: {
-    display: 'block',
-    marginBottom: '6px',
-    marginTop: '14px',
-    fontSize: '12px',
-    fontWeight: '600',
-    color: '#6f5a49'
-  },
-
-  input: {
-    width: '100%',
-    padding: '11px',
-    boxSizing: 'border-box',
-    borderRadius: '7px',
-    border: '1px solid #d9cbbb',
-    background: '#ffffff',
-    color: '#332720',
-    outline: 'none',
-    fontSize: '13px'
-  },
-
-  modalButtons: {
-    display: 'flex',
-    justifyContent: 'flex-end',
-    gap: '10px',
-    marginTop: '20px'
-  },
-
-  cancelButton: {
-    padding: '10px 15px',
-    borderRadius: '7px',
-    border: '1px solid #d8cbbb',
-    background: '#ffffff',
-    color: '#5d5148',
-    cursor: 'pointer'
-  },
-
-  submitButton: {
-    padding: '10px 15px',
-    borderRadius: '7px',
-    border: 'none',
-    background: '#c9a84c',
-    color: '#2f241e',
-    fontWeight: '700',
-    cursor: 'pointer'
-  }
 };
 
 export default CleaningTasks;
