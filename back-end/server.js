@@ -1,16 +1,14 @@
 
-import dns from 'node:dns';
-dns.setServers(['8.8.8.8', '1.1.1.1']);
 
-import express from 'express';
-import mongoose from 'mongoose';
-import dotenv from 'dotenv';
-import cors from 'cors';
+const dns = require('dns');
+dns.setServers(['8.8.8.8', '8.8.4.4']);
 
-// const express = require('express');
-// const mongoose = require('mongoose');
-// const cors = require('cors');
-// require('dotenv').config();
+
+const express = require('express');
+const mongoose = require('mongoose');
+const cors = require('cors');
+require('dotenv').config();
+
 
 const Room = require('./models/Room');
 const RoomType = require('./models/RoomType');
@@ -20,21 +18,19 @@ const Shift = require('./models/Shift');
 const ShiftAssignment = require('./models/ShiftAssignment');
 const Audit = require('./models/Audit');
 
+
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log('✅ Connected to MongoDB successfully!'))
-  .catch((err) => console.error('❌ MongoDB connection error:', err));
 
 // ─────────────────────────────────────────────
 // AUTH
 // ─────────────────────────────────────────────
 
-// POST login — validates admin or employee credentials
-// Admin: username contains @admin (no DB check)
-// Employee: matches portal_access.username + portal_access.password in employees collection
+
+
+
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -42,26 +38,30 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(400).json({ error: 'Username and password are required' });
     }
 
-    // Admin shortcut — exact @admin suffix, no DB check needed
-    // (e.g. "superadmin@admin" or just "@admin")
-    // Does NOT match @jofiane-admin.com — those go through the DB flow below
+
+
+
     if (/^.+@admin$/.test(username.toLowerCase())) {
       return res.json({ role: 'admin', employee: null });
     }
 
-    // Find employee by portal username (case-insensitive)
+
+ 
     const employee = await Employee.findOne({
       'portal_access.username': { $regex: `^${username}$`, $options: 'i' },
       'portal_access.has_access': true,
     });
 
+
     if (!employee) {
       return res.status(401).json({ error: 'Invalid credentials or portal access not granted' });
     }
 
+
     if (employee.portal_access.password !== password) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
+
 
     // Determine department for routing to correct module
     const dept = (employee.employment_details?.department || '').toLowerCase();
@@ -69,6 +69,7 @@ app.post('/api/auth/login', async (req, res) => {
     if (dept.includes('housekeeping'))  module = 'housekeeping';
     else if (dept.includes('maintenance')) module = 'maintenance';
     else if (dept.includes('admin'))    module = 'admin';
+
 
     res.json({
       role: 'employee',
@@ -89,6 +90,10 @@ app.post('/api/auth/login', async (req, res) => {
 });
 
 
+// ─────────────────────────────────────────────
+// ROOMS
+// ─────────────────────────────────────────────
+
 
 app.get('/api/rooms', async (req, res) => {
   try {
@@ -99,6 +104,7 @@ app.get('/api/rooms', async (req, res) => {
   }
 });
 
+
 app.get('/api/room-types', async (req, res) => {
   try {
     const types = await RoomType.find();
@@ -108,17 +114,14 @@ app.get('/api/room-types', async (req, res) => {
   }
 });
 
+
 // ─────────────────────────────────────────────
 // BOOKINGS
-// Real schema: booking_id, room_number, status, source,
-//   dates: { check_in, check_out, nights },
-//   guest: { guest_id, full_name, email, phone },
-//   billing: { expected_total, total_paid, balance_due },
-//   transactions: [ { txn_id, datetime, description, amount,
-//                     payment_method, payment_details, status } ]
 // ─────────────────────────────────────────────
 
-// GET all bookings — optional ?status=  ?source=  ?date= (filters on dates.check_in)
+
+
+
 app.get('/api/bookings', async (req, res) => {
   try {
     const filter = {};
@@ -132,7 +135,9 @@ app.get('/api/bookings', async (req, res) => {
   }
 });
 
-// GET arrivals for a date (?date=YYYY-MM-DD)
+
+
+
 app.get('/api/arrivals', async (req, res) => {
   try {
     const date = req.query.date || new Date().toISOString().slice(0, 10);
@@ -143,7 +148,9 @@ app.get('/api/arrivals', async (req, res) => {
   }
 });
 
-// GET departures for a date (?date=YYYY-MM-DD)
+
+
+
 app.get('/api/departures', async (req, res) => {
   try {
     const date = req.query.date || new Date().toISOString().slice(0, 10);
@@ -157,7 +164,9 @@ app.get('/api/departures', async (req, res) => {
   }
 });
 
-// GET in-house guests (currently checked in)
+
+
+
 app.get('/api/guests/in-house', async (req, res) => {
   try {
     const guests = await Booking.find({ status: 'Checked In' }).sort({ 'dates.check_in': 1 });
@@ -167,7 +176,9 @@ app.get('/api/guests/in-house', async (req, res) => {
   }
 });
 
-// GET a single booking by _id
+
+
+
 app.get('/api/bookings/:id', async (req, res) => {
   try {
     const booking = await Booking.findById(req.params.id);
@@ -178,13 +189,16 @@ app.get('/api/bookings/:id', async (req, res) => {
   }
 });
 
-// DELETE a booking by _id — only allowed if it has no transactions
+
+
+
 app.delete('/api/bookings/:id', async (req, res) => {
   try {
     const booking = await Booking.findById(req.params.id);
     if (!booking) return res.status(404).json({ error: 'Booking not found' });
 
-    // Guard: block deletion if there are any non-voided transactions
+
+   
     const activeTxns = (booking.transactions || []).filter(
       t => t && t.status !== 'VOIDED'
     );
@@ -194,6 +208,7 @@ app.delete('/api/bookings/:id', async (req, res) => {
       });
     }
 
+
     await Booking.findByIdAndDelete(req.params.id);
     res.json({ success: true });
   } catch (error) {
@@ -201,7 +216,10 @@ app.delete('/api/bookings/:id', async (req, res) => {
     res.status(500).json({ error: 'Failed to delete booking', detail: error.message });
   }
 });
-// POST cancel a booking — sets status to "Cancelled" and records cancellation metadata
+
+
+
+
 app.post('/api/bookings/:id/cancel', async (req, res) => {
   try {
     const { reason, cancelled_by, penalty_applied, penalty_amount } = req.body;
@@ -214,8 +232,10 @@ app.post('/api/bookings/:id/cancel', async (req, res) => {
       return res.status(400).json({ error: 'Cannot cancel a booking that is already checked out' });
     }
 
+
     const fmtAmount = (n) =>
       parseFloat(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
 
     const updateData = {
       status: 'Cancelled',
@@ -228,7 +248,8 @@ app.post('/api/bookings/:id/cancel', async (req, res) => {
       },
     };
 
-    // If a penalty applies, push it as a transaction so it shows in the ledger
+
+ 
     if (penalty_applied && parseFloat(penalty_amount) > 0) {
       updateData.$push = {
         transactions: {
@@ -243,6 +264,7 @@ app.post('/api/bookings/:id/cancel', async (req, res) => {
       };
     }
 
+
     const updated = await Booking.findByIdAndUpdate(req.params.id, updateData, { new: true });
     res.json(updated);
   } catch (error) {
@@ -251,16 +273,22 @@ app.post('/api/bookings/:id/cancel', async (req, res) => {
   }
 });
 
+
+
+
 app.post('/api/bookings', async (req, res) => {
   try {
-    const booking = new Booking(req.body);    const saved = await booking.save();
+    const booking = new Booking(req.body);
+    const saved = await booking.save();
     res.status(201).json(saved);
   } catch (error) {
     res.status(500).json({ error: 'Failed to create booking' });
   }
 });
 
-// PUT update a booking by _id
+
+
+
 app.put('/api/bookings/:id', async (req, res) => {
   try {
     const updated = await Booking.findByIdAndUpdate(req.params.id, req.body, { new: true });
@@ -271,7 +299,9 @@ app.put('/api/bookings/:id', async (req, res) => {
   }
 });
 
-// POST check-in: set status to "Checked In"
+
+
+
 app.post('/api/bookings/:id/checkin', async (req, res) => {
   try {
     const updated = await Booking.findByIdAndUpdate(
@@ -285,6 +315,7 @@ app.post('/api/bookings/:id/checkin', async (req, res) => {
     res.status(500).json({ error: 'Failed to check in' });
   }
 });
+
 
 // POST check-out: set status to "Checked Out"
 app.post('/api/bookings/:id/checkout', async (req, res) => {
@@ -301,7 +332,9 @@ app.post('/api/bookings/:id/checkout', async (req, res) => {
   }
 });
 
-// POST add a transaction to a booking's embedded transactions array
+
+
+
 app.post('/api/bookings/:id/transactions', async (req, res) => {
   try {
     const updated = await Booking.findByIdAndUpdate(
@@ -316,8 +349,7 @@ app.post('/api/bookings/:id/transactions', async (req, res) => {
   }
 });
 
-// PATCH void a single embedded transaction by its txn_id
-// Sets status to "VOIDED" on the matching subdocument
+
 app.patch('/api/bookings/:id/transactions/:txnId/void', async (req, res) => {
   try {
     const updated = await Booking.findOneAndUpdate(
@@ -332,13 +364,12 @@ app.patch('/api/bookings/:id/transactions/:txnId/void', async (req, res) => {
   }
 });
 
+
 // ─────────────────────────────────────────────
 // TRANSACTIONS  (read across all bookings)
-// Transactions are embedded in bookings.
-// These routes aggregate them out for the finance view.
 // ─────────────────────────────────────────────
 
-// GET all transactions — flattened from all bookings (?period=today|week|month|year)
+
 app.get('/api/transactions', async (req, res) => {
   try {
     const period = req.query.period || 'today';
@@ -352,13 +383,13 @@ app.get('/api/transactions', async (req, res) => {
       default:      startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     }
 
-    // Use aggregation to unwind the embedded transactions array
+
     const result = await Booking.aggregate([
       { $unwind: '$transactions' },
       {
         $project: {
           _id: 0,
-          booking_object_id: '$_id',      // expose MongoDB _id so front-end can POST back
+          booking_object_id: '$_id',
           txn_id:          '$transactions.txn_id',
           datetime:        '$transactions.datetime',
           description:     '$transactions.description',
@@ -373,20 +404,24 @@ app.get('/api/transactions', async (req, res) => {
       }
     ]);
 
-    // Parse amount strings ("14,700.00") to numbers for KPI math
+
     const parse = (str) => parseFloat((str || '0').replace(/,/g, '')) || 0;
+
 
     const totalIncome = result
       .filter(t => t.status === 'COMPLETED' && parse(t.amount) > 0)
       .reduce((sum, t) => sum + parse(t.amount), 0);
 
+
     const totalExpenses = result
       .filter(t => t.status === 'COMPLETED' && parse(t.amount) < 0)
       .reduce((sum, t) => sum + Math.abs(parse(t.amount)), 0);
 
+
     const outstanding = result
       .filter(t => t.status === 'PENDING')
       .reduce((sum, t) => sum + parse(t.amount), 0);
+
 
     res.json({
       transactions: result,
@@ -402,15 +437,14 @@ app.get('/api/transactions', async (req, res) => {
   }
 });
 
+
 // ─────────────────────────────────────────────
 // EMPLOYEES
-// Real schema: employee_id, full_name,
-//   contact: { email, phone },
-//   portal_access: { username, has_access },
-//   employment_details: { hire_date, status, department, role: { title, base_salary } }
 // ─────────────────────────────────────────────
 
-// GET all employees — optional ?department= ?status=
+
+
+
 app.get('/api/employees', async (req, res) => {
   try {
     const filter = {};
@@ -423,7 +457,9 @@ app.get('/api/employees', async (req, res) => {
   }
 });
 
-// POST create employee
+
+
+
 app.post('/api/employees', async (req, res) => {
   try {
     const employee = new Employee(req.body);
@@ -434,7 +470,9 @@ app.post('/api/employees', async (req, res) => {
   }
 });
 
-// PUT update employee by _id
+
+
+
 app.put('/api/employees/:id', async (req, res) => {
   try {
     const updated = await Employee.findByIdAndUpdate(req.params.id, req.body, { new: true });
@@ -445,7 +483,9 @@ app.put('/api/employees/:id', async (req, res) => {
   }
 });
 
-// DELETE employee by _id
+
+
+
 app.delete('/api/employees/:id', async (req, res) => {
   try {
     const deleted = await Employee.findByIdAndDelete(req.params.id);
@@ -456,12 +496,14 @@ app.delete('/api/employees/:id', async (req, res) => {
   }
 });
 
+
 // ─────────────────────────────────────────────
 // SHIFTS
-// Real schema: shift_id, shift_name, schedule
 // ─────────────────────────────────────────────
 
-// GET all shifts
+
+
+
 app.get('/api/shifts', async (req, res) => {
   try {
     const shifts = await Shift.find().sort({ shift_id: 1 });
@@ -471,12 +513,14 @@ app.get('/api/shifts', async (req, res) => {
   }
 });
 
+
 // ─────────────────────────────────────────────
 // SHIFT ASSIGNMENTS
-// Real schema: assignment_id, employee_id, shift_date, shift_id, status
 // ─────────────────────────────────────────────
 
-// GET assignments for a week — ?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
+
+
+
 app.get('/api/shift-assignments', async (req, res) => {
   try {
     const filter = {};
@@ -493,14 +537,15 @@ app.get('/api/shift-assignments', async (req, res) => {
   }
 });
 
-// PATCH upsert — MUST be defined before /:id routes to avoid "upsert" being parsed as an id
-// Finds existing assignment for employee+date and updates it, or creates a new one
+
+
+
 app.patch('/api/shift-assignments/upsert', async (req, res) => {
   try {
     const { employee_id, shift_date, shift_id, status } = req.body;
     const dateObj = new Date(shift_date);
 
-    // Find existing assignment for this employee on this exact date
+
     const existing = await ShiftAssignment.findOne({
       employee_id,
       shift_date: {
@@ -508,6 +553,7 @@ app.patch('/api/shift-assignments/upsert', async (req, res) => {
         $lt:  new Date(new Date(dateObj.getTime() + 86400000).toISOString().slice(0, 10)),
       },
     });
+
 
     let result;
     if (existing) {
@@ -532,7 +578,9 @@ app.patch('/api/shift-assignments/upsert', async (req, res) => {
   }
 });
 
-// PUT update a shift assignment by _id
+
+
+
 app.put('/api/shift-assignments/:id', async (req, res) => {
   try {
     const updated = await ShiftAssignment.findByIdAndUpdate(req.params.id, req.body, { new: true });
@@ -543,7 +591,9 @@ app.put('/api/shift-assignments/:id', async (req, res) => {
   }
 });
 
-// DELETE a shift assignment by _id
+
+
+
 app.delete('/api/shift-assignments/:id', async (req, res) => {
   try {
     const deleted = await ShiftAssignment.findByIdAndDelete(req.params.id);
@@ -554,7 +604,9 @@ app.delete('/api/shift-assignments/:id', async (req, res) => {
   }
 });
 
-// POST create a shift assignment
+
+
+
 app.post('/api/shift-assignments', async (req, res) => {
   try {
     const assignment = new ShiftAssignment(req.body);
@@ -565,12 +617,14 @@ app.post('/api/shift-assignments', async (req, res) => {
   }
 });
 
+
 // ─────────────────────────────────────────────
 // AUDITS
-// Real schema: audit_id, datetime, action_type, description, user_id, status
 // ─────────────────────────────────────────────
 
-// GET audit logs — optional ?period=today|week|month
+
+
+
 app.get('/api/audits', async (req, res) => {
   try {
     const audits = await Audit.find().sort({ datetime: -1 });
@@ -580,7 +634,7 @@ app.get('/api/audits', async (req, res) => {
   }
 });
 
-// POST create an audit entry
+
 app.post('/api/audits', async (req, res) => {
   try {
     const audit = new Audit(req.body);
@@ -591,14 +645,16 @@ app.post('/api/audits', async (req, res) => {
   }
 });
 
+
 // ─────────────────────────────────────────────
 // DASHBOARD OVERVIEW
-// Aggregates counts from Booking + Room collections
 // ─────────────────────────────────────────────
+
 
 app.get('/api/dashboard/overview', async (req, res) => {
   try {
     const today = new Date().toISOString().slice(0, 10);
+
 
     const [
       totalArrivals,
@@ -621,7 +677,6 @@ app.get('/api/dashboard/overview', async (req, res) => {
       Booking.countDocuments({ 'dates.check_out': today, status: { $in: ['Checked In', 'Confirmed'] } }),
       Booking.countDocuments({ 'dates.check_out': today, status: 'Checked Out' }),
       Booking.countDocuments({ status: 'Checked In' }),
-      // Balance due: billing.balance_due exists and is not "0.00"
       Booking.countDocuments({ status: 'Checked In', 'billing.balance_due': { $nin: ['0.00', '0', null, ''] } }),
       Booking.countDocuments({}),
       Booking.countDocuments({ status: 'Confirmed' }),
@@ -633,10 +688,11 @@ app.get('/api/dashboard/overview', async (req, res) => {
       Audit.find({}).sort({ datetime: -1 }).limit(5),
     ]);
 
+
     const pendingArrivals = totalArrivals - checkedInArrivals;
     const pendingDepartures = totalDepartures - checkedOutDepartures;
 
-    // Map audit entries to the activity feed format the Dashboard expects
+
     const recentActivity = recentAudits.map(a => ({
       id: a._id,
       type: a.action_type,
@@ -644,6 +700,7 @@ app.get('/api/dashboard/overview', async (req, res) => {
       time: a.datetime,
       icon: 'fa-circle-info',
     }));
+
 
     res.json({
       arrivals:   { total: totalArrivals, pending: pendingArrivals, checkedIn: checkedInArrivals, vip: 0 },
@@ -658,11 +715,24 @@ app.get('/api/dashboard/overview', async (req, res) => {
   }
 });
 
+
 // ─────────────────────────────────────────────
-// START SERVER
+// START SERVER (only after MongoDB connects)
 // ─────────────────────────────────────────────
 
+
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`🚀 Server is running on port ${PORT}`);
-});
+
+
+mongoose.connect(process.env.MONGO_URI)
+  .then(() => {
+    console.log('✅ Connected to MongoDB successfully!');
+    app.listen(PORT, () => {
+      console.log(`🚀 Server is running on port ${PORT}`);
+    });
+  })
+  .catch((err) => {
+    console.error('❌ MongoDB connection error:', err);
+    process.exit(1);
+  });
+
