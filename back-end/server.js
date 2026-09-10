@@ -2,10 +2,15 @@
 import dns from 'node:dns';
 dns.setServers(['8.8.8.8', '1.1.1.1']);
 
-const express = require('express');
-const mongoose = require('mongoose');
-const cors = require('cors');
-require('dotenv').config();
+import express from 'express';
+import mongoose from 'mongoose';
+import dotenv from 'dotenv';
+import cors from 'cors';
+
+// const express = require('express');
+// const mongoose = require('mongoose');
+// const cors = require('cors');
+// require('dotenv').config();
 
 const Room = require('./models/Room');
 const RoomType = require('./models/RoomType');
