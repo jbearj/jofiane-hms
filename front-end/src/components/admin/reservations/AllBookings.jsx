@@ -20,25 +20,31 @@ function AllBookings() {
   const fetchBookings = async () => {
     setIsLoading(true);
     try {
-      // TODO: Replace with actual API call
-      // const res = await fetch('http://localhost:8080/api/admin/bookings');
-      // const data = await res.json();
-      await new Promise(resolve => setTimeout(resolve, 500));
+      const res = await fetch('http://localhost:5000/api/bookings');
+      if (!res.ok) throw new Error(`Server error: ${res.status}`);
+      const data = await res.json();
+      // Normalize MongoDB field names to match the UI field names
+      // Parse "25,500.00" → 25500
+      const parseAmount = (str) => parseFloat((str || '0').replace(/,/g, '')) || 0;
 
-      const mockBookings = [
-        { id: 'BKG-8001', guest: 'Marisol Reyes', email: 'marisol@email.com', phone: '+63 917 111 2222', roomType: 'Suite', room: '304', checkIn: '2026-08-10', checkOut: '2026-08-13', nights: 3, source: 'Direct', status: 'checked-in', amount: 25500, specialRequests: 'Late check-in, extra pillows', paymentStatus: 'Paid' },
-        { id: 'BKG-8002', guest: 'Daniel Kho', email: 'daniel.kho@email.com', phone: '+63 918 222 3333', roomType: 'Standard', room: '208', checkIn: '2026-08-11', checkOut: '2026-08-14', nights: 3, source: 'Booking.com', status: 'confirmed', amount: 7500, specialRequests: '', paymentStatus: 'Pending' },
-        { id: 'BKG-8003', guest: 'Fam. Villanueva', email: 'villa@email.com', phone: '+63 919 333 4444', roomType: 'Deluxe', room: '412', checkIn: '2026-08-09', checkOut: '2026-08-12', nights: 3, source: 'Expedia', status: 'checked-out', amount: 12600, specialRequests: 'Connecting rooms', paymentStatus: 'Paid' },
-        { id: 'BKG-8004', guest: 'Lena Park', email: 'lena.p@email.com', phone: '+63 920 444 5555', roomType: 'Premium', room: '220', checkIn: '2026-08-12', checkOut: '2026-08-15', nights: 3, source: 'Direct', status: 'confirmed', amount: 16500, specialRequests: 'Airport transfer', paymentStatus: 'Paid' },
-        { id: 'BKG-8005', guest: 'Kim Tan', email: 'kim.t@email.com', phone: '+63 921 555 6666', roomType: 'Standard', room: '105', checkIn: '2026-08-10', checkOut: '2026-08-11', nights: 1, source: 'Agoda', status: 'no-show', amount: 2500, specialRequests: '', paymentStatus: 'Penalty Applied' },
-        { id: 'BKG-8006', guest: 'Carlos Mendoza', email: 'carlos.m@email.com', phone: '+63 922 666 7777', roomType: 'Deluxe', room: '115', checkIn: '2026-08-08', checkOut: '2026-08-11', nights: 3, source: 'Booking.com', status: 'checked-in', amount: 12600, specialRequests: 'High floor preferred', paymentStatus: 'Paid' },
-        { id: 'BKG-8007', guest: 'Angela Cruz', email: 'angela@email.com', phone: '+63 923 777 8888', roomType: 'Presidential', room: '401', checkIn: '2026-08-14', checkOut: '2026-08-17', nights: 3, source: 'Direct', status: 'confirmed', amount: 45000, specialRequests: 'Champagne on arrival, anniversary setup', paymentStatus: 'Paid' },
-        { id: 'BKG-8008', guest: 'Roberto Santos', email: 'roberto@email.com', phone: '+63 924 888 9999', roomType: 'Suite', room: '305', checkIn: '2026-08-07', checkOut: '2026-08-09', nights: 2, source: 'Expedia', status: 'checked-out', amount: 17000, specialRequests: '', paymentStatus: 'Paid' },
-        { id: 'BKG-8009', guest: 'Jun Aquino', email: 'jun.a@email.com', phone: '+63 925 999 0000', roomType: 'Standard', room: '103', checkIn: '2026-08-11', checkOut: '2026-08-12', nights: 1, source: 'Walk-in', status: 'confirmed', amount: 2500, specialRequests: '', paymentStatus: 'Pending' },
-        { id: 'BKG-8010', guest: 'Maria Clara', email: 'maria.c@email.com', phone: '+63 926 000 1111', roomType: 'Premium', room: '203', checkIn: '2026-08-09', checkOut: '2026-08-10', nights: 1, source: 'Agoda', status: 'cancelled', amount: 5500, specialRequests: '', paymentStatus: 'Refunded' },
-      ];
-
-      setBookings(mockBookings);
+      const normalized = data.map(b => ({
+        id: b.booking_id || b._id,
+        guest: b.guest?.full_name || '',
+        email: b.guest?.email || '',
+        phone: b.guest?.phone || '',
+        roomType: b.room_number || '',   // no room_type field; use room_number
+        room: b.room_number || '',
+        checkIn: b.dates?.check_in || '',
+        checkOut: b.dates?.check_out || '',
+        nights: parseInt(b.dates?.nights) || 0,
+        source: b.source || '',
+        status: b.status || '',
+        amount: parseAmount(b.billing?.expected_total),
+        specialRequests: '',
+        paymentStatus: parseAmount(b.billing?.balance_due) === 0 ? 'Paid' : 'Balance Due',
+        _id: b._id,
+      }));
+      setBookings(normalized);
     } catch (err) {
       console.error('Failed to fetch bookings:', err);
     } finally {
@@ -58,20 +64,98 @@ function AllBookings() {
     setFilteredBookings(result);
   };
 
-  const handleCreateBooking = (bookingData) => {
-    // TODO: POST to API
-    const newBooking = { ...bookingData, id: `BKG-${8010 + bookings.length + 1}` };
-    setBookings(prev => [newBooking, ...prev]);
+  const handleCreateBooking = async (bookingData) => {
+    try {
+      // Build the initial transaction if a payment amount was entered
+      const hasPayment = bookingData.amount && parseFloat(bookingData.amount) > 0;
+      const paymentStatus = hasPayment
+        ? (bookingData.paymentStatus === 'Paid' ? 'Paid' : 'Pending')
+        : 'Pending';
+
+      // Format amount as stored in DB: "25,500.00"
+      const fmtAmount = (n) =>
+        parseFloat(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+      // Derive payment method label and detail for the transaction
+      let txnMethod = bookingData.paymentMethod || 'Cash';
+      let txnDetail = '';
+      if (bookingData.paymentMethod === 'Card/Online') {
+        txnMethod = bookingData.onlinePlatform || 'Card/Online';
+        txnDetail = bookingData.cardHolder
+          ? `${bookingData.cardHolder}${bookingData.onlineRef ? ` ····${bookingData.onlineRef.slice(-4)}` : ''}`
+          : bookingData.onlineRef || '';
+      } else if (bookingData.paymentMethod === 'Cash') {
+        txnDetail = bookingData.cashReceived
+          ? `Cash received: ${fmtAmount(bookingData.cashReceived)}`
+          : 'Front Desk';
+      }
+
+      // Decide initial transaction status:
+      // "Paid" → COMPLETED, "Pending" → PENDING, others → PENDING
+      const txnStatus = bookingData.paymentStatus === 'Paid' ? 'COMPLETED' : 'PENDING';
+
+      const initialTransactions = hasPayment
+        ? [{
+            txn_id: `TXN-${Date.now()}`,
+            datetime: new Date().toLocaleString('en-CA', { hour12: false }).replace(',', ''),
+            description: `Room Charge - ${bookingData.roomType || 'Room'} ${bookingData.room ? `(Rm ${bookingData.room})` : ''}`.trim(),
+            amount: fmtAmount(bookingData.amount),
+            payment_method: txnMethod,
+            payment_details: txnDetail,
+            status: txnStatus,
+          }]
+        : [];
+
+      const totalPaid = txnStatus === 'COMPLETED' ? fmtAmount(bookingData.amount) : '0.00';
+      const balanceDue = txnStatus === 'COMPLETED'
+        ? '0.00'
+        : fmtAmount(bookingData.amount);
+
+      const payload = {
+        booking_id: `BKG-${Date.now()}`,
+        room_number: bookingData.room || '',
+        source: bookingData.source,
+        status: 'Confirmed',
+        dates: {
+          check_in: bookingData.checkIn,
+          check_out: bookingData.checkOut,
+          nights: String(bookingData.nights),
+        },
+        guest: {
+          guest_id: String(Date.now()),
+          full_name: bookingData.guest,
+          email: bookingData.email || '',
+          phone: bookingData.phone || '',
+        },
+        billing: {
+          expected_total: hasPayment ? fmtAmount(bookingData.amount) : '0.00',
+          total_paid: totalPaid,
+          balance_due: balanceDue,
+        },
+        transactions: initialTransactions,
+      };
+
+      const res = await fetch('http://localhost:5000/api/bookings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error(`Server error: ${res.status}`);
+      await fetchBookings();
+    } catch (err) {
+      console.error('Failed to create booking:', err);
+      alert('Failed to save booking. Please try again.');
+    }
     setShowCreateModal(false);
   };
 
   const getStatusTag = (status) => {
     switch (status) {
-      case 'confirmed': return <span className="status-tag tag-gold">Confirmed</span>;
-      case 'checked-in': return <span className="status-tag tag-success">Checked In</span>;
-      case 'checked-out': return <span className="status-tag tag-neutral">Checked Out</span>;
-      case 'no-show': return <span className="status-tag tag-danger">No-Show</span>;
-      case 'cancelled': return <span className="status-tag tag-danger">Cancelled</span>;
+      case 'Confirmed': return <span className="status-tag tag-gold">Confirmed</span>;
+      case 'Checked In': return <span className="status-tag tag-success">Checked In</span>;
+      case 'Checked Out': return <span className="status-tag tag-neutral">Checked Out</span>;
+      case 'No Show': return <span className="status-tag tag-danger">No-Show</span>;
+      case 'Cancelled': return <span className="status-tag tag-danger">Cancelled</span>;
       default: return <span className="status-tag tag-neutral">{status}</span>;
     }
   };
@@ -79,9 +163,9 @@ function AllBookings() {
   const formatDate = (dateStr) => new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
   // Stats
-  const confirmedCount = bookings.filter(b => b.status === 'confirmed').length;
-  const checkedInCount = bookings.filter(b => b.status === 'checked-in').length;
-  const totalRevenue = bookings.filter(b => b.status !== 'cancelled').reduce((sum, b) => sum + b.amount, 0);
+  const confirmedCount = bookings.filter(b => b.status === 'Confirmed').length;
+  const checkedInCount = bookings.filter(b => b.status === 'Checked In').length;
+  const totalRevenue = bookings.filter(b => b.status !== 'Cancelled').reduce((sum, b) => sum + b.amount, 0);
 
   if (isLoading) {
     return (<section className="admin-tab-content active"><div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading bookings...</div></section>);
@@ -127,11 +211,11 @@ function AllBookings() {
             </div>
             <select className="floor-dropdown" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
               <option value="all">All Status</option>
-              <option value="confirmed">Confirmed</option>
-              <option value="checked-in">Checked In</option>
-              <option value="checked-out">Checked Out</option>
-              <option value="no-show">No-Show</option>
-              <option value="cancelled">Cancelled</option>
+              <option value="Confirmed">Confirmed</option>
+              <option value="Checked In">Checked In</option>
+              <option value="Checked Out">Checked Out</option>
+              <option value="No Show">No-Show</option>
+              <option value="Cancelled">Cancelled</option>
             </select>
             <select className="floor-dropdown" value={filterSource} onChange={(e) => setFilterSource(e.target.value)}>
               <option value="all">All Sources</option>
@@ -195,7 +279,22 @@ function AllBookings() {
 
       {/* BOOKING DETAIL MODAL */}
       {selectedBooking && createPortal(
-        <BookingDetailModal booking={selectedBooking} getStatusTag={getStatusTag} formatDate={formatDate} onClose={() => setSelectedBooking(null)} />,
+        <BookingDetailModal
+          booking={selectedBooking}
+          getStatusTag={getStatusTag}
+          formatDate={formatDate}
+          onClose={() => setSelectedBooking(null)}
+          onDeleted={(deletedId) => {
+            setBookings(prev => prev.filter(b => b._id !== deletedId));
+            setSelectedBooking(null);
+          }}
+          onCancelled={(cancelledId) => {
+            setBookings(prev => prev.map(b =>
+              b._id === cancelledId ? { ...b, status: 'Cancelled', paymentStatus: 'Cancelled' } : b
+            ));
+            setSelectedBooking(null);
+          }}
+        />,
         document.body
       )}
 
@@ -209,10 +308,93 @@ function AllBookings() {
 }
 
 /* BOOKING DETAIL MODAL */
-function BookingDetailModal({ booking, getStatusTag, formatDate, onClose }) {
+function BookingDetailModal({ booking, getStatusTag, formatDate, onClose, onDeleted, onCancelled }) {
+  const [transactions, setTransactions] = useState([]);
+  const [loadingTxns, setLoadingTxns] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showCancelForm, setShowCancelForm] = useState(false);
+  const [cancelForm, setCancelForm] = useState({
+    reason: 'Guest request',
+    cancelled_by: '',
+    penalty_applied: false,
+    penalty_amount: '',
+  });
+  const [isCancelling, setIsCancelling] = useState(false);
+
+  useEffect(() => {
+    if (!booking._id) return;
+    const fetchTxns = async () => {
+      setLoadingTxns(true);
+      try {
+        const res = await fetch(`http://localhost:5000/api/bookings/${booking._id}`);
+        const data = await res.json();
+        setTransactions(data?.transactions || []);
+      } catch (err) {
+        console.error('Failed to load transactions', err);
+      } finally {
+        setLoadingTxns(false);
+      }
+    };
+    fetchTxns();
+  }, [booking._id]);
+
+  const handleDelete = async () => {
+    if (!window.confirm(`Delete booking ${booking.id} for ${booking.guest}? This cannot be undone.`)) return;
+    setIsDeleting(true);
+    try {
+      const res = await fetch(`http://localhost:5000/api/bookings/${booking._id}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || 'Failed to delete booking.');
+        setIsDeleting(false);
+        return;
+      }
+      onDeleted(booking._id);
+      onClose();
+    } catch (err) {
+      console.error('Failed to delete booking:', err);
+      alert('Cannot reach the server. Make sure the back-end is running on port 5000.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const parseAmount = (str) => parseFloat((str || '0').replace(/,/g, '')) || 0;
+  const canDelete = !loadingTxns && transactions.length === 0;
+  const canCancel = !['Cancelled', 'Checked Out'].includes(booking.status);
+
+  const handleCancel = async (e) => {
+    e.preventDefault();
+    if (!cancelForm.reason) { alert('Please select a cancellation reason.'); return; }
+    setIsCancelling(true);
+    try {
+      const res = await fetch(`http://localhost:5000/api/bookings/${booking._id}/cancel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          reason: cancelForm.reason,
+          cancelled_by: cancelForm.cancelled_by || 'Staff',
+          penalty_applied: cancelForm.penalty_applied,
+          penalty_amount: cancelForm.penalty_applied ? parseFloat(cancelForm.penalty_amount) || 0 : 0,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) { alert(data.error || 'Failed to cancel booking.'); return; }
+      onCancelled(booking._id);
+      onClose();
+    } catch (err) {
+      console.error('Cancel failed:', err);
+      alert('Cannot reach the server. Make sure the back-end is running on port 5000.');
+    } finally {
+      setIsCancelling(false);
+    }
+  };
+
   return (
     <div className="modal-overlay open">
-      <div className="modal-content" style={{ maxWidth: '520px' }}>
+      <div className="modal-content" style={{ maxWidth: '560px', maxHeight: '90vh', overflowY: 'auto' }}>
         <button className="modal-close" onClick={onClose}>&times;</button>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
           <h3 style={{ fontSize: '18px', fontWeight: '700' }}>{booking.id}</h3>
@@ -223,18 +405,162 @@ function BookingDetailModal({ booking, getStatusTag, formatDate, onClose }) {
           <div><div style={{ fontSize: '10px', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>Email</div><div style={{ fontSize: '13px' }}>{booking.email}</div></div>
           <div><div style={{ fontSize: '10px', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>Phone</div><div style={{ fontSize: '13px' }}>{booking.phone}</div></div>
           <div><div style={{ fontSize: '10px', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>Source</div><div style={{ fontSize: '13px' }}>{booking.source}</div></div>
-          <div><div style={{ fontSize: '10px', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>Room</div><div style={{ fontSize: '13px' }}>{booking.roomType} (Rm {booking.room})</div></div>
+          <div><div style={{ fontSize: '10px', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>Room</div><div style={{ fontSize: '13px' }}>Rm {booking.room}</div></div>
           <div><div style={{ fontSize: '10px', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>Stay</div><div style={{ fontSize: '13px' }}>{formatDate(booking.checkIn)} → {formatDate(booking.checkOut)} ({booking.nights}N)</div></div>
-          <div><div style={{ fontSize: '10px', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>Amount</div><div style={{ fontSize: '13px', fontWeight: '700' }}>{booking.amount.toLocaleString()}</div></div>
-          <div><div style={{ fontSize: '10px', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>Payment</div><div style={{ fontSize: '13px' }}>{booking.paymentStatus}</div></div>
+          <div><div style={{ fontSize: '10px', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>Total Amount</div><div style={{ fontSize: '13px', fontWeight: '700' }}>₱{booking.amount.toLocaleString()}</div></div>
+          <div><div style={{ fontSize: '10px', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>Balance</div><div style={{ fontSize: '13px', fontWeight: '600', color: booking.paymentStatus === 'Paid' ? 'var(--status-vac)' : '#b45309' }}>{booking.paymentStatus}</div></div>
         </div>
-        {booking.specialRequests && (
-          <div style={{ background: 'var(--bg-input)', padding: '14px', borderRadius: '8px', border: '1px solid var(--border-light)', marginBottom: '20px' }}>
-            <div style={{ fontSize: '10px', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '6px' }}>Special Requests</div>
-            <div style={{ fontSize: '13px', color: 'var(--text-primary)' }}>{booking.specialRequests}</div>
+
+        {/* TRANSACTION LEDGER */}
+        <div style={{ marginBottom: '20px' }}>
+          <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '10px', letterSpacing: '0.05em' }}>
+            Transaction Ledger
+          </div>
+          {loadingTxns ? (
+            <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>Loading...</div>
+          ) : transactions.length === 0 ? (
+            <div style={{ padding: '14px 16px', background: 'var(--bg-input)', borderRadius: '8px', border: '1px solid var(--border-light)', fontSize: '13px', color: 'var(--text-muted)' }}>
+              No transactions recorded for this booking.
+            </div>
+          ) : (
+            <div style={{ border: '1px solid var(--border-light)', borderRadius: '8px', overflow: 'hidden' }}>
+              {transactions.map((t, i) => {
+                const amt = parseAmount(t.amount);
+                const isVoided = t.status === 'VOIDED';
+                return (
+                  <div key={t.txn_id || i} style={{
+                    display: 'flex', alignItems: 'center', gap: '12px',
+                    padding: '12px 16px',
+                    borderBottom: i < transactions.length - 1 ? '1px solid var(--border-light)' : 'none',
+                    opacity: isVoided ? 0.5 : 1,
+                    background: isVoided ? 'var(--bg-input)' : 'transparent',
+                  }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)', textDecoration: isVoided ? 'line-through' : 'none' }}>
+                        {t.description}
+                      </div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                        {t.txn_id} · {t.payment_method}{t.payment_details ? ` · ${t.payment_details}` : ''} · {t.datetime}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                      <div style={{ fontSize: '13px', fontWeight: '700', color: amt < 0 ? '#dc2626' : 'var(--text-primary)' }}>
+                        {amt < 0 ? '−' : ''}₱{Math.abs(amt).toLocaleString()}
+                      </div>
+                      <div style={{ fontSize: '10px', marginTop: '2px' }}>
+                        <span style={{
+                          padding: '2px 7px', borderRadius: '10px', fontWeight: '600',
+                          background: t.status === 'COMPLETED' ? '#d1fae5' : t.status === 'VOIDED' ? '#f3f4f6' : '#fef3c7',
+                          color: t.status === 'COMPLETED' ? '#065f46' : t.status === 'VOIDED' ? '#6b7280' : '#92400e',
+                        }}>
+                          {t.status}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* CANCEL BOOKING FORM */}
+        {canCancel && (
+          <div style={{ marginBottom: '20px' }}>
+            {!showCancelForm ? (
+              <button
+                className="btn btn-sm"
+                style={{ color: '#fff', background: '#dc2626', borderColor: '#dc2626' }}
+                onClick={() => setShowCancelForm(true)}
+              >
+                Cancel Booking
+              </button>
+            ) : (
+              <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '10px', padding: '18px' }}>
+                <div style={{ fontSize: '12px', fontWeight: '700', color: '#92400e', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '14px' }}>
+                  Cancel Booking
+                </div>
+                <form onSubmit={handleCancel}>
+                  <div className="form-grid" style={{ marginBottom: '12px' }}>
+                    <div className="form-group">
+                      <label style={{ fontSize: '11px' }}>Reason <span className="required">*</span></label>
+                      <select
+                        value={cancelForm.reason}
+                        onChange={(e) => setCancelForm({ ...cancelForm, reason: e.target.value })}
+                      >
+                        <option>Guest request</option>
+                        <option>No-show</option>
+                        <option>OTA cancellation</option>
+                        <option>Flight cancelled</option>
+                        <option>Overbooking</option>
+                        <option>Other</option>
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label style={{ fontSize: '11px' }}>Cancelled By</label>
+                      <input
+                        type="text"
+                        value={cancelForm.cancelled_by}
+                        onChange={(e) => setCancelForm({ ...cancelForm, cancelled_by: e.target.value })}
+                        placeholder="Staff name"
+                      />
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={cancelForm.penalty_applied}
+                        onChange={(e) => setCancelForm({ ...cancelForm, penalty_applied: e.target.checked, penalty_amount: '' })}
+                        style={{ width: '15px', height: '15px', accentColor: 'var(--gold)' }}
+                      />
+                      Apply cancellation penalty
+                    </label>
+                  </div>
+                  {cancelForm.penalty_applied && (
+                    <div className="form-group" style={{ marginBottom: '14px' }}>
+                      <label style={{ fontSize: '11px' }}>Penalty Amount (₱)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={cancelForm.penalty_amount}
+                        onChange={(e) => setCancelForm({ ...cancelForm, penalty_amount: e.target.value })}
+                        placeholder={`Max: ${booking.amount.toLocaleString()}`}
+                      />
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button type="submit" className="btn btn-sm" style={{ background: '#b45309', color: '#fff', borderColor: '#b45309' }} disabled={isCancelling}>
+                      {isCancelling ? 'Cancelling...' : 'Confirm Cancellation'}
+                    </button>
+                    <button type="button" className="btn btn-sm" onClick={() => setShowCancelForm(false)}>
+                      Back
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
           </div>
         )}
-        <div style={{ display: 'flex', justifyContent: 'flex-end' }}><button className="btn" onClick={onClose}>Close</button></div>
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          {/* Delete — only shown when there are no transactions */}
+          {canDelete ? (
+            <button
+              className="btn btn-sm"
+              style={{ color: 'var(--status-occ)', borderColor: 'var(--status-occ)' }}
+              onClick={handleDelete}
+              disabled={isDeleting}
+            >
+              {isDeleting ? 'Deleting...' : 'Delete Booking'}
+            </button>
+          ) : (
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+              {loadingTxns ? '' : 'Transactions: recorded'}
+            </span>
+          )}
+          <button className="btn" onClick={onClose}>Close</button>
+        </div>
       </div>
     </div>
   );

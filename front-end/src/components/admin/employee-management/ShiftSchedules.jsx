@@ -1,27 +1,29 @@
 import React, { useState, useEffect } from 'react';
 
 const SHIFT_TYPES = [
-  { id: 'morning', label: 'Morning', time: '6am–2pm', color: '#fef3c7', textColor: '#92400e', dot: '#f59e0b' },
-  { id: 'afternoon', label: 'Afternoon', time: '2pm–10pm', color: '#dbeafe', textColor: '#1e40af', dot: '#3b82f6' },
-  { id: 'night', label: 'Night', time: '10pm–6am', color: '#ede9fe', textColor: '#5b21b6', dot: '#8b5cf6' },
-  { id: 'off', label: 'Off', time: '', color: '#f3f4f6', textColor: '#6b7280', dot: '#9ca3af' }
+  { id: 'morning',   label: 'Morning',   time: '6am–2pm',   color: '#fef3c7', textColor: '#92400e', dot: '#f59e0b' },
+  { id: 'day',       label: 'Day',       time: '7am–5pm',   color: '#dcfce7', textColor: '#166534', dot: '#22c55e' },
+  { id: 'night',     label: 'Night',     time: '10pm–6am',  color: '#ede9fe', textColor: '#5b21b6', dot: '#8b5cf6' },
+  { id: 'off',       label: 'Off',       time: '',           color: '#f3f4f6', textColor: '#6b7280', dot: '#9ca3af' },
 ];
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 function ShiftSchedules() {
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading]       = useState(true);
   const [isNavigating, setIsNavigating] = useState(false);
-  const [employees, setEmployees] = useState([]);
-  const [schedule, setSchedule] = useState({});
+  const [employees, setEmployees]       = useState([]);
+  const [schedule, setSchedule]         = useState({});    // key: "empId-dayIdx" → shiftTypeId
+  const [assignmentIds, setAssignmentIds] = useState({});  // key: "empId-dayIdx" → MongoDB _id
+  const [dbShifts, setDbShifts]         = useState([]);    // raw shifts from DB
   const [swapRequests, setSwapRequests] = useState([]);
-  const [filterDept, setFilterDept] = useState('all');
-  const [weekOffset, setWeekOffset] = useState(0);
-  const [editingCell, setEditingCell] = useState(null);
+  const [filterDept, setFilterDept]     = useState('all');
+  const [weekOffset, setWeekOffset]     = useState(0);
+  const [editingCell, setEditingCell]   = useState(null);
+  const [savingCell, setSavingCell]     = useState(null);  // shows saving spinner per cell
 
-  const departments = ['Front Desk', 'Housekeeping', 'Maintenance', 'F&B'];
-  // Minimum staff per shift
-  const minCoverage = { morning: 3, afternoon: 3, night: 2 };
+  const departments   = ['Front Desk', 'Housekeeping', 'Maintenance', 'F&B'];
+  const minCoverage   = { morning: 3, day: 3, night: 2 };
 
   useEffect(() => { fetchSchedule(); }, [weekOffset]);
 
@@ -29,7 +31,7 @@ function ShiftSchedules() {
     const today = new Date();
     const dayOfWeek = today.getDay();
     const monday = new Date(today);
-    monday.setDate(today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1) + (weekOffset * 7));
+    monday.setDate(today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1) + weekOffset * 7);
     return DAYS.map((_, i) => {
       const d = new Date(monday);
       d.setDate(monday.getDate() + i);
@@ -40,57 +42,82 @@ function ShiftSchedules() {
   const weekDates = getWeekDates();
   const weekLabel = `${weekDates[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${weekDates[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
 
+  // Map a DB shift_id number → SHIFT_TYPES id string
+  // Your DB shifts: 1=Morning Shift, 2=Day Shift, 3=Mid Day Shift,
+  //                 4=Regular Office Shift, 5=Night Shift, 6=Unassigned
+  const dbShiftToType = (shiftId, shiftsData) => {
+    const found = shiftsData.find(s => s.shift_id === shiftId);
+    if (!found) return null;
+    const n = (found.shift_name || '').toLowerCase();
+    if (n.includes('morning'))                                        return 'morning';
+    if (n.includes('night'))                                          return 'night';
+    if (n.includes('day') || n.includes('mid') || n.includes('office') || n.includes('regular')) return 'day';
+    return null;
+  };
+
+  // Map a SHIFT_TYPES id string → DB shift_id number (picks the best match)
+  const typeToDbShiftId = (typeId, shiftsData) => {
+    if (typeId === 'off') return null;
+    const scored = shiftsData
+      .filter(s => (s.shift_name || '').toLowerCase() !== 'unassigned')
+      .map(s => {
+        const n = (s.shift_name || '').toLowerCase();
+        let score = 0;
+        if (typeId === 'morning' && n.includes('morning'))            score = 10;
+        if (typeId === 'night'   && n.includes('night'))              score = 10;
+        if (typeId === 'day'     && n.includes('day'))                score = 10;
+        if (typeId === 'day'     && n.includes('mid'))                score = 8;
+        if (typeId === 'day'     && (n.includes('office') || n.includes('regular'))) score = 6;
+        return { shift_id: s.shift_id, score };
+      })
+      .filter(s => s.score > 0)
+      .sort((a, b) => b.score - a.score);
+    return scored[0]?.shift_id ?? null;
+  };
+
   const fetchSchedule = async () => {
-    if (!employees.length) {
-      setIsLoading(true);
-    } else {
-      setIsNavigating(true);
-    }
+    employees.length ? setIsNavigating(true) : setIsLoading(true);
     try {
-      // TODO: Replace with actual API call
-      // const res = await fetch(`http://localhost:8080/api/admin/shifts?weekOffset=${weekOffset}`);
-      // const data = await res.json();
-      await new Promise(resolve => setTimeout(resolve, 400));
+      const startDate = weekDates[0].toISOString().slice(0, 10);
+      const endDate   = weekDates[6].toISOString().slice(0, 10);
 
-      const mockEmployees = [
-        { id: 1, name: 'Ana Buenaflor', department: 'Front Desk', role: 'Concierge' },
-        { id: 2, name: 'Marco Diaz', department: 'Front Desk', role: 'Night Auditor' },
-        { id: 3, name: 'Liza Fernandez', department: 'Housekeeping', role: 'Lead' },
-        { id: 4, name: 'Maria Santos', department: 'Housekeeping', role: 'Housekeeper' },
-        { id: 5, name: 'Rosa Villanueva', department: 'Housekeeping', role: 'Housekeeper' },
-        { id: 6, name: 'Ronnie Cruz', department: 'Maintenance', role: 'Technician' },
-        { id: 7, name: 'Carlo Aquino', department: 'Maintenance', role: 'Technician' },
-        { id: 8, name: 'Jessie Ramos', department: 'Maintenance', role: 'Supervisor' },
-        { id: 9, name: 'Carmen Diaz', department: 'F&B', role: 'Attendant' },
-        { id: 10, name: 'Elena Cruz', department: 'Housekeeping', role: 'Housekeeper' },
-      ];
+      const [empRes, shiftsRes, assignRes] = await Promise.all([
+        fetch('http://localhost:5000/api/employees'),
+        fetch('http://localhost:5000/api/shifts'),
+        fetch(`http://localhost:5000/api/shift-assignments?startDate=${startDate}&endDate=${endDate}`),
+      ]);
+      if (!empRes.ok || !shiftsRes.ok || !assignRes.ok) throw new Error('API request failed');
 
-      // Generate schedule: { "empId-dayIndex": shiftId }
-      const mockSchedule = {};
-      mockEmployees.forEach(emp => {
-        DAYS.forEach((_, dayIdx) => {
-          const key = `${emp.id}-${dayIdx}`;
-          if (emp.name === 'Marco Diaz') {
-            mockSchedule[key] = dayIdx === 5 || dayIdx === 6 ? 'off' : 'night';
-          } else if (dayIdx === 6) {
-            mockSchedule[key] = 'off';
-          } else if (dayIdx === 5) {
-            mockSchedule[key] = Math.random() > 0.5 ? 'morning' : 'off';
-          } else {
-            const shifts = ['morning', 'afternoon', 'morning'];
-            mockSchedule[key] = shifts[emp.id % 3];
-          }
-        });
+      const [empData, shiftsData, assignData] = await Promise.all([
+        empRes.json(), shiftsRes.json(), assignRes.json(),
+      ]);
+
+      setDbShifts(shiftsData);
+
+      const normalizedEmployees = empData.map(e => ({
+        id:         e.employee_id,   // numeric id used as schedule key
+        _id:        e._id,
+        name:       e.full_name || '',
+        department: e.employment_details?.department || '',
+        role:       e.employment_details?.role?.title || '',
+      }));
+
+      const newSchedule    = {};
+      const newAssignIds   = {};
+
+      assignData.forEach(a => {
+        const assignDate = new Date(a.shift_date);
+        const dayIdx = weekDates.findIndex(d => d.toDateString() === assignDate.toDateString());
+        if (dayIdx === -1) return;
+        const key = `${a.employee_id}-${dayIdx}`;
+        newSchedule[key]  = dbShiftToType(a.shift_id, shiftsData) || 'morning';
+        newAssignIds[key] = a._id;   // remember MongoDB _id for updates
       });
 
-      const mockSwaps = [
-        { id: 1, from: 'Maria Santos', to: 'Rosa Villanueva', day: 'Thu', shift: 'Morning', reason: 'Medical appointment', status: 'pending' },
-        { id: 2, from: 'Carlo Aquino', to: 'Ronnie Cruz', day: 'Fri', shift: 'Morning', reason: 'Family event', status: 'pending' },
-      ];
-
-      setEmployees(mockEmployees);
-      setSchedule(mockSchedule);
-      setSwapRequests(mockSwaps);
+      setEmployees(normalizedEmployees);
+      setSchedule(newSchedule);
+      setAssignmentIds(newAssignIds);
+      setSwapRequests([]);
     } catch (err) {
       console.error('Failed to fetch schedule:', err);
     } finally {
@@ -99,27 +126,73 @@ function ShiftSchedules() {
     }
   };
 
-  const assignShift = (empId, dayIdx, shiftId) => {
-    // TODO: PUT to API
-    const key = `${empId}-${dayIdx}`;
-    setSchedule(prev => ({ ...prev, [key]: shiftId }));
+  // Called when an admin clicks a shift option in the inline picker
+  const assignShift = async (empId, dayIdx, shiftTypeId) => {
+    const key         = `${empId}-${dayIdx}`;
+    const targetDate  = weekDates[dayIdx];
+    const dateStr     = targetDate.toISOString().slice(0, 10);
+
+    // Optimistic UI update
+    setSchedule(prev => ({ ...prev, [key]: shiftTypeId }));
     setEditingCell(null);
+    setSavingCell(key);
+
+    try {
+      if (shiftTypeId === 'off') {
+        // If there's a saved assignment, delete it; otherwise nothing to do
+        const existingId = assignmentIds[key];
+        if (existingId) {
+          const res = await fetch(`http://localhost:5000/api/shift-assignments/${existingId}`, {
+            method: 'DELETE',
+          });
+          if (!res.ok) throw new Error(`DELETE failed: ${res.status}`);
+          setAssignmentIds(prev => { const next = { ...prev }; delete next[key]; return next; });
+          setSchedule(prev => { const next = { ...prev }; delete next[key]; return next; });
+        }
+      } else {
+        const dbShiftId = typeToDbShiftId(shiftTypeId, dbShifts);
+        if (dbShiftId === null) {
+          alert(`No matching shift found in the database for "${shiftTypeId}". Please add it to the shifts collection first.`);
+          setSavingCell(null);
+          return;
+        }
+
+        const res = await fetch('http://localhost:5000/api/shift-assignments/upsert', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            employee_id: empId,
+            shift_date:  dateStr,
+            shift_id:    dbShiftId,
+            status:      'PUBLISHED',
+          }),
+        });
+        if (!res.ok) throw new Error(`Upsert failed: ${res.status}`);
+        const saved = await res.json();
+        // Update the local assignment ID so future edits target the right document
+        setAssignmentIds(prev => ({ ...prev, [key]: saved._id }));
+      }
+    } catch (err) {
+      console.error('Failed to save shift assignment:', err);
+      alert('Failed to save. Please try again.');
+      // Revert optimistic update
+      await fetchSchedule();
+    } finally {
+      setSavingCell(null);
+    }
   };
 
   const handleSwapAction = (swapId, action) => {
-    // TODO: PUT to API
     setSwapRequests(prev => prev.map(s => s.id === swapId ? { ...s, status: action } : s));
   };
 
-  // Coverage calculation per day
-  const getCoverage = (dayIdx, shiftId) => {
-    return employees.filter(emp => {
-      const key = `${emp.id}-${dayIdx}`;
-      return schedule[key] === shiftId;
-    }).length;
-  };
+  const getCoverage = (dayIdx, shiftId) =>
+    employees.filter(emp => schedule[`${emp.id}-${dayIdx}`] === shiftId).length;
 
-  const filteredEmployees = filterDept === 'all' ? employees : employees.filter(e => e.department === filterDept);
+  const filteredEmployees = filterDept === 'all'
+    ? employees
+    : employees.filter(e => e.department === filterDept);
+
   const pendingSwaps = swapRequests.filter(s => s.status === 'pending');
 
   if (isLoading) {
@@ -265,10 +338,13 @@ function ShiftSchedules() {
                     const shift = SHIFT_TYPES.find(s => s.id === shiftId);
                     const isToday = new Date().toDateString() === weekDates[dayIdx].toDateString();
                     const isEditing = editingCell === key;
+                    const isSaving = savingCell === key;
 
                     return (
                       <td key={dayIdx} style={{ padding: '4px', borderBottom: '1px solid var(--border-light)', textAlign: 'center', background: isToday ? 'rgba(201,168,76,0.03)' : 'transparent', verticalAlign: 'middle', overflow: 'hidden' }}>
-                        {isEditing ? (
+                        {isSaving ? (
+                          <div style={{ padding: '6px 4px', fontSize: '10px', color: 'var(--text-muted)' }}>saving…</div>
+                        ) : isEditing ? (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                             {SHIFT_TYPES.map(s => (
                               <button

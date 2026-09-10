@@ -29,36 +29,52 @@ function AuditTrail() {
       setIsRefreshing(true);
     }
     try {
-      // TODO: Replace with actual API call
-      // const res = await fetch(`http://localhost:8080/api/admin/audit-trail?period=${filterPeriod}`);
-      // const data = await res.json();
-      await new Promise(resolve => setTimeout(resolve, 500));
+      const res = await fetch(`http://localhost:5000/api/audits?period=${filterPeriod}`);
+      if (!res.ok) throw new Error(`Server error: ${res.status}`);
+      const data = await res.json();
 
-      const mockLogs = [
-        { id: 'AUD-001', timestamp: '2026-08-10T22:05:00', user: 'System', category: 'day-close', action: 'Day Close Executed', description: 'End-of-day process completed. All folios posted.', status: 'balanced', details: { revenuePosted: 57820, roomsProcessed: 106 } },
-        { id: 'AUD-002', timestamp: '2026-08-10T22:03:00', user: 'Marco Diaz', category: 'rate-change', action: 'Rate Override', description: 'Room 304 rate changed from 5,200 to 4,800. Reason: Loyalty discount.', status: 'approved', details: { room: '304', oldRate: 5200, newRate: 4800 } },
-        { id: 'AUD-003', timestamp: '2026-08-10T21:50:00', user: 'System', category: 'no-show', action: 'No-Show Charge Applied', description: 'BKG-8015 (Guest: Kim Tan) marked as no-show. One-night penalty posted.', status: 'completed', details: { booking: 'BKG-8015', penalty: 4500 } },
-        { id: 'AUD-004', timestamp: '2026-08-10T21:45:00', user: 'Marco Diaz', category: 'adjustment', action: 'Folio Adjustment', description: 'Room 212 minibar charge reversed (duplicate entry). Amount: 620.', status: 'approved', details: { room: '212', amount: -620 } },
-        { id: 'AUD-005', timestamp: '2026-08-10T21:30:00', user: 'System', category: 'day-close', action: 'Variance Detected', description: 'Cash drawer short by 150. Logged for review.', status: 'variance', details: { expected: 24500, actual: 24350, difference: -150 } },
-        { id: 'AUD-006', timestamp: '2026-08-09T22:10:00', user: 'System', category: 'day-close', action: 'Day Close Executed', description: 'End-of-day process completed. All folios posted.', status: 'balanced', details: { revenuePosted: 62100, roomsProcessed: 108 } },
-        { id: 'AUD-007', timestamp: '2026-08-09T18:20:00', user: 'Ana Buenaflor', category: 'refund', action: 'Refund Issued', description: 'TXN-9027 refund of 2,100 to Roberto Santos. Reason: Overcharge.', status: 'approved', details: { txnId: 'TXN-9027', amount: 2100 } },
-        { id: 'AUD-008', timestamp: '2026-08-09T15:00:00', user: 'Admin', category: 'void', action: 'Transaction Voided', description: 'TXN-9030 voided. Duplicate room charge for Room 318.', status: 'approved', details: { txnId: 'TXN-9030', amount: 8400 } },
-        { id: 'AUD-009', timestamp: '2026-08-09T10:30:00', user: 'System', category: 'rate-change', action: 'Seasonal Rate Applied', description: 'High season multiplier (1.2x) activated for all room types.', status: 'completed', details: { multiplier: 1.2 } },
-        { id: 'AUD-010', timestamp: '2026-08-08T22:00:00', user: 'System', category: 'day-close', action: 'Day Close Executed', description: 'End-of-day balanced. No variances.', status: 'balanced', details: { revenuePosted: 55400, roomsProcessed: 104 } },
-        { id: 'AUD-011', timestamp: '2026-08-08T14:45:00', user: 'Liza Fernandez', category: 'adjustment', action: 'Late Checkout Waived', description: 'Room 410 late checkout penalty waived per GM approval.', status: 'approved', details: { room: '410', waived: 1500 } },
-        { id: 'AUD-012', timestamp: '2026-08-07T22:05:00', user: 'System', category: 'day-close', action: 'Variance Detected', description: 'Outstanding balance of 3,200 rolled forward (Room 115, 220).', status: 'variance', details: { rooms: ['115', '220'], outstanding: 3200 } },
-      ];
+      // Normalize real audits schema → UI shape
+      // Real fields: audit_id, datetime, action_type, description, user_id, status
+      const normalized = data.map(a => ({
+        id: a.audit_id || a._id,
+        // datetime stored as "2026-08-10 22:05:00" — convert to ISO for Date parsing
+        timestamp: a.datetime ? a.datetime.replace(' ', 'T') : new Date().toISOString(),
+        user: a.user_id || 'System',
+        // Map action_type to a UI category
+        category: (() => {
+          const t = (a.action_type || '').toLowerCase();
+          if (t.includes('day close') || t.includes('close'))  return 'day-close';
+          if (t.includes('rate') || t.includes('override'))    return 'rate-change';
+          if (t.includes('refund'))                            return 'refund';
+          if (t.includes('void'))                              return 'void';
+          if (t.includes('no-show') || t.includes('no show'))  return 'no-show';
+          return 'adjustment';
+        })(),
+        action: a.action_type || '',
+        description: a.description || '',
+        // Map DB status to UI status
+        status: (() => {
+          const s = (a.status || '').toUpperCase();
+          if (s === 'BALANCED')   return 'balanced';
+          if (s === 'VARIANCE')   return 'variance';
+          if (s === 'APPROVED')   return 'approved';
+          if (s === 'COMPLETED')  return 'completed';
+          return 'pending';
+        })(),
+        details: {},
+      }));
 
-      const mockSummary = {
-        totalEntries: 12,
-        balanced: 3,
-        variances: 2,
-        adjustments: 4,
-        pendingReview: 1
+      // Compute summary stats from the normalized data
+      const summaryData = {
+        totalEntries:  normalized.length,
+        balanced:      normalized.filter(l => l.status === 'balanced').length,
+        variances:     normalized.filter(l => l.status === 'variance').length,
+        adjustments:   normalized.filter(l => !['balanced', 'variance'].includes(l.status)).length,
+        pendingReview: normalized.filter(l => l.status === 'pending').length,
       };
 
-      setAuditLogs(mockLogs);
-      setSummaryStats(mockSummary);
+      setAuditLogs(normalized);
+      setSummaryStats(summaryData);
     } catch (err) {
       console.error('Failed to fetch audit logs:', err);
     } finally {

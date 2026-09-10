@@ -119,31 +119,17 @@ function App() {
     }
   }, []);
 
-  const handleLoginSuccess = (role, formData) => {
-    if (role === 'admin') {
+  const handleLoginSuccess = (role, employee, module) => {
+    if (role === 'admin' || module === 'admin') {
       setViewMode('admin');
       setEmployeeRole(null);
+      // If a DB admin employee logged in, store their info for display purposes
+      setLoggedInEmployee(employee || null);
     } else {
-      const employee = employees.find(
-        (emp) => emp.email.toLowerCase() === formData.username.toLowerCase()
-      );
-
-      if (!employee) {
-        alert('Employee account not found.');
-        return;
-      }
-
-      let department = 'frontdesk';
-
-      if (employee.role.toLowerCase().includes('housekeeping')) {
-        department = 'housekeeping';
-      }
-
-      setEmployeeRole(department);
+      setEmployeeRole(module || 'frontdesk');
       setLoggedInEmployee(employee);
       setViewMode('employee');
     }
-
     setIsLoggedIn(true);
   };
   

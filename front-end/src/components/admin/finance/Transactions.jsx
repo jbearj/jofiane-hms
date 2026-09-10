@@ -41,33 +41,28 @@ function Transactions() {
       setIsRefreshing(true);
     }
     try {
-      // TODO: Replace with actual API call
-      // const res = await fetch(`http://localhost:8080/api/admin/transactions?period=${filterPeriod}`);
-      // const data = await res.json();
-      await new Promise(resolve => setTimeout(resolve, 500));
+      const res = await fetch(`http://localhost:5000/api/transactions?period=${filterPeriod}`);
+      if (!res.ok) throw new Error(`Server error: ${res.status}`);
+      const data = await res.json();
 
-      const mockTransactions = [
-        { id: 'TXN-9021', date: '2026-08-10T09:14:00', guest: 'Marisol Reyes', room: '304', description: 'Room Charge - Veranda Suite', amount: 14700, method: 'Credit Card', methodDetail: 'Visa ····4242', type: 'charge', status: 'completed' },
-        { id: 'TXN-9022', date: '2026-08-10T10:30:00', guest: 'Daniel Kho', room: '208', description: 'Room Charge - Garden Room', amount: 4200, method: 'Bank Transfer', methodDetail: 'BDO Unibank', type: 'charge', status: 'pending' },
-        { id: 'TXN-9023', date: '2026-08-10T11:05:00', guest: 'Fam. Villanueva', room: '412', description: 'Room Charge - Amber Loft', amount: 31500, method: 'Cash', methodDetail: 'Front Desk', type: 'charge', status: 'completed' },
-        { id: 'TXN-9024', date: '2026-08-10T12:20:00', guest: 'Marisol Reyes', room: '304', description: 'F&B - Room Service Lunch', amount: 1850, method: 'Room Charge', methodDetail: 'Folio #304', type: 'charge', status: 'completed' },
-        { id: 'TXN-9025', date: '2026-08-10T13:45:00', guest: 'Carlos Mendoza', room: '115', description: 'Minibar Consumption', amount: 620, method: 'Room Charge', methodDetail: 'Folio #115', type: 'charge', status: 'completed' },
-        { id: 'TXN-9026', date: '2026-08-10T14:00:00', guest: 'Lena Park', room: '220', description: 'Spa Treatment - Full Body', amount: 3500, method: 'Credit Card', methodDetail: 'MC ····8891', type: 'charge', status: 'completed' },
-        { id: 'TXN-9027', date: '2026-08-09T16:30:00', guest: 'Roberto Santos', room: '305', description: 'Refund - Overcharge Correction', amount: -2100, method: 'Credit Card', methodDetail: 'Visa ····3310', type: 'refund', status: 'completed' },
-        { id: 'TXN-9028', date: '2026-08-09T08:00:00', guest: 'Angela Cruz', room: '410', description: 'Late Checkout Penalty', amount: 1500, method: 'Cash', methodDetail: 'Front Desk', type: 'charge', status: 'completed' },
-        { id: 'TXN-9029', date: '2026-08-09T09:15:00', guest: 'Mark Rivera', room: '102', description: 'Laundry Service', amount: 450, method: 'Room Charge', methodDetail: 'Folio #102', type: 'charge', status: 'pending' },
-        { id: 'TXN-9030', date: '2026-08-08T17:00:00', guest: 'Jun Aquino', room: '318', description: 'Void - Duplicate Entry', amount: -8400, method: 'System', methodDetail: 'Auto-correction', type: 'void', status: 'voided' },
-      ];
+      // Normalize aggregated transaction fields from embedded booking.transactions
+      const normalized = data.transactions.map(t => ({
+        id: t.txn_id || String(t.booking_object_id),
+        date: t.datetime || new Date().toISOString(),
+        guest: t.guest_name || '',
+        room: t.room_number || '',
+        description: t.description || '',
+        amount: parseFloat((t.amount || '0').replace(/,/g, '')) || 0,
+        method: t.payment_method || '',
+        methodDetail: t.payment_details || '',
+        type: parseFloat((t.amount || '0').replace(/,/g, '')) < 0 ? 'refund' : 'charge',
+        status: (t.status || '').toLowerCase(),   // "COMPLETED" → "completed"
+        _bookingObjectId: t.booking_object_id,    // MongoDB _id of the parent booking
+        _bookingId: t.booking_id,
+      }));
 
-      const mockKpis = {
-        totalIncome: 57820,
-        totalExpenses: 10500,
-        netRevenue: 47320,
-        outstanding: 4650
-      };
-
-      setTransactions(mockTransactions);
-      setKpis(mockKpis);
+      setTransactions(normalized);
+      setKpis(data.kpis);
     } catch (err) {
       console.error('Failed to fetch transactions:', err);
     } finally {
@@ -113,49 +108,101 @@ function Transactions() {
     alert(`Exporting ${filteredTransactions.length} transactions as ${format.toUpperCase()}`);
   };
 
-  const handleRecordPayment = (paymentData) => {
-    // TODO: POST to API
-    const newTxn = {
-      id: `TXN-${9030 + transactions.length + 1}`,
-      date: new Date().toISOString(),
-      guest: paymentData.guest,
-      room: paymentData.room,
-      description: paymentData.description,
-      amount: parseFloat(paymentData.amount),
-      method: paymentData.method,
-      methodDetail: paymentData.methodDetail || '',
-      type: 'charge',
-      status: 'completed'
-    };
-    setTransactions(prev => [newTxn, ...prev]);
+  const handleRecordPayment = async (paymentData) => {
+    try {
+      // Find a checked-in booking matching the given room number
+      const bookingsRes = await fetch(`http://localhost:5000/api/bookings?status=Checked In`);
+      if (!bookingsRes.ok) throw new Error('Could not fetch bookings');
+      const bookings = await bookingsRes.json();
+      const match = bookings.find(b => b.room_number === paymentData.room);
+
+      if (!match) {
+        alert(`No checked-in booking found for room ${paymentData.room}. Please verify the room number.`);
+        return;
+      }
+
+      const txn = {
+        txn_id: `TXN-${Date.now()}`,
+        datetime: new Date().toLocaleString('en-CA', { hour12: false }).replace(',', ''),
+        description: paymentData.description,
+        amount: parseFloat(paymentData.amount).toLocaleString('en-US', { minimumFractionDigits: 2 }),
+        payment_method: paymentData.method,
+        payment_details: paymentData.methodDetail || '',
+        status: 'COMPLETED',
+      };
+
+      const res = await fetch(`http://localhost:5000/api/bookings/${match._id}/transactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(txn),
+      });
+      if (!res.ok) throw new Error(`Server error: ${res.status}`);
+
+      await fetchTransactions();
+    } catch (err) {
+      console.error('Failed to record payment:', err);
+      alert('Failed to record payment. Please try again.');
+    }
     setShowPaymentModal(false);
   };
 
-  const handleRefund = (refundData) => {
-    // TODO: POST to API
-    const newTxn = {
-      id: `TXN-${9030 + transactions.length + 1}`,
-      date: new Date().toISOString(),
-      guest: selectedTransaction.guest,
-      room: selectedTransaction.room,
-      description: `Refund - ${refundData.reason}`,
-      amount: -Math.abs(parseFloat(refundData.amount)),
-      method: selectedTransaction.method,
-      methodDetail: selectedTransaction.methodDetail,
-      type: 'refund',
-      status: 'completed'
-    };
-    setTransactions(prev => [newTxn, ...prev]);
+  const handleRefund = async (refundData) => {
+    if (!selectedTransaction?._bookingObjectId) {
+      alert('Cannot find the booking for this transaction.');
+      return;
+    }
+    try {
+      const refundTxn = {
+        txn_id: `TXN-${Date.now()}`,
+        datetime: new Date().toLocaleString('en-CA', { hour12: false }).replace(',', ''),
+        description: `Refund - ${refundData.reason}`,
+        // Stored as negative string e.g. "-2,100.00"
+        amount: `-${Math.abs(parseFloat(refundData.amount)).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
+        payment_method: selectedTransaction.method,
+        payment_details: selectedTransaction.methodDetail || '',
+        status: 'COMPLETED',
+      };
+
+      const res = await fetch(
+        `http://localhost:5000/api/bookings/${selectedTransaction._bookingObjectId}/transactions`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(refundTxn),
+        }
+      );
+      if (!res.ok) throw new Error(`Server error: ${res.status}`);
+
+      await fetchTransactions();
+    } catch (err) {
+      console.error('Failed to issue refund:', err);
+      alert('Failed to issue refund. Please try again.');
+    }
     setShowRefundModal(false);
     setSelectedTransaction(null);
   };
 
-  const handleVoid = (transaction) => {
+  const handleVoid = async (transaction) => {
     if (!window.confirm(`Void transaction ${transaction.id}? This cannot be undone.`)) return;
-    // TODO: PUT to API
-    setTransactions(prev => prev.map(t =>
-      t.id === transaction.id ? { ...t, status: 'voided', type: 'void' } : t
-    ));
+    if (!transaction._bookingObjectId) {
+      alert('Cannot find the booking for this transaction.');
+      return;
+    }
+    try {
+      const res = await fetch(
+        `http://localhost:5000/api/bookings/${transaction._bookingObjectId}/transactions/${transaction.id}/void`,
+        { method: 'PATCH' }
+      );
+      if (!res.ok) throw new Error(`Server error: ${res.status}`);
+
+      // Update UI immediately without a full refetch
+      setTransactions(prev =>
+        prev.map(t => t.id === transaction.id ? { ...t, status: 'voided' } : t)
+      );
+    } catch (err) {
+      console.error('Failed to void transaction:', err);
+      alert('Failed to void transaction. Please try again.');
+    }
   };
 
   const toggleRow = (txnId) => {
@@ -603,7 +650,9 @@ export default Transactions;
    Shows full info + Refund / Void actions when a row is clicked
    ============================================================ */
 function TransactionDetailModal({ transaction: txn, onClose, onRefund, onVoid, formatDate, formatTime, formatAmount, getStatusTag }) {
-  const canRefund = txn.status === 'completed' && txn.type === 'charge';
+  // Can only refund a completed positive charge
+  const canRefund = txn.status === 'completed' && txn.amount > 0;
+  // Can void anything that isn't already voided
   const canVoid = txn.status !== 'voided';
 
   return (

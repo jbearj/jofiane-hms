@@ -10,25 +10,25 @@ function Dashboard({ employee, setActiveTab }) {
     const fetchDashboard = async () => {
       setIsLoading(true);
       try {
-        // const res = await fetch('http://localhost:8080/api/dashboard/overview');
-        // const data = await res.json();
-        await new Promise(resolve => setTimeout(resolve, 800));
-
+        const res = await fetch('http://localhost:5000/api/dashboard/overview');
+        if (!res.ok) throw new Error(`Server error: ${res.status}`);
+        const data = await res.json();
         setStats({
-          arrivals: { total: 3, pending: 2, checkedIn: 1, vip: 1 },
-          departures: { total: 4, pending: 2, checkedOut: 1, balanceDue: 2 },
-          inHouse: { total: 6, balanceOutstanding: 2 },
-          bookings: { total: 12, confirmed: 8, checkedIn: 4 },
-          rooms: { total: 50, occupied: 32, vacant: 14, maintenance: 4 },
+          arrivals: data.arrivals,
+          departures: data.departures,
+          inHouse: data.inHouse,
+          bookings: data.bookings,
+          rooms: data.rooms,
         });
-
-        setRecentActivity([
-          { id: 1, type: 'check-in', text: 'Jane Doe checked into Room 304', time: '12:30 PM', icon: 'fa-arrow-right-to-bracket' },
-          { id: 2, type: 'request', text: 'Maria Santos requested late checkout (Room 420)', time: '11:45 AM', icon: 'fa-clock' },
-          { id: 3, type: 'maintenance', text: 'AC repair scheduled for Room 212', time: '10:20 AM', icon: 'fa-wrench' },
-          { id: 4, type: 'departure', text: 'Robert Chen overdue for check-out (Room 212)', time: '10:05 AM', icon: 'fa-arrow-right-from-bracket' },
-          { id: 5, type: 'booking', text: 'New reservation BKG-8010 confirmed', time: '09:30 AM', icon: 'fa-calendar-check' },
-        ]);
+        // Normalize activity log field names
+        const activities = (data.recentActivity || []).map(a => ({
+          id: a._id,
+          type: a.type,
+          text: a.text,
+          time: a.time || new Date(a.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+          icon: a.icon || 'fa-circle-info',
+        }));
+        setRecentActivity(activities);
       } catch (err) {
         console.error(err);
       } finally {

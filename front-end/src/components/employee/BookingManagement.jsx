@@ -1,12 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
 
-// Mock data 
-const initialBookings = [
-  { id: 'BKG-8001', guestName: 'Marisol Reyes', roomType: 'Veranda Suite', status: 'Checked-In', arrivalDate: '2026-08-13' },
-  { id: 'BKG-8002', guestName: 'Juan Santos', roomType: 'Deluxe Room', status: 'Confirmed', arrivalDate: '2026-08-15' }
-];
-
 function BookingManagement() {
   const [bookings, setBookings] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -21,13 +15,28 @@ function BookingManagement() {
     const fetchBookings = async () => {
       setIsLoading(true);
       try {
-        // const res = await fetch('http://localhost:8080/api/bookings');
-        // const data = await res.json();
-        await new Promise(resolve => setTimeout(resolve, 800));
-        setBookings(initialBookings);
-        setSelectedBookingId(initialBookings[0]?.id);
+        const res = await fetch('http://localhost:5000/api/bookings');
+        if (!res.ok) throw new Error(`Server error: ${res.status}`);
+        const data = await res.json();
+        // Normalize MongoDB field names to match UI field names
+        const normalized = data.map(b => ({
+          id: b.booking_id || b._id,
+          guestName: b.guest?.full_name || '',
+          roomType: b.room_number || '',
+          status: b.status || '',
+          arrivalDate: b.dates?.check_in || '',
+          checkOut: b.dates?.check_out || '',
+          room: b.room_number || '',
+          amount: parseFloat((b.billing?.expected_total || '0').replace(/,/g, '')) || 0,
+          specialRequests: '',
+          paymentStatus: parseFloat((b.billing?.balance_due || '0').replace(/,/g, '')) === 0
+            ? 'Paid' : 'Balance Due',
+          _id: b._id,
+        }));
+        setBookings(normalized);
+        setSelectedBookingId(normalized[0]?.id);
       } catch (err) {
-        console.error(err);
+        console.error('Failed to fetch bookings:', err);
       } finally {
         setIsLoading(false);
       }

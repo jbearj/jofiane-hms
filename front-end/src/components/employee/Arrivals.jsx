@@ -1,12 +1,5 @@
 import React, { useState, useEffect } from 'react';
 
-// Mock data 
-const MOCK_ARRIVALS = [
-  { id: 'BKG-8005', guestName: 'John Smith', adults: 2, children: 0, nights: 3, roomType: 'Veranda Suite', roomNumber: null, status: 'Pending', arrivalTime: '14:00', flight: 'BA249', balance: 0.0, prepaid: true, requests: 'High floor, extra pillows', isVIP: true },
-  { id: 'BKG-8006', guestName: 'Jane Doe', adults: 1, children: 0, nights: 2, roomType: 'Presidential Suite', roomNumber: '304', status: 'Checked-In', arrivalTime: '12:30', flight: '', balance: 4500.0, prepaid: false, requests: '', isVIP: false },
-  { id: 'BKG-8007', guestName: 'Carlos Rivera', adults: 2, children: 2, nights: 5, roomType: 'Garden Room', roomNumber: '102', status: 'Pending', arrivalTime: '16:00', flight: 'PR112', balance: 0.0, prepaid: true, requests: 'Connecting room requested.', isVIP: false }
-];
-
 function Arrivals() {
   // 1. UI FILTERS STATE
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
@@ -24,13 +17,28 @@ function Arrivals() {
     const fetchArrivals = async () => {
       setIsLoading(true);
       try {
-        // BACKEND CONNECTION
-        // const response = await fetch(`http://localhost:8080/api/arrivals?date=${selectedDate}`);
-        // const data = await response.json();
-        
-        // Simulate network delay for now
-        await new Promise(resolve => setTimeout(resolve, 800)); 
-        setArrivals(MOCK_ARRIVALS); // Replace this with `setArrivals(data)`
+        const response = await fetch(`http://localhost:5000/api/arrivals?date=${selectedDate}`);
+        if (!response.ok) throw new Error(`Server error: ${response.status}`);
+        const data = await response.json();
+        // Normalize MongoDB field names to match UI field names
+        const normalized = data.map(a => ({
+          id: a.booking_id || a._id,
+          guestName: a.guest?.full_name || '',
+          adults: a.adults || 0,
+          children: a.children || 0,
+          nights: parseInt(a.dates?.nights) || 0,
+          roomType: a.room_number || '',
+          roomNumber: a.room_number || null,
+          status: a.status === 'Confirmed' ? 'Pending' : a.status,
+          arrivalTime: '—',
+          flight: '',
+          balance: parseFloat((a.billing?.balance_due || '0').replace(/,/g, '')) || 0,
+          prepaid: parseFloat((a.billing?.balance_due || '0').replace(/,/g, '')) === 0,
+          requests: '',
+          isVIP: false,
+          _id: a._id,
+        }));
+        setArrivals(normalized);
       } catch (err) {
         console.error('Failed to fetch arrivals', err);
       } finally {
@@ -42,14 +50,17 @@ function Arrivals() {
 
   // 4. ASYNC ACTION HANDLERS
   const handleCheckIn = async (bookingId) => {
+    const arrival = arrivals.find(a => a.id === bookingId);
+    if (!arrival) return;
     setProcessingId(bookingId);
     try {
-      // await fetch(`http://localhost:8080/api/bookings/${bookingId}/checkin`, { method: 'POST' });
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
-      console.log('Successfully checked in:', bookingId);
-      // Trigger modal or refresh data here
+      const res = await fetch(`http://localhost:5000/api/bookings/${arrival._id}/checkin`, { method: 'POST' });
+      if (!res.ok) throw new Error(`Server error: ${res.status}`);
+      // Update status locally for instant UI feedback
+      setArrivals(prev => prev.map(a => a.id === bookingId ? { ...a, status: 'Checked-In' } : a));
     } catch (error) {
-      alert("Error checking in guest.");
+      console.error('Check-in failed:', error);
+      alert('Error checking in guest.');
     } finally {
       setProcessingId(null);
     }

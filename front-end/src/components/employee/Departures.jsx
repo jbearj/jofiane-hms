@@ -1,93 +1,5 @@
 import React, { useState, useEffect } from 'react';
 
-// Mock data 
-const MOCK_DEPARTURES = [
-  {
-    id: 102,
-    guestName: 'John Smith',
-    vip: true,
-    adults: 2,
-    children: 0,
-    bookingId: 'BK-102',
-    roomNumber: '304',
-    roomType: 'Deluxe King',
-    scheduledDeparture: '2026-08-08T11:00:00',
-    status: 'Pending', 
-    balance: 0.00,
-    prepaid: true,
-    deposit: 200.00,
-    depositType: 'Credit Card',
-    housekeeping: 'Clean',
-    alerts: ['Wake-up call 06:30', 'Taxi 08:00'],
-    nightsStayed: 3,
-    totalNights: 3,
-    lateRequest: false,
-  },
-  {
-    id: 105,
-    guestName: 'Jane Doe',
-    vip: false,
-    adults: 1,
-    children: 0,
-    bookingId: 'BK-105',
-    roomNumber: '507',
-    roomType: 'Suite',
-    scheduledDeparture: '2026-08-08T12:00:00',
-    status: 'Checked-Out',
-    balance: 150.00,
-    prepaid: false,
-    deposit: 300.00,
-    depositType: 'Cash',
-    housekeeping: 'Dirty',
-    alerts: ['Minibar not checked'],
-    nightsStayed: 2,
-    totalNights: 2,
-    lateRequest: false,
-  },
-  {
-    id: 108,
-    guestName: 'Robert Chen',
-    vip: false,
-    adults: 2,
-    children: 1,
-    bookingId: 'BK-108',
-    roomNumber: '212',
-    roomType: 'Standard',
-    scheduledDeparture: '2026-08-08T10:00:00',
-    status: 'Overdue', 
-    balance: 80.00,
-    prepaid: false,
-    deposit: 0.00,
-    depositType: null,
-    housekeeping: 'Dirty',
-    alerts: ['Overdue: not checked out'],
-    nightsStayed: 1,
-    totalNights: 1,
-    lateRequest: false,
-  },
-  {
-    id: 110,
-    guestName: 'Maria Santos',
-    vip: true,
-    adults: 2,
-    children: 2,
-    bookingId: 'BK-110',
-    roomNumber: '420',
-    roomType: 'Deluxe King',
-    scheduledDeparture: '2026-08-08T14:00:00',
-    status: 'Late Requested',
-    balance: 0.00,
-    prepaid: true,
-    deposit: 500.00,
-    depositType: 'Credit Card',
-    housekeeping: 'Clean',
-    alerts: ['Late checkout 14:00', 'Extra towel request'],
-    nightsStayed: 4,
-    totalNights: 4,
-    lateRequest: true,
-  },
-];
-
 function Departures() {
   // 1. UI FILTERS STATE
   const [selectedDate, setSelectedDate] = useState('2026-08-08'); 
@@ -107,13 +19,35 @@ function Departures() {
       setIsLoading(true);
       setError(null);
       try {
-        // BACKEND CONNECTION
-        // const response = await fetch(`http://localhost:8080/api/departures?date=${selectedDate}`);
-        // const data = await response.json();
-        
-        // Simulate network delay for now
-        await new Promise(resolve => setTimeout(resolve, 800)); 
-        setDepartures(MOCK_DEPARTURES); // Replace this with `setDepartures(data)`
+        const response = await fetch(`http://localhost:5000/api/departures?date=${selectedDate}`);
+        if (!response.ok) throw new Error(`Server error: ${response.status}`);
+        const data = await response.json();
+        // Normalize MongoDB field names to match UI field names
+        const normalized = data.map(d => ({
+          id: d._id,
+          guestName: d.guest?.full_name || '',
+          vip: false,
+          adults: d.adults || 0,
+          children: d.children || 0,
+          bookingId: d.booking_id || d._id,
+          roomNumber: d.room_number || '',
+          roomType: d.room_number || '',
+          scheduledDeparture: d.dates?.check_out
+            ? `${d.dates.check_out}T12:00:00`
+            : new Date().toISOString(),
+          status: d.status === 'Checked In' ? 'Pending' : d.status,
+          balance: parseFloat((d.billing?.balance_due || '0').replace(/,/g, '')) || 0,
+          prepaid: parseFloat((d.billing?.balance_due || '0').replace(/,/g, '')) === 0,
+          deposit: parseFloat((d.billing?.total_paid || '0').replace(/,/g, '')) || 0,
+          depositType: null,
+          housekeeping: 'Unknown',
+          alerts: [],
+          nightsStayed: parseInt(d.dates?.nights) || 0,
+          totalNights: parseInt(d.dates?.nights) || 0,
+          lateRequest: false,
+          _id: d._id,
+        }));
+        setDepartures(normalized);
       } catch (err) {
         console.error('Failed to fetch departures', err);
         setError('Failed to connect to the server.');
@@ -126,14 +60,17 @@ function Departures() {
 
   // 4. ASYNC ACTION HANDLERS
   const handleCheckOut = async (id) => {
+    const departure = departures.find(d => d.id === id);
+    if (!departure) return;
     setProcessingId(id);
     try {
-      // await fetch(`http://localhost:8080/api/bookings/${id}/checkout`, { method: 'POST' });
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
-      console.log('Successfully checked out booking:', id);
-      // You would typically refetch the data here, or update local state
+      const res = await fetch(`http://localhost:5000/api/guests/${departure._id}/checkout`, { method: 'POST' });
+      if (!res.ok) throw new Error(`Server error: ${res.status}`);
+      // Update status locally for instant UI feedback
+      setDepartures(prev => prev.map(d => d.id === id ? { ...d, status: 'Checked-Out' } : d));
     } catch (err) {
-      alert("Error checking out guest.");
+      console.error('Check-out failed:', err);
+      alert('Error checking out guest.');
     } finally {
       setProcessingId(null);
     }

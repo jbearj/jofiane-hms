@@ -25,25 +25,53 @@ function StaffList() {
   const fetchEmployees = async () => {
     setIsLoading(true);
     try {
-      // TODO: Replace with actual API call
-      // const res = await fetch('http://localhost:8080/api/admin/employees');
-      // const data = await res.json();
-      await new Promise(resolve => setTimeout(resolve, 500));
+      const today = new Date().toISOString().slice(0, 10);
 
-      const mockEmployees = [
-        { id: 1, name: 'Ana Buenaflor', email: 'ana@jofiane.com', phone: '+63 917 123 4567', role: 'Front Desk Concierge', department: 'Front Desk', salary: 18000, shift: '06:00 - 14:00', status: 'Active', hireDate: '2024-03-15', photo: employee1, portalAccess: true, username: 'ana.buenaflor' },
-        { id: 2, name: 'Marco Diaz', email: 'marco@jofiane.com', phone: '+63 918 234 5678', role: 'Night Auditor', department: 'Front Desk', salary: 22000, shift: '22:00 - 06:00', status: 'Active', hireDate: '2023-11-01', photo: employee1, portalAccess: true, username: 'marco.diaz' },
-        { id: 3, name: 'Liza Fernandez', email: 'liza@jofiane.com', phone: '+63 919 345 6789', role: 'Housekeeping Lead', department: 'Housekeeping', salary: 19500, shift: '07:00 - 15:00', status: 'On Leave', hireDate: '2024-01-10', photo: employee1, portalAccess: true, username: 'liza.fernandez' },
-        { id: 4, name: 'Ronnie Cruz', email: 'ronnie@jofiane.com', phone: '+63 920 456 7890', role: 'Maintenance Technician', department: 'Maintenance', salary: 20000, shift: '09:00 - 17:00', status: 'Active', hireDate: '2023-08-20', photo: employee1, portalAccess: true, username: 'ronnie.cruz' },
-        { id: 5, name: 'Maria Santos', email: 'maria@jofiane.com', phone: '+63 921 567 8901', role: 'Housekeeper', department: 'Housekeeping', salary: 16000, shift: '06:00 - 14:00', status: 'Active', hireDate: '2024-05-01', photo: employee1, portalAccess: true, username: 'maria.santos' },
-        { id: 6, name: 'Carlo Aquino', email: 'carlo@jofiane.com', phone: '+63 922 678 9012', role: 'Maintenance Technician', department: 'Maintenance', salary: 20000, shift: '09:00 - 17:00', status: 'Active', hireDate: '2025-02-15', photo: employee1, portalAccess: true, username: 'carlo.aquino' },
-        { id: 7, name: 'David Reyes', email: 'david@jofiane.com', phone: '+63 923 789 0123', role: 'Bellhop', department: 'Front Desk', salary: 15000, shift: '', status: 'Terminated', hireDate: '2023-06-01', photo: employee1, portalAccess: false, username: 'david.reyes' },
-        { id: 8, name: 'Rosa Villanueva', email: 'rosa@jofiane.com', phone: '+63 924 890 1234', role: 'Housekeeper', department: 'Housekeeping', salary: 16000, shift: '06:00 - 14:00', status: 'Active', hireDate: '2024-07-20', photo: employee1, portalAccess: true, username: 'rosa.villanueva' },
-        { id: 9, name: 'Jessie Ramos', email: 'jessie@jofiane.com', phone: '+63 925 901 2345', role: 'Maintenance Supervisor', department: 'Maintenance', salary: 25000, shift: '08:00 - 16:00', status: 'Active', hireDate: '2022-09-10', photo: employee1, portalAccess: true, username: 'jessie.ramos' },
-        { id: 10, name: 'Carmen Diaz', email: 'carmen@jofiane.com', phone: '+63 926 012 3456', role: 'F&B Attendant', department: 'F&B', salary: 16500, shift: '10:00 - 18:00', status: 'Active', hireDate: '2025-01-05', photo: employee1, portalAccess: true, username: 'carmen.diaz' },
-      ];
+      // Fetch employees and today's shift assignments in parallel
+      const [empRes, shiftsRes, assignRes] = await Promise.all([
+        fetch('http://localhost:5000/api/employees'),
+        fetch('http://localhost:5000/api/shifts'),
+        fetch(`http://localhost:5000/api/shift-assignments?startDate=${today}&endDate=${today}`),
+      ]);
+      if (!empRes.ok) throw new Error(`Server error: ${empRes.status}`);
+      const [empData, shiftsData, assignData] = await Promise.all([
+        empRes.json(),
+        shiftsRes.ok ? shiftsRes.json() : [],
+        assignRes.ok ? assignRes.json() : [],
+      ]);
 
-      setEmployees(mockEmployees);
+      // Build a map of employee_id → shift schedule string for today
+      const shiftNameMap = {};
+      shiftsData.forEach(s => { shiftNameMap[s.shift_id] = s.schedule || s.shift_name; });
+
+      const todayShiftByEmpId = {};
+      assignData.forEach(a => {
+        todayShiftByEmpId[a.employee_id] = shiftNameMap[a.shift_id] || '';
+      });
+
+      const normalized = empData.map(e => ({
+        id: e._id,
+        employeeId: e.employee_id || '',
+        name: e.full_name || '',
+        email: e.contact?.email || '',
+        phone: e.contact?.phone || '',
+        role: e.employment_details?.role?.title || '',
+        department: e.employment_details?.department || '',
+        salary: e.employment_details?.role?.base_salary || 0,
+        // Pull today's assigned shift schedule (e.g. "06:00 - 14:00") if exists
+        shift: todayShiftByEmpId[e.employee_id] || '',
+        status: e.employment_details?.status === 'ACTIVE'     ? 'Active'
+              : e.employment_details?.status === 'ON LEAVE'   ? 'On Leave'
+              : e.employment_details?.status === 'TERMINATED' ? 'Terminated'
+              : e.employment_details?.status || '',
+        hireDate: e.employment_details?.hire_date || '',
+        photo: employee1,
+        portalAccess: e.portal_access?.has_access ?? false,
+        username: e.portal_access?.username || '',
+        password: e.portal_access?.password || '',
+        _id: e._id,
+      }));
+      setEmployees(normalized);
     } catch (err) {
       console.error('Failed to fetch employees:', err);
     } finally {
@@ -65,32 +93,120 @@ function StaffList() {
   const handleAdd = () => { setEditingEmployee(null); setShowAddEdit(true); };
   const handleEdit = (emp) => { setEditingEmployee(emp); setShowAddEdit(true); setSelectedEmployee(null); };
 
-  const handleDelete = (emp) => {
+  const handleDelete = async (emp) => {
     if (!window.confirm(`Delete ${emp.name}? This cannot be undone.`)) return;
-    // TODO: DELETE to API
-    setEmployees(prev => prev.filter(e => e.id !== emp.id));
-    setSelectedEmployee(null);
+    try {
+      const res = await fetch(`http://localhost:5000/api/employees/${emp._id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error(`Server error: ${res.status}`);
+      setEmployees(prev => prev.filter(e => e.id !== emp.id));
+      setSelectedEmployee(null);
+    } catch (err) {
+      console.error('Failed to delete employee:', err);
+      alert('Failed to delete employee. Please try again.');
+    }
   };
 
-  const handleSave = (empData) => {
-    if (editingEmployee) {
-      // TODO: PUT to API
-      setEmployees(prev => prev.map(e => e.id === editingEmployee.id ? { ...e, ...empData } : e));
-    } else {
-      // TODO: POST to API
-      const newEmp = { ...empData, id: Math.max(...employees.map(e => e.id), 0) + 1, photo: employee1 };
-      setEmployees(prev => [...prev, newEmp]);
+  const handleSave = async (empData) => {
+    try {
+      // Use $set with proper nested dot-notation paths so MongoDB updates subdocuments correctly
+      const payload = {
+        $set: {
+          full_name: empData.name,
+          'contact.email': empData.email,
+          'contact.phone': empData.phone,
+          'portal_access.username': empData.username,
+          'portal_access.has_access': empData.portalAccess,
+          'employment_details.hire_date': empData.hireDate,
+          'employment_details.status':
+            empData.status === 'Active'     ? 'ACTIVE'
+            : empData.status === 'On Leave' ? 'ON LEAVE'
+            : empData.status === 'Terminated' ? 'TERMINATED'
+            : empData.status,
+          'employment_details.department': empData.department,
+          'employment_details.role.title': empData.role,
+          'employment_details.role.base_salary': parseFloat(empData.salary) || 0,
+          ...(empData.password ? { 'portal_access.password': empData.password } : {}),
+        },
+      };
+
+      if (editingEmployee) {
+        const res = await fetch(`http://localhost:5000/api/employees/${editingEmployee._id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) throw new Error(`Server error: ${res.status}`);
+      } else {
+        // For new employees send a clean object without $set wrapper
+        const newPayload = {
+          employee_id: Date.now(),
+          full_name: empData.name,
+          contact: { email: empData.email, phone: empData.phone },
+          portal_access: {
+            username: empData.username,
+            has_access: empData.portalAccess,
+            ...(empData.password ? { password: empData.password } : {}),
+          },
+          employment_details: {
+            hire_date: empData.hireDate,
+            status:
+              empData.status === 'Active'     ? 'ACTIVE'
+              : empData.status === 'On Leave' ? 'ON LEAVE'
+              : empData.status === 'Terminated' ? 'TERMINATED'
+              : empData.status,
+            department: empData.department,
+            role: {
+              title: empData.role,
+              base_salary: parseFloat(empData.salary) || 0,
+            },
+          },
+        };
+        const res = await fetch('http://localhost:5000/api/employees', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newPayload),
+        });
+        if (!res.ok) throw new Error(`Server error: ${res.status}`);
+      }
+      await fetchEmployees();
+    } catch (err) {
+      console.error('Failed to save employee:', err);
+      alert('Failed to save employee. Please try again.');
     }
     setShowAddEdit(false);
     setEditingEmployee(null);
   };
 
-  const handleStatusChange = (empId, newStatus) => {
-    // TODO: PUT to API
-    const portalAccess = newStatus === 'Active';
-    setEmployees(prev => prev.map(e => e.id === empId ? { ...e, status: newStatus, portalAccess } : e));
-    if (selectedEmployee?.id === empId) {
-      setSelectedEmployee(prev => ({ ...prev, status: newStatus, portalAccess }));
+  const handleStatusChange = async (empId, newStatus) => {
+    const emp = employees.find(e => e.id === empId);
+    if (!emp) return;
+    try {
+      const dbStatus =
+        newStatus === 'Active'      ? 'ACTIVE'
+        : newStatus === 'On Leave'  ? 'ON LEAVE'
+        : newStatus === 'Terminated'? 'TERMINATED'
+        : newStatus;
+      const res = await fetch(`http://localhost:5000/api/employees/${emp._id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          $set: {
+            'employment_details.status': dbStatus,
+            'portal_access.has_access': newStatus === 'Active',
+          },
+        }),
+      });
+      if (!res.ok) throw new Error(`Server error: ${res.status}`);
+      const portalAccess = newStatus === 'Active';
+      setEmployees(prev => prev.map(e =>
+        e.id === empId ? { ...e, status: newStatus, portalAccess } : e
+      ));
+      if (selectedEmployee?.id === empId) {
+        setSelectedEmployee(prev => ({ ...prev, status: newStatus, portalAccess }));
+      }
+    } catch (err) {
+      console.error('Failed to update status:', err);
+      alert('Failed to update status. Please try again.');
     }
   };
 
@@ -213,7 +329,7 @@ function StaffList() {
                 <th>Role</th>
                 <th>Department</th>
                 <th>Phone</th>
-                <th>Shift</th>
+                <th>Shift (Today)</th>
                 <th>Status</th>
               </tr>
             </thead>
@@ -267,6 +383,7 @@ function StaffList() {
         <EmployeeFormModal
           employee={editingEmployee}
           departments={departments}
+          existingEmployees={employees}
           onClose={() => { setShowAddEdit(false); setEditingEmployee(null); }}
           onSave={handleSave}
         />,
@@ -281,6 +398,11 @@ function StaffList() {
    ============================================================ */
 function ProfileModal({ employee, getStatusTag, onEdit, onDelete, onStatusChange, onClose }) {
   const [showCredentials, setShowCredentials] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+
+  const empIdDisplay = employee.employeeId
+    ? `EMP-${String(employee.employeeId).padStart(4, '0')}`
+    : employee._id?.toString().slice(-6).toUpperCase();
 
   return (
     <div className="modal-overlay open">
@@ -299,12 +421,13 @@ function ProfileModal({ employee, getStatusTag, onEdit, onDelete, onStatusChange
 
         {/* Details Grid */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
-          <DetailItem label="Email" value={employee.email} />
-          <DetailItem label="Phone" value={employee.phone} />
-          <DetailItem label="Shift" value={employee.shift || 'Unassigned'} />
-          <DetailItem label="Salary" value={`${employee.salary.toLocaleString()} /mo`} />
-          <DetailItem label="Hire Date" value={new Date(employee.hireDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} />
-          <DetailItem label="Employee ID" value={`EMP-${employee.id.toString().padStart(4, '0')}`} />
+          <DetailItem label="Email" value={employee.email || '—'} />
+          <DetailItem label="Phone" value={employee.phone || '—'} />
+          <DetailItem label="Shift (Today)" value={employee.shift || 'Not scheduled today'} />
+          <DetailItem label="Salary" value={employee.salary ? `₱${employee.salary.toLocaleString()} /mo` : '—'} />
+          <DetailItem label="Hire Date" value={employee.hireDate ? new Date(employee.hireDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'} />
+          <DetailItem label="Employee ID" value={empIdDisplay || '—'} />
+          <DetailItem label="Department" value={employee.department || '—'} />
         </div>
 
         {/* Portal Access */}
@@ -313,7 +436,7 @@ function ProfileModal({ employee, getStatusTag, onEdit, onDelete, onStatusChange
             <div>
               <div style={{ fontSize: '10px', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>Portal Access</div>
               <div style={{ fontSize: '13px', fontWeight: '600', color: employee.portalAccess ? 'var(--status-vac)' : 'var(--status-occ)' }}>
-                {employee.portalAccess ? 'Granted' : 'Revoked'}
+                {employee.portalAccess ? '✓ Granted' : '✗ Revoked'}
               </div>
             </div>
             <button className="btn btn-xs" onClick={() => setShowCredentials(!showCredentials)}>
@@ -321,14 +444,37 @@ function ProfileModal({ employee, getStatusTag, onEdit, onDelete, onStatusChange
             </button>
           </div>
           {showCredentials && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', paddingTop: '12px', borderTop: '1px solid var(--border-light)' }}>
-              <div>
-                <div style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '600', textTransform: 'uppercase', marginBottom: '4px' }}>Username</div>
-                <div style={{ fontSize: '13px', fontFamily: 'monospace', color: 'var(--text-primary)' }}>{employee.username}</div>
+            <div style={{ paddingTop: '12px', borderTop: '1px solid var(--border-light)' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '10px' }}>
+                <div>
+                  <div style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '600', textTransform: 'uppercase', marginBottom: '4px' }}>Username</div>
+                  <div style={{ fontSize: '13px', fontFamily: 'monospace', color: 'var(--text-primary)' }}>
+                    {employee.username || <span style={{ fontStyle: 'italic', color: 'var(--text-muted)' }}>Not set</span>}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '600', textTransform: 'uppercase', marginBottom: '4px' }}>Password</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '13px', fontFamily: 'monospace', color: 'var(--text-primary)' }}>
+                      {employee.password
+                        ? (showPassword ? employee.password : '••••••••')
+                        : <span style={{ fontStyle: 'italic', color: 'var(--text-muted)' }}>Not set</span>
+                      }
+                    </span>
+                    {employee.password && (
+                      <button
+                        className="btn btn-xs"
+                        style={{ padding: '2px 7px', fontSize: '10px' }}
+                        onClick={() => setShowPassword(p => !p)}
+                      >
+                        {showPassword ? 'Hide' : 'Show'}
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
-              <div>
-                <div style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '600', textTransform: 'uppercase', marginBottom: '4px' }}>Password</div>
-                <div style={{ fontSize: '13px', fontFamily: 'monospace', color: 'var(--text-primary)' }}>••••••••</div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                To change credentials, use Edit Profile.
               </div>
             </div>
           )}
@@ -376,74 +522,130 @@ function DetailItem({ label, value }) {
 /* ============================================================
    ADD / EDIT EMPLOYEE MODAL
    ============================================================ */
-function EmployeeFormModal({ employee, departments, onClose, onSave }) {
+function EmployeeFormModal({ employee, departments, existingEmployees = [], onClose, onSave }) {
+  const isEdit = !!employee;
+
   const [formData, setFormData] = useState({
-    name: employee?.name || '',
-    email: employee?.email || '',
-    phone: employee?.phone || '',
-    role: employee?.role || '',
-    department: employee?.department || departments[0],
-    salary: employee?.salary || '',
-    shift: employee?.shift || '',
-    status: employee?.status || 'Active',
-    hireDate: employee?.hireDate || new Date().toISOString().split('T')[0],
+    name:         employee?.name        || '',
+    email:        employee?.email       || '',
+    phone:        employee?.phone       || '',
+    role:         employee?.role        || '',
+    department:   employee?.department  || departments[0],
+    salary:       employee?.salary      || '',
+    status:       employee?.status      || 'Active',
+    hireDate:     employee?.hireDate    || new Date().toISOString().split('T')[0],
     portalAccess: employee?.portalAccess ?? true,
-    username: employee?.username || ''
+    password:     '',
   });
+
+  const [showPassword, setShowPassword] = useState(false);
+
+  // ── USERNAME — purely derived, never stored in formData ──
+  // Format: firstname@jofiane-department.com  (e.g. jennifer@jofiane-frontdesk.com)
+  // If that's taken, append 2, 3, ...  → jennifer2@jofiane-frontdesk.com
+  const computeUsername = (name, department) => {
+    const firstName = name.trim().split(/\s+/)[0].toLowerCase().replace(/[^a-z0-9]/g, '');
+    const deptSlug  = department.trim().toLowerCase()
+      .replace(/\s+/g, '-')
+      .replace(/[^a-z0-9-]/g, '');
+    if (!firstName) return '';
+    const domain = deptSlug ? `jofiane-${deptSlug}.com` : 'jofiane.com';
+    const base   = firstName;
+
+    // Collect taken usernames, excluding the employee currently being edited
+    const taken = new Set(
+      existingEmployees
+        .filter(e => e._id !== employee?._id)
+        .map(e => (e.username || '').toLowerCase())
+    );
+
+    if (!taken.has(`${base}@${domain}`)) return `${base}@${domain}`;
+    let n = 2;
+    while (taken.has(`${base}${n}@${domain}`)) n++;
+    return `${base}${n}@${domain}`;
+  };
+
+  // Compute live — updates instantly as name/department fields change
+  const generatedUsername = isEdit
+    ? (employee?.username || '')
+    : computeUsername(formData.name, formData.department);
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!formData.name || !formData.email || !formData.role) {
-      alert('Please fill in required fields (Name, Email, Role).');
-      return;
+    if (!formData.name.trim())  { alert('Full name is required.'); return; }
+    if (!formData.email.trim()) { alert('Email is required.'); return; }
+    if (!formData.role.trim())  { alert('Role / Position is required.'); return; }
+    if (!isEdit && formData.portalAccess && !formData.password) {
+      alert('Please set a password for the portal account.'); return;
     }
-    onSave({ ...formData, salary: parseFloat(formData.salary) || 0 });
+    onSave({
+      ...formData,
+      username: generatedUsername,          // always pass the computed username
+      salary: parseFloat(formData.salary) || 0,
+    });
   };
+
+  const set = (field) => (e) => setFormData(prev => ({ ...prev, [field]: e.target.value }));
+  const setVal = (field, val) => setFormData(prev => ({ ...prev, [field]: val }));
 
   return (
     <div className="modal-overlay open">
-      <div className="modal-content" style={{ maxWidth: '560px' }}>
+      <div className="modal-content" style={{ maxWidth: '560px', maxHeight: '90vh', overflowY: 'auto' }}>
         <button className="modal-close" onClick={onClose}>&times;</button>
         <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '6px' }}>
-          {employee ? `Edit ${employee.name}` : 'Add New Employee'}
+          {isEdit ? `Edit — ${employee.name}` : 'Add New Employee'}
         </h3>
         <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '24px' }}>
-          {employee ? 'Update employee information' : 'Add an employee to the directory'}
+          {isEdit ? 'Update employee information and portal credentials' : 'Add a new employee to the directory'}
         </p>
 
         <form onSubmit={handleSubmit}>
+
+          {/* ── PERSONAL INFO ── */}
+          <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--gold-dark)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>Personal Information</div>
           <div className="form-grid" style={{ marginBottom: '18px' }}>
             <div className="form-group">
               <label>Full Name <span className="required">*</span></label>
-              <input type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="e.g. Juan Dela Cruz" />
+              <input type="text" value={formData.name} onChange={set('name')} placeholder="e.g. Juan Dela Cruz" />
             </div>
             <div className="form-group">
               <label>Email <span className="required">*</span></label>
-              <input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="e.g. juan@jofiane.com" />
+              <input type="email" value={formData.email} onChange={set('email')} placeholder="juan@jofiane.com" />
             </div>
           </div>
-
-          <div className="form-grid" style={{ marginBottom: '18px' }}>
+          <div className="form-grid" style={{ marginBottom: '22px' }}>
             <div className="form-group">
               <label>Phone</label>
-              <input type="text" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} placeholder="+63 9xx xxx xxxx" />
+              <input type="text" value={formData.phone} onChange={set('phone')} placeholder="+63 9xx xxx xxxx" />
             </div>
             <div className="form-group">
-              <label>Role / Position <span className="required">*</span></label>
-              <input type="text" value={formData.role} onChange={(e) => setFormData({ ...formData, role: e.target.value })} placeholder="e.g. Front Desk Concierge" />
+              <label>Hire Date</label>
+              <input type="date" value={formData.hireDate} onChange={set('hireDate')} />
             </div>
           </div>
 
+          {/* ── EMPLOYMENT ── */}
+          <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--gold-dark)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>Employment Details</div>
           <div className="form-grid" style={{ marginBottom: '18px' }}>
             <div className="form-group">
+              <label>Role / Position <span className="required">*</span></label>
+              <input type="text" value={formData.role} onChange={set('role')} placeholder="e.g. Front Desk Concierge" />
+            </div>
+            <div className="form-group">
               <label>Department</label>
-              <select value={formData.department} onChange={(e) => setFormData({ ...formData, department: e.target.value })}>
+              <select value={formData.department} onChange={set('department')}>
                 {departments.map(d => <option key={d} value={d}>{d}</option>)}
               </select>
             </div>
+          </div>
+          <div className="form-grid" style={{ marginBottom: '22px' }}>
+            <div className="form-group">
+              <label>Monthly Salary (₱)</label>
+              <input type="number" value={formData.salary} onChange={set('salary')} placeholder="0" min="0" />
+            </div>
             <div className="form-group">
               <label>Status</label>
-              <select value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })}>
+              <select value={formData.status} onChange={set('status')}>
                 <option value="Active">Active</option>
                 <option value="On Leave">On Leave</option>
                 <option value="Terminated">Terminated</option>
@@ -451,38 +653,78 @@ function EmployeeFormModal({ employee, departments, onClose, onSave }) {
             </div>
           </div>
 
-          <div className="form-grid" style={{ marginBottom: '18px' }}>
-            <div className="form-group">
-              <label>Salary (monthly)</label>
-              <input type="number" value={formData.salary} onChange={(e) => setFormData({ ...formData, salary: e.target.value })} placeholder="0" min="0" />
+          {/* ── PORTAL ACCOUNT ── */}
+          <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--gold-dark)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>Portal Account</div>
+          <div style={{ background: 'var(--bg-input)', borderRadius: '8px', padding: '16px', border: '1px solid var(--border-light)', marginBottom: '22px' }}>
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '13px', fontWeight: '500' }}>
+                <input
+                  type="checkbox"
+                  checked={formData.portalAccess}
+                  onChange={(e) => setVal('portalAccess', e.target.checked)}
+                  style={{ width: '16px', height: '16px', accentColor: 'var(--gold)' }}
+                />
+                Grant Employee Portal access
+              </label>
             </div>
-            <div className="form-group">
-              <label>Shift</label>
-              <input type="text" value={formData.shift} onChange={(e) => setFormData({ ...formData, shift: e.target.value })} placeholder="e.g. 06:00 - 14:00" />
-            </div>
-          </div>
 
-          <div className="form-grid" style={{ marginBottom: '18px' }}>
-            <div className="form-group">
-              <label>Hire Date</label>
-              <input type="date" value={formData.hireDate} onChange={(e) => setFormData({ ...formData, hireDate: e.target.value })} />
+            {/* USERNAME — read-only, auto-generated */}
+            <div className="form-group" style={{ marginBottom: '14px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                Username
+                <span style={{ fontSize: '10px', fontWeight: '600', background: 'rgba(201,168,76,0.12)', color: 'var(--gold-dark)', padding: '2px 7px', borderRadius: '10px' }}>
+                  Auto-generated
+                </span>
+              </label>
+              <input
+                type="text"
+                value={generatedUsername}
+                readOnly
+                style={{
+                  background: 'var(--bg-body)',
+                  cursor: 'default',
+                  color: generatedUsername ? 'var(--text-primary)' : 'var(--text-muted)',
+                  fontStyle: generatedUsername ? 'normal' : 'italic',
+                  opacity: formData.portalAccess ? 1 : 0.45,
+                }}
+                placeholder="Fill in name and department above"
+              />
             </div>
-            <div className="form-group">
-              <label>Portal Username</label>
-              <input type="text" value={formData.username} onChange={(e) => setFormData({ ...formData, username: e.target.value })} placeholder="e.g. juan.delacruz" />
-            </div>
-          </div>
 
-          <div style={{ marginBottom: '24px' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '13px', fontWeight: '500' }}>
-              <input type="checkbox" checked={formData.portalAccess} onChange={(e) => setFormData({ ...formData, portalAccess: e.target.checked })} style={{ width: '16px', height: '16px', accentColor: 'var(--gold)' }} />
-              Grant Employee Portal access
-            </label>
+            {/* PASSWORD */}
+            <div className="form-group">
+              <label>
+                {isEdit ? 'New Password' : 'Password'}
+                {!isEdit && <span className="required"> *</span>}
+              </label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={formData.password}
+                  onChange={set('password')}
+                  placeholder={isEdit ? 'Leave blank to keep current' : 'Set a password'}
+                  disabled={!formData.portalAccess}
+                  style={{ opacity: formData.portalAccess ? 1 : 0.45, paddingRight: '60px', width: '100%' }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(p => !p)}
+                  style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: '11px', color: 'var(--text-muted)', fontWeight: '600' }}
+                >
+                  {showPassword ? 'Hide' : 'Show'}
+                </button>
+              </div>
+              {isEdit && (
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', fontStyle: 'italic' }}>
+                  Leave blank to keep the existing password unchanged.
+                </div>
+              )}
+            </div>
           </div>
 
           <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
             <button type="button" className="btn" onClick={onClose}>Cancel</button>
-            <button type="submit" className="btn btn-gold">{employee ? 'Save Changes' : 'Add Employee'}</button>
+            <button type="submit" className="btn btn-gold">{isEdit ? 'Save Changes' : 'Add Employee'}</button>
           </div>
         </form>
       </div>

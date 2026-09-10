@@ -16,22 +16,31 @@ function Cancellations() {
   const fetchCancellations = async () => {
     setIsLoading(true);
     try {
-      // TODO: Replace with actual API call
-      // const res = await fetch('http://localhost:8080/api/admin/cancellations');
-      // const data = await res.json();
-      await new Promise(resolve => setTimeout(resolve, 500));
+      const res = await fetch('http://localhost:5000/api/bookings?status=Cancelled');
+      if (!res.ok) throw new Error(`Server error: ${res.status}`);
+      const data = await res.json();
 
-      const mockData = [
-        { id: 'BKG-8010', guest: 'Maria Clara', room: '203', roomType: 'Premium', checkIn: '2026-08-09', checkOut: '2026-08-10', nights: 1, amount: 5500, reason: 'Guest request', cancelledBy: 'Guest', cancelledDate: '2026-08-07T14:00:00', penaltyApplied: false, penaltyAmount: 0, source: 'Agoda' },
-        { id: 'BKG-8015', guest: 'Kim Tan', room: '105', roomType: 'Standard', checkIn: '2026-08-10', checkOut: '2026-08-11', nights: 1, amount: 2500, reason: 'No-show', cancelledBy: 'System', cancelledDate: '2026-08-10T23:00:00', penaltyApplied: true, penaltyAmount: 2500, source: 'Agoda' },
-        { id: 'BKG-7998', guest: 'Paolo Reyes', room: '302', roomType: 'Suite', checkIn: '2026-08-05', checkOut: '2026-08-08', nights: 3, amount: 25500, reason: 'OTA cancellation', cancelledBy: 'Booking.com', cancelledDate: '2026-08-03T09:30:00', penaltyApplied: true, penaltyAmount: 8500, source: 'Booking.com' },
-        { id: 'BKG-7995', guest: 'Sarah Lim', room: '110', roomType: 'Standard', checkIn: '2026-08-04', checkOut: '2026-08-06', nights: 2, amount: 5000, reason: 'Guest request', cancelledBy: 'Guest', cancelledDate: '2026-08-02T16:00:00', penaltyApplied: false, penaltyAmount: 0, source: 'Direct' },
-        { id: 'BKG-7990', guest: 'Chen Wei', room: '401', roomType: 'Presidential', checkIn: '2026-08-06', checkOut: '2026-08-09', nights: 3, amount: 45000, reason: 'Flight cancelled', cancelledBy: 'Guest', cancelledDate: '2026-08-05T11:00:00', penaltyApplied: true, penaltyAmount: 15000, source: 'Expedia' },
-        { id: 'BKG-7985', guest: 'Amy Torres', room: '205', roomType: 'Deluxe', checkIn: '2026-08-03', checkOut: '2026-08-05', nights: 2, amount: 8400, reason: 'Overbooking', cancelledBy: 'Hotel', cancelledDate: '2026-08-02T08:00:00', penaltyApplied: false, penaltyAmount: 0, source: 'Direct' },
-        { id: 'BKG-7980', guest: 'Jake Mendoza', room: '104', roomType: 'Standard', checkIn: '2026-08-01', checkOut: '2026-08-02', nights: 1, amount: 2500, reason: 'No-show', cancelledBy: 'System', cancelledDate: '2026-08-01T23:00:00', penaltyApplied: true, penaltyAmount: 2500, source: 'Walk-in' },
-      ];
+      const parseAmount = (str) => parseFloat((str || '0').replace(/,/g, '')) || 0;
 
-      setCancellations(mockData);
+      const normalized = data.map(b => ({
+        id: b.booking_id || b._id,
+        guest: b.guest?.full_name || '',
+        room: b.room_number || '',
+        roomType: b.room_number || '',
+        checkIn: b.dates?.check_in || '',
+        checkOut: b.dates?.check_out || '',
+        nights: parseInt(b.dates?.nights) || 0,
+        amount: parseAmount(b.billing?.expected_total),
+        reason: b.cancellation?.reason || 'Guest request',
+        cancelledBy: b.cancellation?.cancelled_by || 'Staff',
+        cancelledDate: b.cancellation?.cancelled_at || b.updatedAt || '',
+        penaltyApplied: b.cancellation?.penalty_applied || false,
+        penaltyAmount: parseAmount(b.cancellation?.penalty_amount),
+        source: b.source || '',
+        _id: b._id,
+      }));
+
+      setCancellations(normalized);
     } catch (err) {
       console.error('Failed to fetch cancellations:', err);
     } finally {
@@ -54,12 +63,18 @@ function Cancellations() {
   };
 
   const handleRebook = (cancellation) => {
-    // TODO: Navigate or open create booking with pre-filled data
-    alert(`Re-booking for ${cancellation.guest} — ${cancellation.roomType}, ${cancellation.nights} night(s)`);
+    // Open AllBookings with pre-filled data is out of scope here
+    // For now just show key info the front desk needs to manually re-book
+    alert(`Re-book for:\nGuest: ${cancellation.guest}\nRoom: ${cancellation.room}\nDates: ${cancellation.checkIn} → ${cancellation.checkOut} (${cancellation.nights}N)\nSource: ${cancellation.source}\n\nOpen All Bookings and use "New Booking" to re-create this reservation.`);
   };
 
-  const formatDate = (dateStr) => new Date(dateStr).toLocaleDateString('en-US', { month: 'Short', day: 'numeric' });
-  const formatDateTime = (dateStr) => new Date(dateStr).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const formatDate = (dateStr) => new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const formatDateTime = (dateStr) => {
+    if (!dateStr) return '—';
+    // Handle "2026-08-10 22:05:00" format from DB as well as ISO strings
+    const d = new Date(dateStr.replace(' ', 'T'));
+    return isNaN(d) ? dateStr : d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  };
 
   // Stats
   const totalLost = cancellations.reduce((sum, c) => sum + c.amount, 0);

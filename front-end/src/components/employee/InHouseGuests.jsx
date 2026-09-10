@@ -1,13 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
 
-// Mock data 
-const MOCK_INHOUSE = [
-  { id: 102, guestName: 'John Smith', roomNumber: '304', roomType: 'Presidential Suite', checkIn: '2026-08-05', expectedDeparture: '2026-08-10', balance: 0.00, housekeeping: 'Clean' },
-  { id: 105, guestName: 'Jane Doe', roomNumber: '101', roomType: 'Deluxe Room', checkIn: '2026-08-07', expectedDeparture: '2026-08-09', balance: 150.00, housekeeping: 'Dirty' }
-];
-
-
 function InHouseGuests() {
   // BACKEND-READY STATES
   const [guests, setGuests] = useState([]);
@@ -19,12 +12,24 @@ function InHouseGuests() {
     const fetchGuests = async () => {
       setIsLoading(true);
       try {
-        // const res = await fetch('http://localhost:8080/api/guests/in-house');
-        // const data = await res.json();
-        await new Promise(resolve => setTimeout(resolve, 800)); // Simulate loading
-        setGuests(MOCK_INHOUSE);
+        const res = await fetch('http://localhost:5000/api/guests/in-house');
+        if (!res.ok) throw new Error(`Server error: ${res.status}`);
+        const data = await res.json();
+        // Normalize MongoDB field names to match UI field names
+        const normalized = data.map(g => ({
+          id: g._id,
+          guestName: g.guest?.full_name || '',
+          roomNumber: g.room_number || '',
+          roomType: g.room_number || '',
+          checkIn: g.dates?.check_in || '',
+          expectedDeparture: g.dates?.check_out || '',
+          balance: parseFloat((g.billing?.balance_due || '0').replace(/,/g, '')) || 0,
+          housekeeping: 'Unknown',
+          _id: g._id,
+        }));
+        setGuests(normalized);
       } catch (error) {
-        console.error("Failed to fetch");
+        console.error('Failed to fetch in-house guests:', error);
       } finally {
         setIsLoading(false);
       }
@@ -34,11 +39,17 @@ function InHouseGuests() {
 
   // ASYNC CHECKOUT
   const handleCheckOut = async (id) => {
+    const guest = guests.find(g => g.id === id);
+    if (!guest) return;
     setProcessingId(id);
     try {
-      // await fetch(`http://localhost:8080/api/guests/${id}/checkout`, { method: 'POST' });
-      await new Promise(resolve => setTimeout(resolve, 1200)); 
-      alert('Guest checked out successfully!');
+      const res = await fetch(`http://localhost:5000/api/guests/${guest._id}/checkout`, { method: 'POST' });
+      if (!res.ok) throw new Error(`Server error: ${res.status}`);
+      // Remove guest from the in-house list after successful checkout
+      setGuests(prev => prev.filter(g => g.id !== id));
+    } catch (error) {
+      console.error('Checkout failed:', error);
+      alert('Guest checkout failed. Please try again.');
     } finally {
       setProcessingId(null);
     }

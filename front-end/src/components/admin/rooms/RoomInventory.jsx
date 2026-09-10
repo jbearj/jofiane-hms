@@ -27,38 +27,44 @@ function RoomInventory() {
   const fetchRooms = async () => {
     setIsLoading(true);
     try {
-      // TODO: Replace with actual API call
-      // const res = await fetch('http://localhost:8080/api/admin/rooms');
-      // const data = await res.json();
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // 1. Fetch live data from your Node.js server
+      const [roomsRes, typesRes] = await Promise.all([
+        fetch('http://localhost:5000/api/rooms'),
+        fetch('http://localhost:5000/api/room-types')
+      ]);
 
-      const mockTypes = [
-        { id: 1, name: 'Standard', baseRate: 2500, capacity: 2 },
-        { id: 2, name: 'Deluxe', baseRate: 4200, capacity: 2 },
-        { id: 3, name: 'Premium', baseRate: 5500, capacity: 3 },
-        { id: 4, name: 'Suite', baseRate: 8500, capacity: 4 },
-        { id: 5, name: 'Presidential', baseRate: 15000, capacity: 4 }
-      ];
+      if (!roomsRes.ok || !typesRes.ok) {
+        throw new Error('Failed to retrieve inventory data from backend');
+      }
 
-      const mockRooms = [
-        { id: 1, number: '101', floor: 1, type: 'Standard', capacity: 2, rate: 2500, status: 'vacant', amenities: ['Wi-Fi', 'TV', 'AC', 'Mini Fridge'] },
-        { id: 2, number: '102', floor: 1, type: 'Standard', capacity: 2, rate: 2500, status: 'occupied', amenities: ['Wi-Fi', 'TV', 'AC', 'Mini Fridge'] },
-        { id: 3, number: '103', floor: 1, type: 'Deluxe', capacity: 2, rate: 4200, status: 'occupied', amenities: ['Wi-Fi', 'TV', 'AC', 'Mini Bar', 'Balcony'] },
-        { id: 4, number: '104', floor: 1, type: 'Standard', capacity: 2, rate: 2500, status: 'vacant', amenities: ['Wi-Fi', 'TV', 'AC', 'Mini Fridge'] },
-        { id: 5, number: '201', floor: 2, type: 'Deluxe', capacity: 2, rate: 4200, status: 'occupied', amenities: ['Wi-Fi', 'TV', 'AC', 'Mini Bar', 'Balcony'] },
-        { id: 6, number: '202', floor: 2, type: 'Deluxe', capacity: 2, rate: 4200, status: 'vacant', amenities: ['Wi-Fi', 'TV', 'AC', 'Mini Bar', 'Balcony'] },
-        { id: 7, number: '203', floor: 2, type: 'Premium', capacity: 3, rate: 5500, status: 'occupied', amenities: ['Wi-Fi', 'TV', 'AC', 'Mini Bar', 'Balcony', 'Bathtub'] },
-        { id: 8, number: '204', floor: 2, type: 'Premium', capacity: 3, rate: 5500, status: 'out-of-order', amenities: ['Wi-Fi', 'TV', 'AC', 'Mini Bar', 'Balcony', 'Bathtub'] },
-        { id: 9, number: '301', floor: 3, type: 'Suite', capacity: 4, rate: 8500, status: 'occupied', amenities: ['Wi-Fi', 'TV', 'AC', 'Mini Bar', 'Balcony', 'Bathtub', 'Living Area'] },
-        { id: 10, number: '302', floor: 3, type: 'Suite', capacity: 4, rate: 8500, status: 'vacant', amenities: ['Wi-Fi', 'TV', 'AC', 'Mini Bar', 'Balcony', 'Bathtub', 'Living Area'] },
-        { id: 11, number: '303', floor: 3, type: 'Premium', capacity: 3, rate: 5500, status: 'occupied', amenities: ['Wi-Fi', 'TV', 'AC', 'Mini Bar', 'Balcony', 'Bathtub'] },
-        { id: 12, number: '304', floor: 3, type: 'Suite', capacity: 4, rate: 8500, status: 'occupied', amenities: ['Wi-Fi', 'TV', 'AC', 'Mini Bar', 'Balcony', 'Bathtub', 'Living Area'] },
-        { id: 13, number: '401', floor: 4, type: 'Presidential', capacity: 4, rate: 15000, status: 'vacant', amenities: ['Wi-Fi', 'TV', 'AC', 'Mini Bar', 'Balcony', 'Bathtub', 'Living Area', 'Dining Area', 'Kitchen'] },
-        { id: 14, number: '402', floor: 4, type: 'Presidential', capacity: 4, rate: 15000, status: 'occupied', amenities: ['Wi-Fi', 'TV', 'AC', 'Mini Bar', 'Balcony', 'Bathtub', 'Living Area', 'Dining Area', 'Kitchen'] },
-      ];
+      const dbRooms = await roomsRes.json();
+      const dbTypes = await typesRes.json();
 
-      setRoomTypes(mockTypes);
-      setRooms(mockRooms);
+      // 2. Format room types from database
+      const formattedTypes = dbTypes.map((type) => ({
+        id: type.type_id,
+        name: type.name,
+        baseRate: type.base_rate,
+        capacity: type.base_capacity
+      }));
+
+      // 3. Merge MongoDB room records with corresponding room type details
+      const formattedRooms = dbRooms.map((room) => {
+        const matchedType = dbTypes.find((t) => t.type_id === room.type_id);
+        return {
+          id: room._id || room.room_number,
+          number: room.room_number ? room.room_number.toString() : '',
+          floor: room.floor,
+          type: matchedType ? matchedType.name : 'Standard',
+          capacity: matchedType ? matchedType.base_capacity : 2,
+          rate: matchedType ? matchedType.base_rate : 0,
+          status: (room.status || 'vacant').toLowerCase(),
+          amenities: matchedType?.amenities || []
+        };
+      });
+
+      setRoomTypes(formattedTypes);
+      setRooms(formattedRooms);
     } catch (err) {
       console.error('Failed to fetch rooms:', err);
     } finally {
@@ -97,17 +103,14 @@ function RoomInventory() {
 
   const handleDeleteRoom = (room) => {
     if (!window.confirm(`Delete Room ${room.number}? This cannot be undone.`)) return;
-    // TODO: DELETE to API
     setRooms(prev => prev.filter(r => r.id !== room.id));
   };
 
   const handleSaveRoom = (roomData) => {
     if (editingRoom) {
-      // TODO: PUT to API
       setRooms(prev => prev.map(r => r.id === editingRoom.id ? { ...r, ...roomData } : r));
     } else {
-      // TODO: POST to API
-      const newRoom = { ...roomData, id: Math.max(...rooms.map(r => r.id), 0) + 1 };
+      const newRoom = { ...roomData, id: Math.max(...rooms.map(r => Number(r.id) || 0), 0) + 1 };
       setRooms(prev => [...prev, newRoom]);
     }
     setShowModal(false);
@@ -119,7 +122,7 @@ function RoomInventory() {
   const occupied = rooms.filter(r => r.status === 'occupied').length;
   const vacant = rooms.filter(r => r.status === 'vacant').length;
   const outOfOrder = rooms.filter(r => r.status === 'out-of-order').length;
-  const floors = [...new Set(rooms.map(r => r.floor))].sort();
+  const floors = [...new Set(rooms.map(r => r.floor))].sort((a, b) => a - b);
 
   const getStatusTag = (status) => {
     switch (status) {
@@ -153,7 +156,7 @@ function RoomInventory() {
         </div>
       </div>
 
-      {/* INVENTORY SUMMARY — Compact inline layout */}
+      {/* INVENTORY SUMMARY */}
       <div className="panel" style={{ padding: '22px 28px', marginBottom: '22px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
           
@@ -211,7 +214,7 @@ function RoomInventory() {
               >
                 <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)' }}>{type.name}</span>
                 <span style={{ fontSize: '10px', color: 'var(--text-muted)', background: 'var(--bg-card)', padding: '1px 6px', borderRadius: '10px' }}>{count}</span>
-                <span style={{ fontSize: '10px', color: 'var(--gold)', fontWeight: '600' }}>{type.baseRate.toLocaleString()}</span>
+                <span style={{ fontSize: '10px', color: 'var(--gold)', fontWeight: '600' }}>{type.baseRate?.toLocaleString()}</span>
               </button>
             );
           })}
@@ -298,7 +301,7 @@ function RoomInventory() {
                       <span className="std-text">{room.capacity} pax</span>
                     </td>
                     <td style={{ textAlign: 'right', fontWeight: '700' }}>
-                      {room.rate.toLocaleString()}
+                      {room.rate?.toLocaleString()}
                     </td>
                     <td>
                       <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
