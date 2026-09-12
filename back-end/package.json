@@ -1,7 +1,6 @@
 {
   "name": "back-end",
   "version": "1.0.0",
-
   "description": "This directory contains the backend REST API services for the **JOFIANE Hotel Management System**.",
   "main": "index.js",
   "scripts": {

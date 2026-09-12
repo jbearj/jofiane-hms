@@ -329,7 +329,7 @@ function FrontDeskLog() {
       {/* New Entry Modal */}
       {newEntryModal && (
         <div className="modal-overlay logbook-modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(2px)' }}>
-          <div className="modal-content logbook-modal" style={{ width: 480, maxWidth: '92%', padding: '28px', borderRadius: '12px', background: '#fff', boxShadow: '0 20px 60px rgba(0,0,0,0.15)' }}>
+          <div className="modal-content logbook-modal logbook-new-entry" style={{ width: 480, maxWidth: '92%', padding: '28px', borderRadius: '12px', background: '#fff', boxShadow: '0 20px 60px rgba(0,0,0,0.15)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: '#1f2937' }}>New Log Entry</h3>
               <button onClick={() => setNewEntryModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: '#9ca3af', padding: '4px' }}>

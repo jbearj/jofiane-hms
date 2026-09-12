@@ -81,14 +81,14 @@ const Login = ({ onLoginSuccess }) => {
   };
 
   return (
-    <div style={styles.wrapper}>
+    <div className="login-shell" style={styles.wrapper}>
       {/* Brand logo top-left */}
       <header style={styles.brandHeader}>
         <img src={logo} alt="Jofiane Hotel" style={styles.logo} />
       </header>
 
       {/* Glassmorphism card */}
-      <main style={styles.card}>
+      <main className="login-card" style={styles.card}>
         <div style={styles.content}>
           <div style={styles.titleBlock}>
             <h1 style={styles.title}>Welcome Back</h1>

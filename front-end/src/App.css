@@ -2725,6 +2725,264 @@ tr:last-child td {
   }
 }
 
+/* ============================================================
+   PREMIUM UI POLISH
+   Shared surfaces, controls, and interaction details.  These
+   rules intentionally reuse the existing brown / gold palette.
+   ============================================================ */
+:root {
+  --surface-highlight: rgba(255, 255, 255, 0.42);
+  --control-border: rgba(111, 83, 61, 0.26);
+  --control-shadow: 0 8px 22px rgba(66, 42, 27, 0.06);
+}
+
+.portal-shell {
+  isolation: isolate;
+}
+
+.portal-shell::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  background: radial-gradient(circle at 16% 12%, rgba(255, 255, 255, 0.14), transparent 34%);
+}
+
+.portal-shell .panel,
+.portal-shell .kpi-card,
+.portal-shell .employee-glass-card,
+.portal-shell .modal-content {
+  border-width: 1px !important;
+  box-shadow: var(--employee-shadow, 0 18px 50px rgba(61, 37, 23, 0.10)), inset 0 1px 0 var(--surface-highlight) !important;
+  transition: transform 220ms cubic-bezier(.22, 1, .36, 1), box-shadow 220ms ease, border-color 220ms ease, background 220ms ease !important;
+}
+
+.portal-shell .panel:hover,
+.portal-shell .kpi-card:hover,
+.portal-shell .employee-glass-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 22px 54px rgba(61, 37, 23, 0.14), inset 0 1px 0 var(--surface-highlight) !important;
+}
+
+.portal-shell .btn,
+.portal-shell .ledger-btn,
+.portal-shell .nav-link,
+.portal-shell button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.portal-shell .btn:active,
+.portal-shell .ledger-btn:active,
+.portal-shell .nav-link:active {
+  transform: translateY(0) scale(0.98);
+}
+
+/* Every native control follows the active shell theme. */
+.portal-shell input,
+.portal-shell select,
+.portal-shell textarea,
+.portal-shell .floor-dropdown {
+  color: var(--text-primary) !important;
+  background: rgba(255, 255, 255, 0.62) !important;
+  border: 1px solid var(--control-border) !important;
+  box-shadow: inset 0 1px 1px rgba(66, 42, 27, 0.03) !important;
+  transition: border-color 180ms ease, box-shadow 180ms ease, background 180ms ease !important;
+}
+
+.portal-shell select,
+.portal-shell select option {
+  color: var(--text-primary) !important;
+  background-color: var(--bg-card) !important;
+}
+
+.portal-shell input::placeholder,
+.portal-shell textarea::placeholder {
+  color: var(--text-muted) !important;
+  opacity: 0.9;
+}
+
+.portal-shell input:focus,
+.portal-shell select:focus,
+.portal-shell textarea:focus,
+.portal-shell .floor-dropdown:focus {
+  border-color: var(--gold) !important;
+  background: rgba(255, 255, 255, 0.84) !important;
+  box-shadow: 0 0 0 3px var(--gold-glow), var(--control-shadow) !important;
+}
+
+.portal-shell.theme-dark input,
+.portal-shell.theme-dark select,
+.portal-shell.theme-dark textarea,
+.portal-shell.theme-dark .floor-dropdown {
+  color-scheme: dark;
+  color: var(--text-primary) !important;
+  background: rgba(35, 28, 24, 0.82) !important;
+  border-color: rgba(232, 213, 163, 0.24) !important;
+}
+
+.portal-shell.theme-dark select,
+.portal-shell.theme-dark select option {
+  background-color: #332923 !important;
+  color: #f4ede5 !important;
+}
+
+.portal-shell.theme-dark input:focus,
+.portal-shell.theme-dark select:focus,
+.portal-shell.theme-dark textarea:focus,
+.portal-shell.theme-dark .floor-dropdown:focus {
+  background: rgba(48, 38, 32, 0.96) !important;
+  border-color: #e0c36e !important;
+  box-shadow: 0 0 0 3px rgba(201, 168, 76, 0.22), 0 10px 28px rgba(0, 0, 0, 0.18) !important;
+}
+
+/* Account and payment forms: keep fields visibly separated from glass. */
+.admin-portal-shell .modal-content input,
+.admin-portal-shell .modal-content select,
+.admin-portal-shell .modal-content textarea,
+.employee-portal-shell .modal-content input,
+.employee-portal-shell .modal-content select,
+.employee-portal-shell .modal-content textarea {
+  border: 1px solid var(--control-border) !important;
+  min-height: 42px;
+}
+
+.admin-portal-shell.theme-dark .modal-content input,
+.admin-portal-shell.theme-dark .modal-content select,
+.admin-portal-shell.theme-dark .modal-content textarea,
+.employee-portal-shell.theme-dark .modal-content input,
+.employee-portal-shell.theme-dark .modal-content select,
+.employee-portal-shell.theme-dark .modal-content textarea {
+  border-color: rgba(232, 213, 163, 0.28) !important;
+}
+
+/* Front Desk log uses legacy inline light colors; these selectors restore
+   readable contrast and theme-aware controls in the new-entry dialog. */
+.logbook-module .logbook-new-entry h3,
+.logbook-module .logbook-new-entry label,
+.logbook-module .logbook-new-entry input,
+.logbook-module .logbook-new-entry select,
+.logbook-module .logbook-new-entry textarea {
+  color: var(--text-primary) !important;
+}
+
+.logbook-module .logbook-new-entry input,
+.logbook-module .logbook-new-entry select,
+.logbook-module .logbook-new-entry textarea {
+  background: var(--bg-input) !important;
+  border: 1px solid var(--control-border) !important;
+}
+
+.employee-portal-shell.theme-dark .logbook-module .logbook-new-entry input,
+.employee-portal-shell.theme-dark .logbook-module .logbook-new-entry select,
+.employee-portal-shell.theme-dark .logbook-module .logbook-new-entry textarea {
+  background: rgba(35, 28, 24, 0.9) !important;
+  border-color: rgba(232, 213, 163, 0.28) !important;
+  color: #f4ede5 !important;
+  color-scheme: dark;
+}
+
+.employee-portal-shell.theme-dark .logbook-module .logbook-new-entry select,
+.employee-portal-shell.theme-dark .logbook-module .logbook-new-entry select option {
+  background-color: #332923 !important;
+  color: #f4ede5 !important;
+}
+
+.employee-portal-shell.theme-dark .logbook-module .logbook-new-entry label,
+.employee-portal-shell.theme-dark .logbook-module .logbook-new-entry button,
+.employee-portal-shell.theme-dark .logbook-module .logbook-new-entry input::placeholder,
+.employee-portal-shell.theme-dark .logbook-module .logbook-new-entry textarea::placeholder {
+  color: var(--text-secondary) !important;
+}
+
+/* Give the transactions search field useful working space on desktop. */
+.transaction-module .txn-search {
+  flex: 1 1 380px !important;
+  max-width: 520px !important;
+}
+
+.transaction-module .txn-search input {
+  width: 100% !important;
+  min-height: 48px !important;
+  padding-top: 12px !important;
+  padding-bottom: 12px !important;
+  border-radius: 12px !important;
+  font-size: 13px !important;
+}
+
+@media (max-width: 760px) {
+  .transaction-module .txn-search {
+    flex-basis: 100% !important;
+    max-width: none !important;
+  }
+}
+
+/* Login: premium, calm first impression while preserving the existing logo. */
+.login-shell {
+  isolation: isolate;
+}
+
+.login-shell::before,
+.login-shell::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+  border-radius: 50%;
+  filter: blur(2px);
+}
+
+.login-shell::before {
+  width: 38vw;
+  height: 38vw;
+  min-width: 300px;
+  min-height: 300px;
+  top: -18vw;
+  right: -10vw;
+  background: radial-gradient(circle, rgba(201, 168, 76, 0.22), transparent 68%);
+}
+
+.login-shell::after {
+  width: 28vw;
+  height: 28vw;
+  min-width: 240px;
+  min-height: 240px;
+  bottom: -14vw;
+  left: -8vw;
+  background: radial-gradient(circle, rgba(111, 83, 61, 0.28), transparent 70%);
+}
+
+.login-shell .login-card {
+  animation: loginCardIn 520ms cubic-bezier(.22, 1, .36, 1) both;
+  position: relative;
+  overflow: hidden;
+}
+
+.login-shell .login-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(120deg, rgba(255,255,255,0.09), transparent 35%, rgba(201,168,76,0.06));
+}
+
+.login-shell .glass-input:hover {
+  border-color: rgba(232, 213, 163, 0.38) !important;
+  transform: translateY(-1px);
+}
+
+.login-shell .submit-btn-hover:active {
+  transform: translateY(1px) scale(.985);
+}
+
+@keyframes loginCardIn {
+  from { opacity: 0; transform: translateY(14px) scale(.985); filter: blur(4px); }
+  to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-shell .login-card { animation: none !important; }
+}
+
 @media (max-width: 700px) {
   .portal-mode-switch {
     top: 12px;
