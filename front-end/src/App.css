@@ -785,6 +785,9 @@ tr:last-child td {
   gap: 5px;
 }
 .form-group label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: 10px;
   font-weight: 600;
   text-transform: uppercase;
@@ -798,13 +801,14 @@ tr:last-child td {
 .form-group select,
 .form-group textarea {
   padding: 10px 14px;
-  border: 1px solid var(--border-light);
+  border: 1.5px solid rgba(111, 83, 61, 0.35);
   border-radius: var(--radius-sm);
-  background: var(--bg-input);
+  background: #ffffff;
   color: var(--text-primary);
   transition: var(--transition);
   width: 100%;
   font-size: 13px;
+  box-shadow: 0 1px 2px rgba(44, 27, 20, 0.04);
 }
 .form-group input:focus,
 .form-group select:focus,
@@ -2779,13 +2783,29 @@ tr:last-child td {
 }
 
 /* Every native control follows the active shell theme. */
-.portal-shell input,
+.portal-shell input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):not([type="file"]),
+.admin-portal-shell input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):not([type="file"]),
 .portal-shell select,
+.admin-portal-shell select,
 .portal-shell textarea,
-.portal-shell .floor-dropdown {
+.admin-portal-shell textarea,
+.portal-shell .floor-dropdown,
+.admin-portal-shell .floor-dropdown {
+  min-height: 40px;
   color: var(--text-primary) !important;
-  background: rgba(255, 255, 255, 0.62) !important;
-  border: 1px solid var(--control-border) !important;
+  background: rgba(255, 255, 255, 0.82) !important;
+  border: 1.5px solid rgba(111, 83, 61, 0.32) !important;
+  border-radius: 10px !important;
+  box-shadow: 0 1px 2px rgba(44, 27, 20, 0.04) !important;
+  transition: border-color 180ms ease, box-shadow 180ms ease, background 180ms ease !important;
+}
+
+.portal-shell.theme-dark input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):not([type="file"]),
+.portal-shell.theme-dark textarea,
+.portal-shell.theme-dark .floor-dropdown {
+  color-scheme: dark;
+  background: rgba(255, 255, 255, 0.08) !important;
+  border: 1.5px solid rgba(255, 255, 255, 0.22) !important;
   box-shadow: inset 0 1px 1px rgba(66, 42, 27, 0.03) !important;
   transition: border-color 180ms ease, box-shadow 180ms ease, background 180ms ease !important;
 }
@@ -2836,24 +2856,174 @@ tr:last-child td {
   box-shadow: 0 0 0 3px rgba(201, 168, 76, 0.22), 0 10px 28px rgba(0, 0, 0, 0.18) !important;
 }
 
-/* Account and payment forms: keep fields visibly separated from glass. */
-.admin-portal-shell .modal-content input,
+/* ============================================================
+   MODAL CONTROLS — Crisp, Polished Borders & High-Contrast Fields
+   ============================================================ */
+.modal-content input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):not([type="file"]),
+.modal-content select,
+.modal-content textarea,
+.admin-portal-shell .modal-content input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):not([type="file"]),
 .admin-portal-shell .modal-content select,
 .admin-portal-shell .modal-content textarea,
-.employee-portal-shell .modal-content input,
+.employee-portal-shell .modal-content input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):not([type="file"]),
 .employee-portal-shell .modal-content select,
-.employee-portal-shell .modal-content textarea {
-  border: 1px solid var(--control-border) !important;
+.employee-portal-shell .modal-content textarea,
+.modal-overlay .form-group input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):not([type="file"]),
+.modal-overlay .form-group select,
+.modal-overlay .form-group textarea,
+.modal-overlay .form-grid input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):not([type="file"]),
+.modal-overlay .form-grid select,
+.modal-overlay .form-grid textarea {
+  width: 100%;
   min-height: 42px;
+  padding: 10px 14px !important;
+  font-size: 13px !important;
+  color: var(--text-primary) !important;
+  background: #ffffff !important;
+  border: 1.5px solid rgba(111, 83, 61, 0.38) !important;
+  border-radius: 9px !important;
+  box-shadow: 0 1px 2px rgba(44, 27, 20, 0.05) !important;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease !important;
+  box-sizing: border-box !important;
+  outline: none !important;
 }
 
-.admin-portal-shell.theme-dark .modal-content input,
+.modal-content input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):not([type="file"]):hover,
+.modal-content select:hover,
+.modal-content textarea:hover,
+.admin-portal-shell .modal-content input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):not([type="file"]):hover,
+.admin-portal-shell .modal-content select:hover,
+.admin-portal-shell .modal-content textarea:hover,
+.employee-portal-shell .modal-content input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):not([type="file"]):hover,
+.employee-portal-shell .modal-content select:hover,
+.employee-portal-shell .modal-content textarea:hover,
+.modal-overlay .form-group input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):not([type="file"]):hover,
+.modal-overlay .form-group select:hover,
+.modal-overlay .form-group textarea:hover,
+.modal-overlay .form-grid input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):not([type="file"]):hover,
+.modal-overlay .form-grid select:hover,
+.modal-overlay .form-grid textarea:hover {
+  border-color: rgba(111, 83, 61, 0.65) !important;
+}
+
+.modal-content input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):not([type="file"]):focus,
+.modal-content select:focus,
+.modal-content textarea:focus,
+.admin-portal-shell .modal-content input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):not([type="file"]):focus,
+.admin-portal-shell .modal-content select:focus,
+.admin-portal-shell .modal-content textarea:focus,
+.employee-portal-shell .modal-content input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):not([type="file"]):focus,
+.employee-portal-shell .modal-content select:focus,
+.employee-portal-shell .modal-content textarea:focus,
+.modal-overlay .form-group input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):not([type="file"]):focus,
+.modal-overlay .form-group select:focus,
+.modal-overlay .form-group textarea:focus,
+.modal-overlay .form-grid input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):not([type="file"]):focus,
+.modal-overlay .form-grid select:focus,
+.modal-overlay .form-grid textarea:focus {
+  border-color: var(--gold) !important;
+  box-shadow: 0 0 0 3px rgba(201, 168, 76, 0.25), 0 1px 2px rgba(44, 27, 20, 0.06) !important;
+  background: #ffffff !important;
+  outline: none !important;
+}
+
+.modal-content textarea,
+.admin-portal-shell .modal-content textarea,
+.employee-portal-shell .modal-content textarea,
+.modal-overlay textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+.modal-content input::placeholder,
+.modal-content textarea::placeholder,
+.admin-portal-shell .modal-content input::placeholder,
+.admin-portal-shell .modal-content textarea::placeholder,
+.employee-portal-shell .modal-content input::placeholder,
+.employee-portal-shell .modal-content textarea::placeholder {
+  color: #9c9288 !important;
+  opacity: 1;
+}
+
+/* Modal Readonly and Disabled States */
+.modal-content input[readonly],
+.modal-content input:disabled,
+.modal-content select:disabled,
+.modal-content textarea:disabled,
+.admin-portal-shell .modal-content input[readonly],
+.admin-portal-shell .modal-content input:disabled,
+.admin-portal-shell .modal-content select:disabled,
+.admin-portal-shell .modal-content textarea:disabled,
+.employee-portal-shell .modal-content input[readonly],
+.employee-portal-shell .modal-content input:disabled,
+.employee-portal-shell .modal-content select:disabled,
+.employee-portal-shell .modal-content textarea:disabled {
+  background: #f4f1ec !important;
+  border-color: rgba(111, 83, 61, 0.22) !important;
+  color: var(--text-secondary) !important;
+  cursor: not-allowed !important;
+}
+
+/* Keep label text and required asterisk together on one line in modal forms */
+.modal-content .form-group label,
+.modal-overlay .form-group label {
+  display: inline-flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 4px !important;
+}
+
+/* Modal form controls in dark theme */
+.admin-portal-shell.theme-dark .modal-content input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):not([type="file"]),
 .admin-portal-shell.theme-dark .modal-content select,
 .admin-portal-shell.theme-dark .modal-content textarea,
-.employee-portal-shell.theme-dark .modal-content input,
+.employee-portal-shell.theme-dark .modal-content input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):not([type="file"]),
 .employee-portal-shell.theme-dark .modal-content select,
 .employee-portal-shell.theme-dark .modal-content textarea {
-  border-color: rgba(232, 213, 163, 0.28) !important;
+  background: rgba(38, 30, 24, 0.85) !important;
+  border: 1.5px solid rgba(232, 213, 163, 0.35) !important;
+  color: #f4ede5 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25) !important;
+}
+
+.admin-portal-shell.theme-dark .modal-content input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):not([type="file"]):hover,
+.admin-portal-shell.theme-dark .modal-content select:hover,
+.admin-portal-shell.theme-dark .modal-content textarea:hover,
+.employee-portal-shell.theme-dark .modal-content input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):not([type="file"]):hover,
+.employee-portal-shell.theme-dark .modal-content select:hover,
+.employee-portal-shell.theme-dark .modal-content textarea:hover {
+  border-color: rgba(232, 213, 163, 0.6) !important;
+}
+
+.admin-portal-shell.theme-dark .modal-content input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):not([type="file"]):focus,
+.admin-portal-shell.theme-dark .modal-content select:focus,
+.admin-portal-shell.theme-dark .modal-content textarea:focus,
+.employee-portal-shell.theme-dark .modal-content input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):not([type="file"]):focus,
+.employee-portal-shell.theme-dark .modal-content select:focus,
+.employee-portal-shell.theme-dark .modal-content textarea:focus {
+  border-color: #e0c36e !important;
+  box-shadow: 0 0 0 3px rgba(201, 168, 76, 0.28) !important;
+  background: rgba(48, 38, 32, 0.95) !important;
+}
+
+.admin-portal-shell.theme-dark .modal-content input::placeholder,
+.admin-portal-shell.theme-dark .modal-content textarea::placeholder,
+.employee-portal-shell.theme-dark .modal-content input::placeholder,
+.employee-portal-shell.theme-dark .modal-content textarea::placeholder {
+  color: rgba(244, 237, 229, 0.45) !important;
+}
+
+.admin-portal-shell.theme-dark .modal-content input[readonly],
+.admin-portal-shell.theme-dark .modal-content input:disabled,
+.admin-portal-shell.theme-dark .modal-content select:disabled,
+.admin-portal-shell.theme-dark .modal-content textarea:disabled,
+.employee-portal-shell.theme-dark .modal-content input[readonly],
+.employee-portal-shell.theme-dark .modal-content input:disabled,
+.employee-portal-shell.theme-dark .modal-content select:disabled,
+.employee-portal-shell.theme-dark .modal-content textarea:disabled {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  color: rgba(244, 237, 229, 0.5) !important;
 }
 
 /* Front Desk log uses legacy inline light colors; these selectors restore
@@ -5814,24 +5984,25 @@ tr:last-child td {
   box-shadow: inset 3px 0 0 var(--gold);
 }
 
-.admin-portal-shell input,
+.admin-portal-shell input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):not([type="file"]),
 .admin-portal-shell select,
 .admin-portal-shell textarea,
 .admin-portal-shell .floor-dropdown {
   min-height: 40px;
   color: var(--text-primary) !important;
-  background: rgba(255, 255, 255, 0.46) !important;
-  border: 1px solid rgba(111, 83, 61, 0.22) !important;
+  background: rgba(255, 255, 255, 0.82) !important;
+  border: 1.5px solid rgba(111, 83, 61, 0.32) !important;
   border-radius: 10px !important;
+  box-shadow: 0 1px 2px rgba(44, 27, 20, 0.04) !important;
 }
 
-.admin-portal-shell.theme-dark input,
+.admin-portal-shell.theme-dark input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):not([type="file"]),
 .admin-portal-shell.theme-dark select,
 .admin-portal-shell.theme-dark textarea,
 .admin-portal-shell.theme-dark .floor-dropdown {
   color-scheme: dark;
-  background: rgba(255, 255, 255, 0.065) !important;
-  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  border: 1.5px solid rgba(255, 255, 255, 0.22) !important;
 }
 
 .admin-portal-shell input:focus,
@@ -6395,10 +6566,10 @@ tr:last-child td {
 .required-note, .secure-label { color: var(--text-muted); font-size: 11px; }
 .secure-label { color: #3b815e; font-weight: 700; }
 
-.form-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 18px; }
-.form-grid label { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
-.form-grid label > span, .walkin-module label > span { color: var(--text-secondary); font-size: 11px; font-weight: 700; }
-.form-grid input, .form-grid select, .form-grid textarea, .roomrack-filters input, .roomrack-filters select {
+.walkin-module .form-grid, .walkin-form-panel .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 18px; }
+.walkin-module .form-grid label, .walkin-form-panel .form-grid label { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.walkin-module label > span, .walkin-form-panel label > span { color: var(--text-secondary); font-size: 11px; font-weight: 700; }
+.walkin-module .form-grid input, .walkin-form-panel .form-grid input, .walkin-module .form-grid select, .walkin-form-panel .form-grid select, .walkin-module .form-grid textarea, .walkin-form-panel .form-grid textarea, .roomrack-filters input, .roomrack-filters select {
   width: 100%;
   min-height: 43px;
   padding: 10px 12px;
@@ -6411,9 +6582,9 @@ tr:last-child td {
   font-size: 13px;
   box-sizing: border-box;
 }
-.form-grid input:focus, .form-grid select:focus, .form-grid textarea:focus, .roomrack-filters input:focus, .roomrack-filters select:focus { border-color: #c9a84c; box-shadow: 0 0 0 3px rgba(201,168,76,.16); }
-.form-grid textarea { resize: vertical; }
-.form-grid .full-span { grid-column: 1 / -1; }
+.walkin-module .form-grid input:focus, .walkin-form-panel .form-grid input:focus, .walkin-module .form-grid select:focus, .walkin-form-panel .form-grid select:focus, .walkin-module .form-grid textarea:focus, .walkin-form-panel .form-grid textarea:focus, .roomrack-filters input:focus, .roomrack-filters select:focus { border-color: #c9a84c; box-shadow: 0 0 0 3px rgba(201,168,76,.16); }
+.walkin-module .form-grid textarea, .walkin-form-panel .form-grid textarea { resize: vertical; }
+.walkin-module .form-grid .full-span, .walkin-form-panel .form-grid .full-span { grid-column: 1 / -1; }
 .stay-fields { grid-template-columns: 1.3fr 1.3fr .7fr .7fr; margin-bottom: 20px; }
 
 .available-room-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; }
