@@ -38,20 +38,36 @@ function Dashboard({ employee, setActiveTab }) {
     fetchDashboard();
   }, []);
 
-  if (isLoading) {
-    return (
-      <main className="main-content employee-dashboard">
-        <section className="admin-tab-content active">
-          <div style={{ padding: '60px', textAlign: 'center', color: '#6b7280' }}>
-            <i className="fas fa-spinner fa-spin" style={{ fontSize: '20px', marginBottom: '12px', display: 'block' }}></i>
-            Loading Overview...
-          </div>
-        </section>
-      </main>
-    );
-  }
+if (isLoading) {
+  return (
+    <main className="main-content employee-dashboard">
+      <section className="admin-tab-content active">
+        <div style={{ padding: '60px', textAlign: 'center', color: '#6b7280' }}>
+          <i
+            className="fas fa-spinner fa-spin"
+            style={{ fontSize: '20px', marginBottom: '12px', display: 'block'}}
+          >
+          </i>
+          Loading Overview...
+        </div>
+      </section>
+    </main>
+  );
+}
 
-  const occupancyRate = stats ? Math.round((stats.rooms.occupied / stats.rooms.total) * 100) : 0;
+if (!stats) {
+  return (
+    <main className="main-content employee-dashboard">
+      <section className="admin-tab-content active">
+        <div style={{ padding: '60px', textAlign: 'center', color: '#6b7280' }}>
+          Unable to load dashboard data.
+        </div>
+      </section>
+    </main>
+  );
+}
+
+const occupancyRate = stats.rooms.total > 0 ? Math.round((stats.rooms.occupied / stats.rooms.total) * 100) : 0;
 
   return (
     <main className="main-content employee-dashboard">
