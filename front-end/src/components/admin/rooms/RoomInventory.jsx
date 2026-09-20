@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 
 function RoomInventory() {
   const [isLoading, setIsLoading] = useState(true);
@@ -328,14 +329,16 @@ function RoomInventory() {
         </div>
       </div>
 
-      {/* ROOM MODAL */}
-      {showModal && (
+      {/* ROOM MODAL — portaled to <body> so the overlay covers the whole
+          viewport (including sidebar) and blurs everything behind it */}
+      {showModal && createPortal(
         <RoomModal
           room={editingRoom}
           roomTypes={roomTypes}
           onClose={() => { setShowModal(false); setEditingRoom(null); }}
           onSave={handleSaveRoom}
-        />
+        />,
+        document.body
       )}
     </section>
   );
@@ -345,6 +348,13 @@ function RoomInventory() {
    ROOM ADD/EDIT MODAL
    ============================================================ */
 function RoomModal({ room, roomTypes, onClose, onSave }) {
+  // Lock background scroll while the modal is open; restore on close.
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+
   const [formData, setFormData] = useState({
     number: room?.number || '',
     floor: room?.floor || 1,
@@ -388,8 +398,8 @@ function RoomModal({ room, roomTypes, onClose, onSave }) {
   };
 
   return (
-    <div className="modal-overlay open" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal-content" style={{ maxWidth: '560px' }}>
+    <div className="modal-overlay modal-portal-overlay open" onMouseDown={(e) => e.stopPropagation()}>
+      <div className="modal-content" style={{ maxWidth: '560px' }} onMouseDown={(e) => e.stopPropagation()}>
         <button className="modal-close" onClick={onClose}>&times;</button>
         <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '6px' }}>
           {room ? `Edit Room ${room.number}` : 'Add New Room'}

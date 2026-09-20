@@ -1,231 +1,77 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
+import { usePolling } from '../../hooks/usePolling';
 
-function HousekeepingDashboard({ employee, setActiveTab }) {
+function HousekeepingDashboard({ employee, setActiveTab, isLead = false }) {
   const [todayDate] = useState(
-    new Date().toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    })
+    new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
   );
+  const [rooms, setRooms]       = useState([]);
+  const [tasks, setTasks]       = useState([]);
+  const [requests, setRequests] = useState([]);
+  const [activities, setActivities] = useState([]);
+  const [isLoading, setIsLoading]   = useState(true);
+  const firstLoad = useRef(true);   // only show full loader on the very first fetch
 
-  const [rooms] = useState([
-    {
-      id: 1,
-      room: '102',
-      type: 'Standard',
-      status: 'Dirty',
-      assignedTo: 'Maria Santos',
-      priority: true,
-      note: 'Checkout at 11 AM - Arrival at 2 PM'
-    },
-    {
-      id: 2,
-      room: '103',
-      type: 'Deluxe',
-      status: 'In Progress',
-      assignedTo: 'Rosa Villanueva',
-      priority: false,
-      note: ''
-    },
-    {
-      id: 3,
-      room: '104',
-      type: 'Standard',
-      status: 'Inspected',
-      assignedTo: 'Maria Santos',
-      priority: false,
-      note: ''
-    },
-    {
-      id: 4,
-      room: '201',
-      type: 'Deluxe',
-      status: 'Dirty',
-      assignedTo: 'Rosa Villanueva',
-      priority: true,
-      note: 'VIP arrival at 1 PM'
-    },
-    {
-      id: 5,
-      room: '202',
-      type: 'Deluxe',
-      status: 'Clean',
-      assignedTo: 'Rosa Villanueva',
-      priority: false,
-      note: ''
-    },
-    {
-      id: 6,
-      room: '203',
-      type: 'Premium',
-      status: 'Dirty',
-      assignedTo: 'Elena Cruz',
-      priority: false,
-      note: 'Guest requested no cleaning today'
-    },
-    {
-      id: 7,
-      room: '204',
-      type: 'Premium',
-      status: 'In Progress',
-      assignedTo: 'Elena Cruz',
-      priority: true,
-      note: 'Express turnover needed'
-    },
-    {
-      id: 8,
-      room: '301',
-      type: 'Suite',
-      status: 'Clean',
-      assignedTo: 'Carmen Diaz',
-      priority: false,
-      note: ''
-    },
-    {
-      id: 9,
-      room: '302',
-      type: 'Suite',
-      status: 'Dirty',
-      assignedTo: 'Carmen Diaz',
-      priority: false,
-      note: ''
-    },
-    {
-      id: 10,
-      room: '303',
-      type: 'Premium',
-      status: 'Inspected',
-      assignedTo: 'Elena Cruz',
-      priority: false,
-      note: ''
-    },
-    {
-      id: 11,
-      room: '304',
-      type: 'Suite',
-      status: 'Dirty',
-      assignedTo: 'Carmen Diaz',
-      priority: true,
-      note: 'Checkout + VIP check-in at 3 PM'
-    },
-    {
-      id: 12,
-      room: '401',
-      type: 'Presidential',
-      status: 'Clean',
-      assignedTo: 'Carmen Diaz',
-      priority: false,
-      note: ''
-    },
-    {
-      id: 13,
-      room: '402',
-      type: 'Presidential',
-      status: 'In Progress',
-      assignedTo: 'Rosa Villanueva',
-      priority: false,
-      note: 'Deep clean scheduled'
+  const loadDashboard = async () => {
+    // Only blank the screen on the first load; polls refresh silently
+    if (firstLoad.current) setIsLoading(true);
+    try {
+      const [roomsRes, tasksRes, reqRes] = await Promise.all([
+        fetch('http://localhost:5000/api/rooms'),
+        fetch('http://localhost:5000/api/cleaning-tasks?status=PENDING'),
+        fetch('http://localhost:5000/api/guest-requests?status=PENDING'),
+      ]);
+      const [roomsData, tasksData, reqData] = await Promise.all([
+        roomsRes.ok ? roomsRes.json() : [],
+        tasksRes.ok ? tasksRes.json() : [],
+        reqRes.ok   ? reqRes.json()   : [],
+      ]);
+      const normRooms = roomsData.map(r => ({
+        id:         r._id,
+        room:       String(r.room_number || ''),
+        type:       r.room_type_name || `Type ${r.type_id || ''}`,
+        status:     normalizeStatus(r.housekeeping),
+        assignedTo: r.assigned_to || '',
+        priority:   r.priority || false,
+        note:       r.notes || '',
+      }));
+      const normTasks = tasksData.slice(0, 3).map(t => ({
+        id:         t._id,
+        room:       String(t.room_number || ''),
+        task:       t.task_type || '',
+        assignedTo: t.assigned_name || '',
+        status:     t.status === 'IN PROGRESS' ? 'In Progress' : 'Pending',
+      }));
+      setRooms(normRooms);
+      setTasks(normTasks);
+      setRequests(reqData);
+      setActivities([]);
+    } catch (err) {
+      console.error('HousekeepingDashboard fetch error:', err);
+    } finally {
+      setIsLoading(false);
+      firstLoad.current = false;
     }
-  ]);
+  };
 
-  const [tasks] = useState([
-    {
-      id: 1,
-      room: '102',
-      task: 'Room Cleaning',
-      assignedTo: 'Maria Santos',
-      status: 'Pending'
-    },
-    {
-      id: 2,
-      room: '204',
-      task: 'Express Turnover',
-      assignedTo: 'Elena Cruz',
-      status: 'In Progress'
-    },
-    {
-      id: 3,
-      room: '402',
-      task: 'Deep Cleaning',
-      assignedTo: 'Rosa Villanueva',
-      status: 'In Progress'
-    }
-  ]);
+  usePolling(loadDashboard, 12000);
 
-  const [requests] = useState([
-    {
-      id: 'REQ-001',
-      room: '203',
-      request: 'Extra Towels',
-      status: 'Pending'
-    },
-    {
-      id: 'REQ-002',
-      room: '304',
-      request: 'Extra Pillows',
-      status: 'In Progress'
-    },
-    {
-      id: 'REQ-003',
-      room: '115',
-      request: 'Toiletries Refill',
-      status: 'Pending'
-    }
-  ]);
+  const normalizeStatus = (s) => {
+    if (!s) return 'Dirty';
+    const l = s.toLowerCase();
+    if (l === 'clean')       return 'Clean';
+    if (l === 'inspected')   return 'Inspected';
+    if (l.includes('progress')) return 'In Progress';
+    return 'Dirty';
+  };
 
-  const [activities] = useState([
-    {
-      id: 1,
-      text: 'Room 103 cleaning started',
-      time: '10:30 AM'
-    },
-    {
-      id: 2,
-      text: 'Room 104 marked as inspected',
-      time: '10:10 AM'
-    },
-    {
-      id: 3,
-      text: 'Maintenance request submitted for Room 201',
-      time: '09:45 AM'
-    },
-    {
-      id: 4,
-      text: 'Room 202 marked clean',
-      time: '09:20 AM'
-    }
-  ]);
-
-  const dirtyRooms = rooms.filter(
-    (room) => room.status === 'Dirty'
-  ).length;
-
-  const inProgressRooms = rooms.filter(
-    (room) => room.status === 'In Progress'
-  ).length;
-
-  const readyRooms = rooms.filter(
-    (room) =>
-      room.status === 'Clean' ||
-      room.status === 'Inspected'
-  ).length;
-
-  const priorityRooms = rooms.filter(
-    (room) => room.priority
-  );
-
-  const completedRooms = readyRooms;
-
-  const progress =
-    rooms.length > 0
-      ? Math.round((completedRooms / rooms.length) * 100)
-      : 0;
-
-  const pendingRequests = requests.filter(
-    (request) => request.status !== 'Completed'
-  ).length;
+  const dirtyRooms      = rooms.filter(r => r.status === 'Dirty').length;
+  const inProgressRooms = rooms.filter(r => r.status === 'In Progress').length;
+  const readyRooms      = rooms.filter(r => r.status === 'Clean' || r.status === 'Inspected').length;
+  const priorityRooms   = rooms.filter(r => r.priority);
+  const completedRooms  = readyRooms;
+  const progress        = rooms.length > 0 ? Math.round((completedRooms / rooms.length) * 100) : 0;
+  const pendingRequests = requests.length; // already filtered to PENDING on fetch
 
   const getStatusStyle = (status) => {
     if (status === 'Clean') {
@@ -259,10 +105,20 @@ function HousekeepingDashboard({ employee, setActiveTab }) {
     <main className="main-content employee-content">
       <section className="admin-tab-content active">
 
-        {/* Page Header */}
+        {/* Page Header — adapts to Lead vs Cleaner */}
         <div className="employee-dashboard-header" style={{ marginBottom: '32px' }}>
           <div>
-            <span className="eyebrow">Housekeeping Operations</span>
+            <span className="eyebrow" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {isLead ? 'Housekeeping Management' : 'My Housekeeping Tasks'}
+              <span style={{
+                fontSize: '10px', fontWeight: '700', padding: '2px 8px', borderRadius: '10px',
+                background: isLead ? 'rgba(201,168,76,0.15)' : 'rgba(59,130,246,0.12)',
+                color: isLead ? 'var(--gold-dark, #9f7f2e)' : '#1e40af',
+                textTransform: 'uppercase', letterSpacing: '0.04em',
+              }}>
+                {isLead ? 'Lead' : 'Cleaner'}
+              </span>
+            </span>
 
             <h2
               style={{
@@ -276,15 +132,17 @@ function HousekeepingDashboard({ employee, setActiveTab }) {
             </h2>
 
             <p style={{ margin: 0, fontSize: '14px', color: 'var(--text-secondary)' }}>
-              {todayDate}
+              {isLead
+                ? `Oversee today's housekeeping operations · ${todayDate}`
+                : `Here are your tasks for today · ${todayDate}`}
             </p>
           </div>
 
           <div className="shift-status" aria-label="Current shift status">
             <span className="shift-status-dot" />
             <span>
-              <strong>Morning shift</strong>
-              <small>06:00 – 14:00</small>
+              <strong>{employee?.role || (isLead ? 'Housekeeping Lead' : 'Housekeeper')}</strong>
+              <small>Morning shift · 06:00 – 14:00</small>
             </span>
           </div>
         </div>
@@ -299,8 +157,8 @@ function HousekeepingDashboard({ employee, setActiveTab }) {
 
           <div
             className="kpi-card"
-            onClick={() => setActiveTab('housekeeping')}
-            style={{ cursor: 'pointer' }}
+            onClick={isLead ? () => setActiveTab('housekeeping') : undefined}
+            style={{ cursor: isLead ? 'pointer' : 'default' }}
           >
             <span className="lbl" style={{ color: 'var(--text-muted)' }}>
               DIRTY ROOMS
@@ -317,8 +175,8 @@ function HousekeepingDashboard({ employee, setActiveTab }) {
 
           <div
             className="kpi-card"
-            onClick={() => setActiveTab('housekeeping')}
-            style={{ cursor: 'pointer' }}
+            onClick={isLead ? () => setActiveTab('housekeeping') : undefined}
+            style={{ cursor: isLead ? 'pointer' : 'default' }}
           >
             <span className="lbl" style={{ color: 'var(--text-muted)' }}>
               IN PROGRESS
@@ -335,8 +193,8 @@ function HousekeepingDashboard({ employee, setActiveTab }) {
 
           <div
             className="kpi-card"
-            onClick={() => setActiveTab('housekeeping')}
-            style={{ cursor: 'pointer' }}
+            onClick={isLead ? () => setActiveTab('housekeeping') : undefined}
+            style={{ cursor: isLead ? 'pointer' : 'default' }}
           >
             <span className="lbl" style={{ color: 'var(--text-muted)' }}>
               READY / CLEAN
@@ -464,12 +322,14 @@ function HousekeepingDashboard({ employee, setActiveTab }) {
                 </p>
               </div>
 
-              <button
-                className="btn btn-sm"
-                onClick={() => setActiveTab('housekeeping')}
-              >
-                View Rooms
-              </button>
+              {isLead && (
+                <button
+                  className="btn btn-sm"
+                  onClick={() => setActiveTab('housekeeping')}
+                >
+                  View Rooms
+                </button>
+              )}
             </div>
 
             <div>
@@ -614,12 +474,14 @@ function HousekeepingDashboard({ employee, setActiveTab }) {
                 gap: '10px'
               }}
             >
-              <button
-                className="btn"
-                onClick={() => setActiveTab('housekeeping')}
-              >
-                Room Status
-              </button>
+              {isLead && (
+                <button
+                  className="btn"
+                  onClick={() => setActiveTab('housekeeping')}
+                >
+                  Room Status
+                </button>
+              )}
 
               <button
                 className="btn"
@@ -635,12 +497,14 @@ function HousekeepingDashboard({ employee, setActiveTab }) {
                 Guest Requests
               </button>
 
-              <button
-                className="btn"
-                onClick={() => setActiveTab('maintenance')}
-              >
-                Maintenance
-              </button>
+              {isLead && (
+                <button
+                  className="btn"
+                  onClick={() => setActiveTab('maintenance')}
+                >
+                  Maintenance
+                </button>
+              )}
 
               <button
                 className="btn"
@@ -649,12 +513,14 @@ function HousekeepingDashboard({ employee, setActiveTab }) {
                 Lost & Found
               </button>
 
-              <button
-                className="btn"
-                onClick={() => setActiveTab('housekeeping-logs')}
-              >
-                Shift Log
-              </button>
+              {isLead && (
+                <button
+                  className="btn"
+                  onClick={() => setActiveTab('housekeeping-logs')}
+                >
+                  Shift Log
+                </button>
+              )}
             </div>
           </div>
 
@@ -662,12 +528,14 @@ function HousekeepingDashboard({ employee, setActiveTab }) {
             <div className="panel-header">
               <h3 style={{ color: 'var(--text-primary)' }}>Recent Housekeeping Activity</h3>
 
-              <button
-                className="btn btn-sm"
-                onClick={() => setActiveTab('housekeeping-logs')}
-              >
-                Open Log
-              </button>
+              {isLead && (
+                <button
+                  className="btn btn-sm"
+                  onClick={() => setActiveTab('housekeeping-logs')}
+                >
+                  Open Log
+                </button>
+              )}
             </div>
 
             {activities.map((activity) => (

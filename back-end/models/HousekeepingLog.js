@@ -1,14 +1,12 @@
 const mongoose = require('mongoose');
 
 const housekeepingLogSchema = new mongoose.Schema({
-  log_id: Number,              // e.g. 1
-  employee_id: Number,         // references employees.employee_id
-  room_number: Number,         // references rooms.room_number
-  action: String,              // e.g. "Room Cleaned", "Inspection Completed"
-  description: String,
-  log_datetime: Date,
-  status: String,              // e.g. "COMPLETED", "PENDING"
-  notes: String
+  log_id: Number,           // auto-incremented sequence
+  room_number: String,      // e.g. "203"
+  category: String,         // "Room Note", "Room Status", "Priority", "DND", "Maintenance", "Lost & Found", "Shift Handover"
+  description: String,      // the note text
+  employee: String,         // name of the staff who logged it
+  datetime: Date,           // when the log was created
 }, { timestamps: true });
 
 module.exports = mongoose.model('HousekeepingLog', housekeepingLogSchema, 'housekeeping_logs');

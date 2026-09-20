@@ -10,44 +10,9 @@ function OccupancyReports() {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      // TODO: Replace with actual API call
-      // const res = await fetch(`http://localhost:8080/api/admin/reports/occupancy?period=${period}`);
-      // const data = await res.json();
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      const mockData = {
-        kpis: { avgOccupancy: 86.2, totalRooms: 120, alos: 2.8, peakDay: 'Saturday', lowDay: 'Tuesday' },
-        trend: [
-          { label: 'Week 1', rate: 82 },
-          { label: 'Week 2', rate: 91 },
-          { label: 'Week 3', rate: 85 },
-          { label: 'Week 4', rate: 88 }
-        ],
-        byRoomType: [
-          { type: 'Presidential', rate: 95, rooms: 2 },
-          { type: 'Suite', rate: 92, rooms: 6 },
-          { type: 'Premium', rate: 88, rooms: 12 },
-          { type: 'Deluxe', rate: 85, rooms: 30 },
-          { type: 'Standard', rate: 78, rooms: 70 }
-        ],
-        byFloor: [
-          { floor: 'Floor 1', rate: 80, rooms: 30 },
-          { floor: 'Floor 2', rate: 85, rooms: 30 },
-          { floor: 'Floor 3', rate: 90, rooms: 30 },
-          { floor: 'Floor 4', rate: 95, rooms: 30 }
-        ],
-        forecast: [
-          { date: 'Aug 11', confirmed: 98, projected: 102 },
-          { date: 'Aug 12', confirmed: 104, projected: 108 },
-          { date: 'Aug 13', confirmed: 95, projected: 100 },
-          { date: 'Aug 14', confirmed: 88, projected: 95 },
-          { date: 'Aug 15', confirmed: 75, projected: 85 },
-          { date: 'Aug 16', confirmed: 110, projected: 115 },
-          { date: 'Aug 17', confirmed: 108, projected: 112 }
-        ]
-      };
-
-      setData(mockData);
+      const res = await fetch('http://localhost:5000/api/reports/occupancy');
+      if (!res.ok) throw new Error(`Server error: ${res.status}`);
+      setData(await res.json());
     } catch (err) {
       console.error('Failed to fetch occupancy data:', err);
     } finally {

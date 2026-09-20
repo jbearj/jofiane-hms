@@ -101,6 +101,23 @@ function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [employeeRole, setEmployeeRole] = useState(null); // Store the role of the logged-in employee
   const [loggedInEmployee, setLoggedInEmployee] = useState(null); // Store the logged-in employee object
+
+  // Shared admin profile — edited in Settings, reflected in Sidebar + Dashboard.
+  // Persisted to localStorage so it survives refresh.
+  const [adminProfile, setAdminProfile] = useState(() => {
+    if (typeof window === 'undefined') {
+      return { fullName: 'Administrator', email: 'admin@jofiane.com', role: 'Super Admin', photo: null };
+    }
+    const saved = window.localStorage.getItem('jofiane-admin-profile');
+    return saved
+      ? JSON.parse(saved)
+      : { fullName: 'Administrator', email: 'admin@jofiane.com', role: 'Super Admin', photo: null };
+  });
+
+  const updateAdminProfile = (next) => {
+    setAdminProfile(next);
+    window.localStorage.setItem('jofiane-admin-profile', JSON.stringify(next));
+  };
   const [isAdminDarkMode, setIsAdminDarkMode] = useState(() => {
     if (typeof window === 'undefined') return false;
     const savedTheme = window.localStorage.getItem('jofiane-admin-theme');
@@ -110,7 +127,12 @@ function App() {
 
   useEffect(() => {
     window.localStorage.setItem('jofiane-admin-theme', isAdminDarkMode ? 'dark' : 'light');
-  }, [isAdminDarkMode]);
+    // Flag on <body> so portaled modals (rendered outside the app shell) can
+    // pick up dark-mode styling too. Only applies while the admin view is shown.
+    if (viewMode === 'admin') {
+      document.body.classList.toggle('app-dark', isAdminDarkMode);
+    }
+  }, [isAdminDarkMode, viewMode]);
 
   useEffect(() => {
     if (typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 900px)').matches) {
@@ -125,6 +147,18 @@ function App() {
       setEmployeeRole(null);
       // If a DB admin employee logged in, store their info for display purposes
       setLoggedInEmployee(employee || null);
+      // Seed the shared admin profile from the DB employee record (if any)
+      if (employee) {
+        const seeded = {
+          fullName: employee.name || 'Administrator',
+          email:    employee.email || 'admin@jofiane.com',
+          role:     employee.role || 'Admin',
+          photo:    employee.photo || null,
+          _id:      employee._id || null,   // MongoDB id → lets us persist password/profile changes
+        };
+        setAdminProfile(seeded);
+        window.localStorage.setItem('jofiane-admin-profile', JSON.stringify(seeded));
+      }
     } else {
       setEmployeeRole(module || 'frontdesk');
       setLoggedInEmployee(employee);
@@ -167,7 +201,7 @@ function App() {
   const renderContent = () => {
     switch (activeTab) {
       case 'overview':
-        return <Overview setActiveTab={setActiveTab} />;
+        return <Overview setActiveTab={setActiveTab} adminProfile={adminProfile} />;
       case 'transactions':
       case 'payments':
         return <Transactions />;
@@ -198,9 +232,9 @@ function App() {
       case 'guest-reports':
         return <GuestReports />;
       case 'settings':
-        return <Settings isDarkMode={isAdminDarkMode} setIsDarkMode={setIsAdminDarkMode} sidebarCollapsed={isCollapsed} setSidebarCollapsed={setIsCollapsed} />;
+        return <Settings isDarkMode={isAdminDarkMode} setIsDarkMode={setIsAdminDarkMode} sidebarCollapsed={isCollapsed} setSidebarCollapsed={setIsCollapsed} adminProfile={adminProfile} onUpdateProfile={updateAdminProfile} />;
       default:
-        return <Overview setActiveTab={setActiveTab} />;
+        return <Overview setActiveTab={setActiveTab} adminProfile={adminProfile} />;
     }
   };
 
@@ -241,6 +275,7 @@ function App() {
         setActiveTab={setActiveTab}
         isDarkMode={isAdminDarkMode}
         setIsDarkMode={setIsAdminDarkMode}
+        adminProfile={adminProfile}
       />
       <button type="button" className="mobile-nav-trigger" onClick={() => setIsCollapsed(false)} aria-label="Open admin navigation">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 7h16M4 12h16M4 17h16" /></svg>

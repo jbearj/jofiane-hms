@@ -20,6 +20,23 @@ import HousekeepingLogs from './HousekeepingLogs';
 import LostAndFound from './LostAndFound';
 
 function EmployeePortal({employeeRole, employee}) {
+  // Live profile shared across the sidebar, dashboards, and settings.
+  // Seeded from the logged-in employee; updated when they edit their profile,
+  // so the change reflects everywhere (mirrors the admin adminProfile pattern).
+  const [employeeProfile, setEmployeeProfile] = useState(employee);
+  // Keep in sync if the logged-in employee prop changes (e.g. re-login).
+  useEffect(() => { setEmployeeProfile(employee); }, [employee]);
+
+  // Called by EmployeeSettings after a successful save.
+  const handleProfileUpdate = (updated) => {
+    setEmployeeProfile(prev => ({
+      ...prev,
+      name:  updated.fullName ?? prev?.name,
+      email: updated.email ?? prev?.email,
+      photo: updated.photo ?? prev?.photo,
+    }));
+  };
+
   const frontDeskTabs = [
   'dashboard',
   'bookings',
@@ -34,16 +51,38 @@ function EmployeePortal({employeeRole, employee}) {
   'settings'
   ];
 
-  const housekeepingTabs = [
+  // Housekeeping Lead → full control of the whole housekeeping module
+  const housekeepingLeadTabs = [
     'dashboard',
-    'housekeeping',
+    'housekeeping',       // Room Status control
     'cleaning-tasks',
     'guest-requests',
     'lost-found',
-    'maintenance',
+    'maintenance',        // Maintenance Requests
     'housekeeping-logs',
     'settings'
   ];
+
+  // Housekeeping Cleaner → restricted: only their day-to-day work views
+  const housekeepingCleanerTabs = [
+    'dashboard',
+    'cleaning-tasks',     // their assigned tasks
+    'guest-requests',     // requests they fulfil
+    'lost-found',         // report found items
+    'settings'
+  ];
+
+  // A "lead" is any housekeeping role whose title includes "lead" (or "supervisor"/"manager")
+  const roleTitle = (employeeProfile?.role || '').toLowerCase();
+  const isHousekeepingLead =
+    roleTitle.includes('lead') ||
+    roleTitle.includes('supervisor') ||
+    roleTitle.includes('manager') ||
+    roleTitle.includes('head');
+
+  const housekeepingTabs = isHousekeepingLead
+    ? housekeepingLeadTabs
+    : housekeepingCleanerTabs;
 
   const allowedTabs =
     employeeRole === 'housekeeping'
@@ -70,6 +109,10 @@ function EmployeePortal({employeeRole, employee}) {
 
   useEffect(() => {
     window.localStorage.setItem('jofiane-employee-theme', isDarkMode ? 'dark' : 'light');
+    // Flag on <body> so portaled modals (rendered outside the shell) inherit
+    // dark-mode styling too. Cleared when the employee portal unmounts.
+    document.body.classList.toggle('app-dark', isDarkMode);
+    return () => document.body.classList.remove('app-dark');
   }, [isDarkMode]);
 
   useEffect(() => () => {
@@ -113,12 +156,12 @@ function EmployeePortal({employeeRole, employee}) {
   if (!allowedTabs.includes(displayedTab)) {
     if (employeeRole === 'housekeeping') {
       return (
-        <HousekeepingDashboard employee={employee} setActiveTab={navigateToTab}/>
+        <HousekeepingDashboard employee={employeeProfile} setActiveTab={navigateToTab} isLead={isHousekeepingLead}/>
       );
     }
 
     return (
-      <Dashboard activeTab="dashboard" employee={employee} setActiveTab={navigateToTab}/>
+      <Dashboard activeTab="dashboard" employee={employeeProfile} setActiveTab={navigateToTab}/>
     );
   }
 
@@ -126,12 +169,12 @@ function EmployeePortal({employeeRole, employee}) {
     case 'dashboard':
       if (employeeRole === 'housekeeping') {
         return (
-          <HousekeepingDashboard employee={employee} setActiveTab={navigateToTab}/>
+          <HousekeepingDashboard employee={employeeProfile} setActiveTab={navigateToTab} isLead={isHousekeepingLead}/>
         );
       }
 
       return (
-        <Dashboard activeTab={displayedTab} employee={employee} setActiveTab={navigateToTab}
+        <Dashboard activeTab={displayedTab} employee={employeeProfile} setActiveTab={navigateToTab}
         />
       );
 
@@ -166,7 +209,7 @@ function EmployeePortal({employeeRole, employee}) {
     case 'logbook':
       return (
         <main className="main-content employee-content">
-          <FrontDeskLog />
+          <FrontDeskLog employee={employeeProfile} />
         </main>
       );
 
@@ -208,13 +251,13 @@ function EmployeePortal({employeeRole, employee}) {
     case 'cleaning-tasks':
       return (
         <main className="main-content employee-content">
-          <CleaningTasks />
+          <CleaningTasks isLead={isHousekeepingLead} employee={employeeProfile} />
         </main>
       );
     
     case 'guest-requests':
       return (
-        <GuestRequests />
+        <GuestRequests isLead={isHousekeepingLead} employee={employeeProfile} />
       );
 
     case 'lost-found':
@@ -236,17 +279,17 @@ function EmployeePortal({employeeRole, employee}) {
       );
 
     case 'settings':
-      return <EmployeeSettings isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} employee={employee} />;
+      return <EmployeeSettings isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} employee={employeeProfile} onUpdateProfile={handleProfileUpdate} />;
 
     default:
       if (employeeRole === 'housekeeping') {
         return (
-          <HousekeepingDashboard employee={employee} etActiveTab={navigateToTab}/>
+          <HousekeepingDashboard employee={employeeProfile} setActiveTab={navigateToTab} isLead={isHousekeepingLead}/>
         );
       }
 
       return (
-        <Dashboard activeTab="dashboard" employee={employee} setActiveTab={navigateToTab}/>
+        <Dashboard activeTab="dashboard" employee={employeeProfile} setActiveTab={navigateToTab}/>
       );
   }
 };
@@ -255,7 +298,8 @@ function EmployeePortal({employeeRole, employee}) {
     <div className={`portal-shell employee-portal-shell page-transition-${transitionPhase} ${isCollapsed ? 'nav-collapsed' : ''} ${isDarkMode ? 'theme-dark' : 'theme-light'}`}>
       <Sidebar 
         employeeRole={employeeRole}
-        employee={employee}
+        employee={employeeProfile}
+        isHousekeepingLead={isHousekeepingLead}
         isCollapsed={isCollapsed}
         setIsCollapsed={setIsCollapsed}
         activeTab={activeTab}

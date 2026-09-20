@@ -61,7 +61,7 @@ function EmployeeModal({ employee, onClose, onSave, onDelete }) {
   const togglePassword = () => setShowPassword(!showPassword);
 
   return (
-    <div className="modal-overlay open" onClick={onClose}>
+    <div className="modal-overlay open">
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <button className="modal-close" onClick={onClose}>×</button>
 

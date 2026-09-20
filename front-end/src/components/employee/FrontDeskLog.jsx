@@ -1,60 +1,10 @@
 import React, { useState, useEffect } from 'react';
 
-// --- MOCK DATA ---
-const MOCK_ENTRIES = [
-  {
-    id: 'log_001',
-    createdAt: new Date(Date.now() - 2 * 60 * 1000).toISOString(),
-    createdBy: { staffId: 'SF01', name: 'Ana Buenaflor' },
-    shift: 'afternoon',
-    category: 'Guest Request',
-    priority: 'high',
-    status: 'open',
-    pinned: true,
-    title: 'Late checkout - Maria Santos',
-    description: 'Guest requested late checkout until 14:00. Half-day rate applied. Housekeeping informed to delay cleaning Room 420. Guest will pay at departure.',
-    linked: { guestName: 'Maria Santos', roomNumber: 420, bookingId: 'BK-110' },
-    readBy: ['SF02'],
-    comments: [],
-    isSystemGenerated: false,
-  },
-  {
-    id: 'log_002',
-    createdAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
-    createdBy: { staffId: 'SF02', name: 'Juan Dela Cruz' },
-    shift: 'afternoon',
-    category: 'Maintenance',
-    priority: 'medium',
-    status: 'open',
-    pinned: false,
-    title: 'AC not cooling - Room 212',
-    description: 'Guest complained AC is blowing warm air. Created maintenance ticket #42. Technician scheduled for 15:00.',
-    linked: { guestName: 'Robert Chen', roomNumber: 212, bookingId: 'BK-108' },
-    readBy: ['SF01'],
-    comments: [
-      { staffId: 'SF01', name: 'Ana Buenaflor', text: 'Guest offered a fan in the meantime.', timestamp: new Date(Date.now() - 30 * 60 * 1000).toISOString() },
-    ],
-    isSystemGenerated: false,
-  },
-  {
-    id: 'log_003',
-    createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
-    createdBy: { staffId: 'SYSTEM', name: 'System' },
-    shift: 'morning',
-    category: 'Check-In',
-    priority: 'low',
-    status: 'open',
-    pinned: false,
-    title: 'Guest checked in - John Smith',
-    description: 'John Smith (BK-102) checked into Room 304. 2 adults, prepaid.',
-    linked: { guestName: 'John Smith', roomNumber: 304, bookingId: 'BK-102' },
-    readBy: ['SF01', 'SF02'],
-    comments: [],
-    isSystemGenerated: true,
-  }
-];
+function FrontDeskLog({ employee = null }) {
+  // Logged-in agent's identity for attributing new entries / comments.
+  const currentName = employee?.name || 'Staff';
+  const currentStaffId = employee?.employee_id || 'STAFF';
 
-function FrontDeskLog() {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
   const [selectedShift, setSelectedShift] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -74,11 +24,37 @@ function FrontDeskLog() {
       setIsLoading(true);
       setError(null);
       try {
-        // BACKEND CONNECTION: Uncomment when Java API is ready
-        // const res = await fetch(`http://localhost:8080/api/logs?date=${selectedDate}`);
-        // const data = await res.json();
-        await new Promise((resolve) => setTimeout(resolve, 800));
-        setEntries(MOCK_ENTRIES);
+        const res = await fetch(`http://localhost:5000/api/front-desk-logs?date=${selectedDate}`);
+        if (!res.ok) throw new Error(`Server error: ${res.status}`);
+        const data = await res.json();
+
+        // Each doc: audit_id, datetime, action_type, description, user_id, status
+        // We stored full entry JSON in description when creating
+        const normalized = data.map(doc => {
+          let parsed = {};
+          try { parsed = JSON.parse(doc.description); } catch (_) {}
+          return {
+            id:       doc._id,
+            _dbId:    doc._id,
+            createdAt: doc.datetime
+              ? new Date(doc.datetime.replace(' ', 'T')).toISOString()
+              : doc.createdAt,
+            createdBy: { staffId: parsed.staffId || 'STAFF', name: doc.user_id || 'Staff' },
+            shift:     parsed.shift || 'morning',
+            category:  doc.action_type || 'General Note',
+            priority:  parsed.priority || 'low',
+            status:    (doc.status || 'OPEN').toLowerCase() === 'balanced' ? 'resolved' : 'open',
+            pinned:    parsed.pinned || false,
+            title:     parsed.title || doc.action_type || '',
+            description: parsed.body || '',
+            linked:    parsed.linked || null,
+            readBy:    parsed.readBy || [],
+            comments:  parsed.comments || [],
+            isSystemGenerated: parsed.isSystemGenerated || false,
+          };
+        });
+
+        setEntries(normalized);
       } catch (err) {
         setError('Failed to fetch log entries from server.');
       } finally {
@@ -117,8 +93,17 @@ function FrontDeskLog() {
     );
   };
 
-  const deleteEntry = (id) => {
-    setEntries((prev) => prev.filter((e) => e.id !== id));
+  const deleteEntry = async (id) => {
+    const entry = entries.find(e => e.id === id);
+    // Optimistic remove
+    setEntries(prev => prev.filter(e => e.id !== id));
+    if (entry?._dbId) {
+      try {
+        await fetch(`http://localhost:5000/api/front-desk-logs/${entry._dbId}`, { method: 'DELETE' });
+      } catch (e) {
+        console.error('Failed to delete log entry:', e);
+      }
+    }
   };
 
   const addComment = (id, commentText) => {
@@ -131,8 +116,8 @@ function FrontDeskLog() {
               comments: [
                 ...e.comments,
                 {
-                  staffId: 'SF01',
-                  name: 'Ana Buenaflor',
+                  staffId: currentStaffId,
+                  name: currentName,
                   text: commentText,
                   timestamp: new Date().toISOString(),
                 },
@@ -154,39 +139,67 @@ function FrontDeskLog() {
   });
 
   const handleCreateEntry = async () => {
-    const entry = {
-      id: `log_${Date.now()}`,
-      createdAt: new Date().toISOString(),
-      createdBy: { staffId: 'SF01', name: 'Ana Buenaflor' },
-      shift: 'afternoon',
-      category: newEntry.category,
-      priority: newEntry.priority,
-      status: 'open',
-      pinned: newEntry.pin,
-      title: newEntry.title,
-      description: newEntry.description,
-      linked: newEntry.linkedGuest
-        ? {
-            guestName: newEntry.linkedGuest,
-            roomNumber: parseInt(newEntry.linkedRoom) || null,
-            bookingId: null,
-          }
-        : null,
-      readBy: [],
-      comments: [],
-      isSystemGenerated: false,
+    if (!newEntry.title.trim()) { alert('Please enter a title.'); return; }
+
+    // Store full entry as JSON in description; action_type = category
+    const payload = {
+      action_type: newEntry.category,
+      user_id:     currentName,   // the logged-in front-desk agent
+      status:      'OPEN',
+      description: JSON.stringify({
+        title:    newEntry.title,
+        body:     newEntry.description,
+        category: newEntry.category,
+        priority: newEntry.priority,
+        shift:    'morning',
+        pinned:   newEntry.pin,
+        linked:   newEntry.linkedGuest
+          ? { guestName: newEntry.linkedGuest, roomNumber: parseInt(newEntry.linkedRoom) || null, bookingId: null }
+          : null,
+        readBy:           [],
+        comments:         [],
+        isSystemGenerated: false,
+        staffId:          currentStaffId,
+      }),
     };
-    setEntries((prev) => [entry, ...prev]);
+
+    try {
+      const res = await fetch('http://localhost:5000/api/front-desk-logs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error(`Server error: ${res.status}`);
+      const saved = await res.json();
+
+      // Add optimistically to the UI without a full refetch
+      const entry = {
+        id:       saved._id,
+        _dbId:    saved._id,
+        createdAt: new Date().toISOString(),
+        createdBy: { staffId: currentStaffId, name: currentName },
+        shift:    'morning',
+        category: newEntry.category,
+        priority: newEntry.priority,
+        status:   'open',
+        pinned:   newEntry.pin,
+        title:    newEntry.title,
+        description: newEntry.description,
+        linked:   newEntry.linkedGuest
+          ? { guestName: newEntry.linkedGuest, roomNumber: parseInt(newEntry.linkedRoom) || null, bookingId: null }
+          : null,
+        readBy:   [],
+        comments: [],
+        isSystemGenerated: false,
+      };
+      setEntries(prev => [entry, ...prev]);
+    } catch (e) {
+      console.error(e);
+      alert('Failed to save log entry. Please try again.');
+    }
+
     setNewEntryModal(false);
-    setNewEntry({
-      title: '',
-      description: '',
-      category: 'General Note',
-      priority: 'low',
-      linkedGuest: '',
-      linkedRoom: '',
-      pin: false,
-    });
+    setNewEntry({ title: '', description: '', category: 'General Note', priority: 'low', linkedGuest: '', linkedRoom: '', pin: false });
   };
 
   return (
@@ -328,8 +341,8 @@ function FrontDeskLog() {
 
       {/* New Entry Modal */}
       {newEntryModal && (
-        <div className="modal-overlay logbook-modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(2px)' }}>
-          <div className="modal-content logbook-modal logbook-new-entry" style={{ width: 480, maxWidth: '92%', padding: '28px', borderRadius: '12px', background: '#fff', boxShadow: '0 20px 60px rgba(0,0,0,0.15)' }}>
+        <div className="modal-overlay logbook-modal-overlay open" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div className="modal-content logbook-modal logbook-new-entry" style={{ width: 480, maxWidth: '92%', padding: '28px', borderRadius: '12px', boxShadow: '0 20px 60px rgba(0,0,0,0.15)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: '#1f2937' }}>New Log Entry</h3>
               <button onClick={() => setNewEntryModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: '#9ca3af', padding: '4px' }}>

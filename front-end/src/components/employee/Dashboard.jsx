@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { usePolling } from '../../hooks/usePolling';
 
 function Dashboard({ employee, setActiveTab }) {
   const [isLoading, setIsLoading] = useState(true);
@@ -6,37 +7,35 @@ function Dashboard({ employee, setActiveTab }) {
   const [recentActivity, setRecentActivity] = useState([]);
   const [todayDate] = useState(new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }));
 
-  useEffect(() => {
-    const fetchDashboard = async () => {
-      setIsLoading(true);
-      try {
-        const res = await fetch('http://localhost:5000/api/dashboard/overview');
-        if (!res.ok) throw new Error(`Server error: ${res.status}`);
-        const data = await res.json();
-        setStats({
-          arrivals: data.arrivals,
-          departures: data.departures,
-          inHouse: data.inHouse,
-          bookings: data.bookings,
-          rooms: data.rooms,
-        });
-        // Normalize activity log field names
-        const activities = (data.recentActivity || []).map(a => ({
-          id: a._id,
-          type: a.type,
-          text: a.text,
-          time: a.time || new Date(a.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-          icon: a.icon || 'fa-circle-info',
-        }));
-        setRecentActivity(activities);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchDashboard();
-  }, []);
+  const fetchDashboard = async () => {
+    setIsLoading(true);
+    try {
+      const res = await fetch('http://localhost:5000/api/dashboard/overview');
+      if (!res.ok) throw new Error(`Server error: ${res.status}`);
+      const data = await res.json();
+      setStats({
+        arrivals:   data.arrivals,
+        departures: data.departures,
+        inHouse:    data.inHouse,
+        bookings:   data.bookings,
+        rooms:      data.rooms,
+      });
+      const activities = (data.recentActivity || []).map(a => ({
+        id:   a._id,
+        type: a.type,
+        text: a.text,
+        time: a.time || new Date(a.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+        icon: a.icon || 'fa-circle-info',
+      }));
+      setRecentActivity(activities);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  usePolling(fetchDashboard, 15000);
 
 if (isLoading) {
   return (

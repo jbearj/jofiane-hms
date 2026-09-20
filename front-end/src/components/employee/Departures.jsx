@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { usePolling } from '../../hooks/usePolling';
 
 function Departures() {
   // 1. UI FILTERS STATE
@@ -13,50 +14,48 @@ function Departures() {
   const [processingId, setProcessingId] = useState(null);
   const [error, setError] = useState(null);
 
-  // 3. FETCH DATA 
-  useEffect(() => {
-    const fetchDepartures = async () => {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const response = await fetch(`http://localhost:5000/api/departures?date=${selectedDate}`);
-        if (!response.ok) throw new Error(`Server error: ${response.status}`);
-        const data = await response.json();
-        // Normalize MongoDB field names to match UI field names
-        const normalized = data.map(d => ({
-          id: d._id,
-          guestName: d.guest?.full_name || '',
-          vip: false,
-          adults: d.adults || 0,
-          children: d.children || 0,
-          bookingId: d.booking_id || d._id,
-          roomNumber: d.room_number || '',
-          roomType: d.room_number || '',
-          scheduledDeparture: d.dates?.check_out
-            ? `${d.dates.check_out}T12:00:00`
-            : new Date().toISOString(),
-          status: d.status === 'Checked In' ? 'Pending' : d.status,
-          balance: parseFloat((d.billing?.balance_due || '0').replace(/,/g, '')) || 0,
-          prepaid: parseFloat((d.billing?.balance_due || '0').replace(/,/g, '')) === 0,
-          deposit: parseFloat((d.billing?.total_paid || '0').replace(/,/g, '')) || 0,
-          depositType: null,
-          housekeeping: 'Unknown',
-          alerts: [],
-          nightsStayed: parseInt(d.dates?.nights) || 0,
-          totalNights: parseInt(d.dates?.nights) || 0,
-          lateRequest: false,
-          _id: d._id,
-        }));
-        setDepartures(normalized);
-      } catch (err) {
-        console.error('Failed to fetch departures', err);
-        setError('Failed to connect to the server.');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchDepartures();
-  }, [selectedDate]);
+  // 3. FETCH DATA
+  const fetchDepartures = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(`http://localhost:5000/api/departures?date=${selectedDate}`);
+      if (!response.ok) throw new Error(`Server error: ${response.status}`);
+      const data = await response.json();
+      const normalized = data.map(d => ({
+        id: d._id,
+        guestName: d.guest?.full_name || '',
+        vip: false,
+        adults: d.adults || 0,
+        children: d.children || 0,
+        bookingId: d.booking_id || d._id,
+        roomNumber: d.room_number || '',
+        roomType: d.room_number || '',
+        scheduledDeparture: d.dates?.check_out
+          ? `${d.dates.check_out}T12:00:00`
+          : new Date().toISOString(),
+        status: d.status === 'Checked In' ? 'Pending' : d.status,
+        balance: parseFloat((d.billing?.balance_due || '0').replace(/,/g, '')) || 0,
+        prepaid: parseFloat((d.billing?.balance_due || '0').replace(/,/g, '')) === 0,
+        deposit: parseFloat((d.billing?.total_paid || '0').replace(/,/g, '')) || 0,
+        depositType: null,
+        housekeeping: 'Unknown',
+        alerts: [],
+        nightsStayed: parseInt(d.dates?.nights) || 0,
+        totalNights: parseInt(d.dates?.nights) || 0,
+        lateRequest: false,
+        _id: d._id,
+      }));
+      setDepartures(normalized);
+    } catch (err) {
+      console.error('Failed to fetch departures', err);
+      setError('Failed to connect to the server.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  usePolling(fetchDepartures, 10000, [selectedDate]);
 
   // 4. ASYNC ACTION HANDLERS
   const handleCheckOut = async (id) => {

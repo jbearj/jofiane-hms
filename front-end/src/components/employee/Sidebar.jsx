@@ -3,7 +3,7 @@ import logoFull from '../../assets/Jofiane-logo.png';
 import logoMini from '../../assets/Jofiane-logo 2.png'; 
 import employee1 from '../../assets/employee1.jpeg';
 
-function Sidebar({ employeeRole, employee, isCollapsed, setIsCollapsed, activeTab, setActiveTab, isDarkMode, setIsDarkMode, onLogout }) {
+function Sidebar({ employeeRole, employee, isHousekeepingLead = false, isCollapsed, setIsCollapsed, activeTab, setActiveTab, isDarkMode, setIsDarkMode, onLogout }) {
   const navMenuRef = useRef(null);
   const navScrollPositionRef = useRef(0);
   const transitionTimerRef = useRef(null);
@@ -112,6 +112,7 @@ function Sidebar({ employeeRole, employee, isCollapsed, setIsCollapsed, activeTa
       // Clear Storage at Logout
       try {
         window.localStorage.removeItem('token');
+        window.localStorage.removeItem('jofiane-token'); // JWT auth token
         window.localStorage.removeItem('user');
         window.sessionStorage.clear();
       } catch (error) {
@@ -247,6 +248,19 @@ function Sidebar({ employeeRole, employee, isCollapsed, setIsCollapsed, activeTa
     }
 
     return false;
+  })
+  // Restrict housekeeping sub-items for non-lead (Cleaner) staff
+  .map((item) => {
+    if (item.id === 'housekeeping' && employeeRole === 'housekeeping' && !isHousekeepingLead) {
+      // Cleaners only see the tasks/requests/lost-found they work on —
+      // no Room Status control, no Maintenance Requests, no Housekeeping Log
+      const cleanerAllowed = ['cleaning-tasks', 'guest-requests', 'lost-found'];
+      return {
+        ...item,
+        subItems: item.subItems.filter((sub) => cleanerAllowed.includes(sub.id)),
+      };
+    }
+    return item;
   });
 
   return (

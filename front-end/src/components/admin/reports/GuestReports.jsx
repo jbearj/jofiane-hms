@@ -10,46 +10,9 @@ function GuestReports() {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      // TODO: Replace with actual API call
-      // const res = await fetch(`http://localhost:8080/api/admin/reports/guests?period=${period}`);
-      // const data = await res.json();
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      const mockData = {
-        kpis: { totalGuests: 284, newGuests: 218, returning: 66, avgSpend: 6480, returnRate: 23.2 },
-        nationalities: [
-          { country: 'Philippines', count: 156, pct: 54.9 },
-          { country: 'South Korea', count: 42, pct: 14.8 },
-          { country: 'Japan', count: 28, pct: 9.9 },
-          { country: 'USA', count: 22, pct: 7.7 },
-          { country: 'China', count: 18, pct: 6.3 },
-          { country: 'Others', count: 18, pct: 6.3 }
-        ],
-        bookingSource: [
-          { source: 'Direct (Website)', pct: 32, count: 91 },
-          { source: 'Booking.com', pct: 25, count: 71 },
-          { source: 'Walk-in', pct: 18, count: 51 },
-          { source: 'Expedia', pct: 14, count: 40 },
-          { source: 'Agoda', pct: 7, count: 20 },
-          { source: 'Other OTAs', pct: 4, count: 11 }
-        ],
-        purpose: [
-          { type: 'Leisure', pct: 52, count: 148 },
-          { type: 'Business', pct: 28, count: 80 },
-          { type: 'Event', pct: 12, count: 34 },
-          { type: 'Transit', pct: 8, count: 22 }
-        ],
-        topGuests: [
-          { name: 'Marisol Reyes', visits: 8, totalSpent: 198000, lastVisit: '2026-08-10' },
-          { name: 'Daniel Kho', visits: 6, totalSpent: 145000, lastVisit: '2026-08-11' },
-          { name: 'Angela Cruz', visits: 5, totalSpent: 225000, lastVisit: '2026-08-14' },
-          { name: 'Fam. Villanueva', visits: 4, totalSpent: 112000, lastVisit: '2026-08-09' },
-          { name: 'Roberto Santos', visits: 4, totalSpent: 98000, lastVisit: '2026-08-07' }
-        ],
-        feedback: { avgRating: 4.6, totalReviews: 142, positive: 128, neutral: 10, negative: 4 }
-      };
-
-      setData(mockData);
+      const res = await fetch('http://localhost:5000/api/reports/guests');
+      if (!res.ok) throw new Error(`Server error: ${res.status}`);
+      setData(await res.json());
     } catch (err) {
       console.error('Failed to fetch guest data:', err);
     } finally {
@@ -61,7 +24,10 @@ function GuestReports() {
     return (<section className="admin-tab-content active"><div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading guest reports...</div></section>);
   }
 
-  const { kpis, nationalities, bookingSource, purpose, topGuests, feedback } = data;
+  const { kpis, bookingSource, topGuests } = data;
+  const nationalities = data.nationalities || [];
+  const purpose = data.purpose || [];
+  const feedback = data.feedback;
   const sourceColors = ['#C9A84C', '#4a3728', '#3b82f6', '#059669', '#8b5cf6', '#9ca3af'];
 
   return (
@@ -100,18 +66,24 @@ function GuestReports() {
         {/* Nationality */}
         <div className="panel" style={{ padding: '24px 28px' }}>
           <h3 style={{ fontSize: '14px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '20px' }}>Guest Nationality</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {nationalities.map((item, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <span style={{ fontSize: '12px', fontWeight: '600', width: '100px', color: 'var(--text-primary)' }}>{item.country}</span>
-                <div style={{ flex: 1, height: '8px', background: 'var(--bg-input)', borderRadius: '4px', overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${item.pct}%`, background: 'var(--gold)', borderRadius: '4px', opacity: 1 - (i * 0.12) }}></div>
+          {nationalities.length === 0 ? (
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic', padding: '10px 0' }}>
+              Nationality data is not collected at booking. Add a nationality field to guest records to populate this.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {nationalities.map((item, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <span style={{ fontSize: '12px', fontWeight: '600', width: '100px', color: 'var(--text-primary)' }}>{item.country}</span>
+                  <div style={{ flex: 1, height: '8px', background: 'var(--bg-input)', borderRadius: '4px', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${item.pct}%`, background: 'var(--gold)', borderRadius: '4px', opacity: 1 - (i * 0.12) }}></div>
+                  </div>
+                  <span style={{ fontSize: '11px', fontWeight: '700', width: '30px', textAlign: 'right' }}>{item.count}</span>
+                  <span style={{ fontSize: '10px', color: 'var(--text-muted)', width: '35px', textAlign: 'right' }}>{item.pct}%</span>
                 </div>
-                <span style={{ fontSize: '11px', fontWeight: '700', width: '30px', textAlign: 'right' }}>{item.count}</span>
-                <span style={{ fontSize: '10px', color: 'var(--text-muted)', width: '35px', textAlign: 'right' }}>{item.pct}%</span>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Booking Source */}
@@ -140,22 +112,28 @@ function GuestReports() {
         {/* Purpose of Stay */}
         <div className="panel" style={{ padding: '24px 28px' }}>
           <h3 style={{ fontSize: '14px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '20px' }}>Purpose of Stay</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            {purpose.map((item, i) => {
-              const colors = ['#C9A84C', '#4a3728', '#3b82f6', '#9ca3af'];
-              return (
-                <div key={i}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                    <span style={{ fontSize: '12px', fontWeight: '600' }}>{item.type}</span>
-                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{item.count} ({item.pct}%)</span>
+          {purpose.length === 0 ? (
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic', padding: '10px 0' }}>
+              Purpose of stay is not collected at booking.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {purpose.map((item, i) => {
+                const colors = ['#C9A84C', '#4a3728', '#3b82f6', '#9ca3af'];
+                return (
+                  <div key={i}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                      <span style={{ fontSize: '12px', fontWeight: '600' }}>{item.type}</span>
+                      <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{item.count} ({item.pct}%)</span>
+                    </div>
+                    <div style={{ height: '8px', background: 'var(--bg-input)', borderRadius: '4px', overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${item.pct}%`, background: colors[i], borderRadius: '4px' }}></div>
+                    </div>
                   </div>
-                  <div style={{ height: '8px', background: 'var(--bg-input)', borderRadius: '4px', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${item.pct}%`, background: colors[i], borderRadius: '4px' }}></div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Top Guests */}
@@ -193,15 +171,23 @@ function GuestReports() {
         {/* Feedback Summary */}
         <div className="panel" style={{ padding: '24px 28px' }}>
           <h3 style={{ fontSize: '14px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '20px' }}>Guest Feedback</h3>
-          <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-            <div style={{ fontSize: '42px', fontWeight: '700', color: 'var(--gold)' }}>{feedback.avgRating}</div>
-            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>out of 5.0 · {feedback.totalReviews} reviews</div>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <FeedbackBar label="Positive" count={feedback.positive} total={feedback.totalReviews} color="#10b981" />
-            <FeedbackBar label="Neutral" count={feedback.neutral} total={feedback.totalReviews} color="#f59e0b" />
-            <FeedbackBar label="Negative" count={feedback.negative} total={feedback.totalReviews} color="#ef4444" />
-          </div>
+          {!feedback ? (
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic', padding: '10px 0' }}>
+              No guest review system is connected yet.
+            </div>
+          ) : (
+            <>
+              <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+                <div style={{ fontSize: '42px', fontWeight: '700', color: 'var(--gold)' }}>{feedback.avgRating}</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>out of 5.0 · {feedback.totalReviews} reviews</div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <FeedbackBar label="Positive" count={feedback.positive} total={feedback.totalReviews} color="#10b981" />
+                <FeedbackBar label="Neutral" count={feedback.neutral} total={feedback.totalReviews} color="#f59e0b" />
+                <FeedbackBar label="Negative" count={feedback.negative} total={feedback.totalReviews} color="#ef4444" />
+              </div>
+            </>
+          )}
         </div>
       </div>
     </section>

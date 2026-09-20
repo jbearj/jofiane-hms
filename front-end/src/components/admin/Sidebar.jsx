@@ -10,7 +10,7 @@ const defaultAccordions = {
   reports: false
 };
 
-function Sidebar({ isCollapsed, setIsCollapsed, activeTab, setActiveTab, isDarkMode, setIsDarkMode, onLogout }) {
+function Sidebar({ isCollapsed, setIsCollapsed, activeTab, setActiveTab, isDarkMode, setIsDarkMode, onLogout, adminProfile }) {
   const navMenuRef = useRef(null);
   const navScrollPositionRef = useRef(0);
   const transitionTimerRef = useRef(null);
@@ -87,6 +87,7 @@ function Sidebar({ isCollapsed, setIsCollapsed, activeTab, setActiveTab, isDarkM
     setShowLogoutConfirm(false);
     try {
       window.localStorage.removeItem('token');
+      window.localStorage.removeItem('jofiane-token'); // JWT auth token
       window.localStorage.removeItem('user');
       window.sessionStorage.clear();
     } catch (error) {
@@ -416,10 +417,14 @@ function Sidebar({ isCollapsed, setIsCollapsed, activeTab, setActiveTab, isDarkM
             onClick={() => setShowProfileMenu((prev) => !prev)}
             style={{ cursor: 'pointer' }}
           >
-            <div className="avatar admin-avatar">A</div>
+            <div className="avatar admin-avatar" style={adminProfile?.photo ? { padding: 0, overflow: 'hidden' } : undefined}>
+              {adminProfile?.photo
+                ? <img src={adminProfile.photo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                : (adminProfile?.fullName || 'A').charAt(0).toUpperCase()}
+            </div>
             <div className="user-info">
-              <div className="name">Admin</div>
-              <div className="role">General Manager</div>
+              <div className="name">{adminProfile?.fullName || 'Admin'}</div>
+              <div className="role">{adminProfile?.role || 'General Manager'}</div>
             </div>
           </div>
         </div>

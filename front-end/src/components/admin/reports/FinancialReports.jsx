@@ -10,51 +10,9 @@ function FinancialReports() {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      // TODO: Replace with actual API call
-      // const res = await fetch(`http://localhost:8080/api/admin/reports/financial?period=${period}`);
-      // const data = await res.json();
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      const mockData = {
-        kpis: { totalRevenue: 1842000, totalExpenses: 680000, netProfit: 1162000, profitMargin: 63.1, adr: 4850, revpar: 4290 },
-        revenueTrend: [
-          { label: 'Week 1', current: 420000, previous: 390000 },
-          { label: 'Week 2', current: 485000, previous: 410000 },
-          { label: 'Week 3', current: 462000, previous: 445000 },
-          { label: 'Week 4', current: 475000, previous: 430000 }
-        ],
-        revenueBySource: [
-          { source: 'Rooms', amount: 1280000, pct: 69.5 },
-          { source: 'F&B', amount: 285000, pct: 15.5 },
-          { source: 'Spa & Wellness', amount: 142000, pct: 7.7 },
-          { source: 'Minibar', amount: 62000, pct: 3.4 },
-          { source: 'Laundry', amount: 38000, pct: 2.1 },
-          { source: 'Penalties & Fees', amount: 35000, pct: 1.9 }
-        ],
-        expenses: [
-          { category: 'Payroll', amount: 380000, pct: 55.9 },
-          { category: 'OTA Commissions', amount: 145000, pct: 21.3 },
-          { category: 'Supplies & Amenities', amount: 68000, pct: 10.0 },
-          { category: 'Maintenance', amount: 52000, pct: 7.6 },
-          { category: 'Utilities', amount: 35000, pct: 5.1 }
-        ],
-        adrTrend: [
-          { label: 'Week 1', adr: 4500, revpar: 3690 },
-          { label: 'Week 2', adr: 4800, revpar: 4368 },
-          { label: 'Week 3', adr: 4900, revpar: 4312 },
-          { label: 'Week 4', adr: 5200, revpar: 4836 }
-        ],
-        paymentMethods: [
-          { method: 'Cash', amount: 520000, pct: 28.2 },
-          { method: 'Credit Card', amount: 680000, pct: 36.9 },
-          { method: 'Bank Transfer', amount: 310000, pct: 16.8 },
-          { method: 'GCash / Maya', amount: 192000, pct: 10.4 },
-          { method: 'OTA Collect', amount: 140000, pct: 7.6 }
-        ],
-        outstanding: { total: 48500, count: 6 }
-      };
-
-      setData(mockData);
+      const res = await fetch('http://localhost:5000/api/reports/financial');
+      if (!res.ok) throw new Error(`Server error: ${res.status}`);
+      setData(await res.json());
     } catch (err) {
       console.error('Failed to fetch financial data:', err);
     } finally {

@@ -24,6 +24,7 @@ const Login = ({ onLoginSuccess }) => {
       { username: 'ana@jofiane.com',   password: 'ana2026secure',  name: 'Ana Buenaflor',   role: 'Front Desk Concierge', department: 'Front Desk',  module: 'frontdesk' },
       { username: 'marco@jofiane.com', password: 'marcoNight123',  name: 'Marco Diaz',       role: 'Night Auditor',        department: 'Front Desk',  module: 'frontdesk' },
       { username: 'liza@jofiane.com',  password: 'lizaClean99',    name: 'Liza Fernandez',   role: 'Housekeeping Lead',    department: 'Housekeeping',module: 'housekeeping' },
+      { username: 'maria@jofiane.com', password: 'mariaClean22',   name: 'Maria Santos',     role: 'Housekeeper',          department: 'Housekeeping',module: 'housekeeping' },
       { username: 'ronnie@jofiane.com',password: 'wrench2026',     name: 'Ronnie Cruz',      role: 'Maintenance Tech',     department: 'Maintenance', module: 'frontdesk' },
     ];
 
@@ -37,6 +38,10 @@ const Login = ({ onLoginSuccess }) => {
       const data = await res.json();
 
       if (res.ok) {
+        // Always replace the token for THIS login so a previous user's token
+        // can never linger and cause profile edits to hit the wrong account.
+        if (data.token) localStorage.setItem('jofiane-token', data.token);
+        else localStorage.removeItem('jofiane-token');
         // module === 'admin' means DB employee with Admin department → full admin panel
         onLoginSuccess(data.role, data.employee, data.module);
         return;
@@ -48,6 +53,7 @@ const Login = ({ onLoginSuccess }) => {
            && a.password === formData.password
       );
       if (testMatch) {
+        localStorage.removeItem('jofiane-token'); // test accounts have no server token
         onLoginSuccess('employee', {
           name: testMatch.name, role: testMatch.role,
           email: testMatch.username, department: testMatch.department,
@@ -63,6 +69,7 @@ const Login = ({ onLoginSuccess }) => {
            && a.password === formData.password
       );
       if (testMatch) {
+        localStorage.removeItem('jofiane-token'); // no server token → clear any stale one
         onLoginSuccess('employee', {
           name: testMatch.name, role: testMatch.role,
           email: testMatch.username, department: testMatch.department,
@@ -71,6 +78,7 @@ const Login = ({ onLoginSuccess }) => {
       }
       // Also check admin shortcut offline (exact @admin suffix only)
       if (/^.+@admin$/.test(formData.username.toLowerCase())) {
+        localStorage.removeItem('jofiane-token'); // no server token → clear any stale one
         onLoginSuccess('admin', null, null);
         return;
       }

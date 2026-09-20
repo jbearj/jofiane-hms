@@ -1,475 +1,216 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
+import { usePolling } from '../../hooks/usePolling';
+import PortalModal from '../common/PortalModal';
+
+const API = 'http://localhost:5000/api/maintenance-requests';
 
 const Maintenance = () => {
+  const [requests, setRequests] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [showForm, setShowForm] = useState(false);
-
-  const [requests, setRequests] = useState([
-    {
-      id: 1,
-      room: '101',
-      issue: 'Air conditioner not working',
-      priority: 'High',
-      reportedBy: 'Liza Fernandez',
-      status: 'Pending',
-      date: 'Aug 18, 2026'
-    },
-    {
-      id: 2,
-      room: '205',
-      issue: 'Bathroom light is broken',
-      priority: 'Medium',
-      reportedBy: 'Maria Santos',
-      status: 'In Progress',
-      date: 'Aug 18, 2026'
-    },
-    {
-      id: 3,
-      room: '310',
-      issue: 'Leaking faucet',
-      priority: 'High',
-      reportedBy: 'Liza Fernandez',
-      status: 'Completed',
-      date: 'Aug 17, 2026'
-    }
-  ]);
+  const [savingId, setSavingId] = useState(null);
 
   const [formData, setFormData] = useState({
-    room: '',
-    issue: '',
-    priority: 'Medium',
-    description: ''
+    room_number: '',
+    issue_type: '',
+    description: '',
+    priority: 'NORMAL',
   });
 
-  const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
+  const firstLoad = useRef(true);
+
+  // ── FETCH ──────────────────────────────────────────
+  const fetchRequests = async () => {
+    if (firstLoad.current) setIsLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(API);
+      if (!res.ok) throw new Error(`Server error: ${res.status}`);
+      setRequests(await res.json());
+    } catch (e) {
+      console.error(e);
+      setError('Failed to load maintenance requests.');
+    } finally {
+      setIsLoading(false);
+      firstLoad.current = false;
+    }
   };
 
-  const handleSubmit = (e) => {
+  usePolling(fetchRequests, 12000);
+
+  // ── CREATE ─────────────────────────────────────────
+  const handleSubmit = async (e) => {
     e.preventDefault();
-
-    const newRequest = {
-      id: requests.length + 1,
-      room: formData.room,
-      issue: formData.issue,
-      priority: formData.priority,
-      reportedBy: 'Current Employee',
-      status: 'Pending',
-      date: new Date().toLocaleDateString(
-        'en-US',
-        {
-          month: 'short',
-          day: 'numeric',
-          year: 'numeric'
-        }
-      )
-    };
-
-    setRequests([...requests, newRequest]);
-
-    setFormData({
-      room: '',
-      issue: '',
-      priority: 'Medium',
-      description: ''
-    });
-
-    setShowForm(false);
+    try {
+      const res = await fetch(API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          room_number:  parseInt(formData.room_number) || 0,
+          issue_type:   formData.issue_type,
+          description:  formData.description,
+          priority:     formData.priority,
+          status:       'PENDING',
+        }),
+      });
+      if (!res.ok) throw new Error(`Server error: ${res.status}`);
+      await fetchRequests();
+      setFormData({ room_number: '', issue_type: '', description: '', priority: 'NORMAL' });
+      setShowForm(false);
+    } catch (e) {
+      console.error(e);
+      alert('Failed to submit request. Please try again.');
+    }
   };
 
-  const getPriorityClass = (priority) => {
-    if (priority === 'High') {
-      return 'status-tag tag-danger';
+  // ── UPDATE STATUS ──────────────────────────────────
+  const updateStatus = async (id, newStatus) => {
+    setSavingId(id);
+    try {
+      const body = { status: newStatus };
+      if (newStatus === 'COMPLETED') body.completed_at = new Date();
+      const res = await fetch(`${API}/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error();
+      const updated = await res.json();
+      setRequests(prev => prev.map(r => r._id === id ? updated : r));
+    } catch (e) {
+      console.error(e);
+      alert('Failed to update status.');
+    } finally {
+      setSavingId(null);
     }
-
-    if (priority === 'Medium') {
-      return 'status-tag tag-warning';
-    }
-
-    return 'status-tag tag-success';
   };
 
-  const getStatusClass = (status) => {
-    if (status === 'Completed') {
-      return 'status-tag tag-success';
-    }
+  // ── HELPERS ────────────────────────────────────────
+  const getPriorityClass = (p) => p === 'HIGH' || p === 'URGENT' ? 'status-tag tag-danger' : p === 'NORMAL' ? 'status-tag tag-warning' : 'status-tag tag-success';
+  const getStatusClass   = (s) => s === 'COMPLETED' ? 'status-tag tag-success' : s === 'IN PROGRESS' ? 'status-tag tag-gold' : 'status-tag tag-warning';
 
-    if (status === 'In Progress') {
-      return 'status-tag tag-gold';
-    }
-
-    return 'status-tag tag-warning';
-  };
-
-  const totalRequests = requests.length;
-
-  const pendingRequests = requests.filter(
-    (item) => item.status === 'Pending'
-  ).length;
-
-  const inProgressRequests = requests.filter(
-    (item) => item.status === 'In Progress'
-  ).length;
-
-  const completedRequests = requests.filter(
-    (item) => item.status === 'Completed'
-  ).length;
+  const totalRequests     = requests.length;
+  const pendingRequests   = requests.filter(r => r.status === 'PENDING').length;
+  const inProgressRequests = requests.filter(r => r.status === 'IN PROGRESS').length;
+  const completedRequests = requests.filter(r => r.status === 'COMPLETED').length;
 
   return (
     <section className="admin-tab-content active housekeeping-module">
 
-      <div
-        className="employee-dashboard-header"
-        style={{ marginBottom: '28px' }}
-      >
+      <div className="employee-dashboard-header" style={{ marginBottom: '28px' }}>
         <div>
-          <h2
-            style={{
-              fontSize: '28px',
-              fontWeight: '700',
-              color: 'var(--text-primary)',
-              margin: '0 0 6px 0'
-            }}
-          >
-            Maintenance Requests
-          </h2>
-
-          <p
-            style={{
-              margin: 0,
-              fontSize: '14px',
-              color: 'var(--text-secondary)'
-            }}
-          >
-            Report and monitor room maintenance issues.
-          </p>
+          <h2 style={{ fontSize: '28px', fontWeight: '700', color: 'var(--text-primary)', margin: '0 0 6px 0' }}>Maintenance Requests</h2>
+          <p style={{ margin: 0, fontSize: '14px', color: 'var(--text-secondary)' }}>Report and monitor room maintenance issues.</p>
         </div>
-
-        <button
-          className="btn btn-gold"
-          onClick={() => setShowForm(true)}
-        >
-          + Report Maintenance
-        </button>
+        <button className="btn btn-gold" onClick={() => setShowForm(true)}>+ Report Maintenance</button>
       </div>
 
-      <div
-        className="kpi-grid"
-        style={{
-          gridTemplateColumns: 'repeat(4, 1fr)',
-          marginBottom: '22px'
-        }}
-      >
-        <div className="kpi-card">
-          <span
-            className="lbl"
-            style={{ color: 'var(--text-muted)' }}
-          >
-            TOTAL REQUESTS
-          </span>
-
-          <span
-            className="val"
-            style={{ color: 'var(--text-primary)' }}
-          >
-            {totalRequests}
-          </span>
-
-          <span
-            className="sub"
-            style={{ color: 'var(--text-secondary)' }}
-          >
-            Maintenance reports
-          </span>
-        </div>
-
-        <div className="kpi-card">
-          <span
-            className="lbl"
-            style={{ color: 'var(--text-muted)' }}
-          >
-            PENDING
-          </span>
-
-          <span
-            className="val"
-            style={{ color: 'var(--text-primary)' }}
-          >
-            {pendingRequests}
-          </span>
-
-          <span
-            className="sub"
-            style={{ color: 'var(--text-secondary)' }}
-          >
-            Waiting for action
-          </span>
-        </div>
-
-        <div className="kpi-card">
-          <span
-            className="lbl"
-            style={{ color: 'var(--text-muted)' }}
-          >
-            IN PROGRESS
-          </span>
-
-          <span
-            className="val"
-            style={{ color: 'var(--text-primary)' }}
-          >
-            {inProgressRequests}
-          </span>
-
-          <span
-            className="sub"
-            style={{ color: 'var(--text-secondary)' }}
-          >
-            Currently being repaired
-          </span>
-        </div>
-
-        <div className="kpi-card">
-          <span
-            className="lbl"
-            style={{ color: 'var(--text-muted)' }}
-          >
-            COMPLETED
-          </span>
-
-          <span
-            className="val"
-            style={{ color: 'var(--text-primary)' }}
-          >
-            {completedRequests}
-          </span>
-
-          <span
-            className="sub"
-            style={{ color: 'var(--text-secondary)' }}
-          >
-            Resolved requests
-          </span>
-        </div>
+      {/* KPIs */}
+      <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', marginBottom: '22px' }}>
+        <div className="kpi-card"><span className="lbl">TOTAL REQUESTS</span><span className="val">{totalRequests}</span><span className="sub">Maintenance reports</span></div>
+        <div className="kpi-card"><span className="lbl">PENDING</span><span className="val">{pendingRequests}</span><span className="sub">Waiting for action</span></div>
+        <div className="kpi-card"><span className="lbl">IN PROGRESS</span><span className="val">{inProgressRequests}</span><span className="sub">Currently being repaired</span></div>
+        <div className="kpi-card"><span className="lbl">COMPLETED</span><span className="val">{completedRequests}</span><span className="sub">Resolved requests</span></div>
       </div>
 
-      <div
-        className="panel"
-        style={{
-          padding: 0,
-          overflow: 'hidden'
-        }}
-      >
-        <div
-          className="panel-header"
-          style={{
-            padding: '20px 24px',
-            margin: 0,
-            borderBottom: '1px solid var(--border-light)'
-          }}
-        >
-          <h3
-            style={{
-              margin: 0,
-              color: 'var(--text-primary)'
-            }}
-          >
-            Maintenance Requests
-          </h3>
+      {/* TABLE */}
+      <div className="panel" style={{ padding: 0, overflow: 'hidden' }}>
+        <div className="panel-header" style={{ padding: '20px 24px', margin: 0, borderBottom: '1px solid var(--border-light)' }}>
+          <h3 style={{ margin: 0, color: 'var(--text-primary)' }}>Maintenance Requests</h3>
         </div>
-
         <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Room</th>
-                <th>Issue</th>
-                <th>Priority</th>
-                <th>Reported By</th>
-                <th>Status</th>
-                <th>Date</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {requests.map((request) => (
-                <tr
-                  key={request.id}
-                  className="table-row-hover"
-                >
-                  <td>
-                    <strong
-                      style={{
-                        color: 'var(--text-primary)'
-                      }}
-                    >
-                      Room {request.room}
-                    </strong>
-                  </td>
-
-                  <td
-                    style={{
-                      color: 'var(--text-secondary)'
-                    }}
-                  >
-                    {request.issue}
-                  </td>
-
-                  <td>
-                    <span
-                      className={getPriorityClass(request.priority)}
-                    >
-                      {request.priority}
-                    </span>
-                  </td>
-
-                  <td
-                    style={{
-                      color: 'var(--text-secondary)'
-                    }}
-                  >
-                    {request.reportedBy}
-                  </td>
-
-                  <td>
-                    <span
-                      className={getStatusClass(request.status)}
-                    >
-                      {request.status}
-                    </span>
-                  </td>
-
-                  <td
-                    style={{
-                      color: 'var(--text-secondary)'
-                    }}
-                  >
-                    {request.date}
-                  </td>
+          {isLoading ? (
+            <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading requests...</div>
+          ) : error ? (
+            <div style={{ padding: '20px', color: '#dc2626' }}>{error}</div>
+          ) : requests.length === 0 ? (
+            <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>No maintenance requests yet.</div>
+          ) : (
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th><th>Room</th><th>Issue Type</th><th>Description</th>
+                  <th>Priority</th><th>Reported</th><th>Status</th><th>Action</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {requests.map(r => (
+                  <tr key={r._id} className="table-row-hover">
+                    <td><strong style={{ color: 'var(--text-primary)' }}>MNT-{String(r.maintenance_id).padStart(3,'0')}</strong></td>
+                    <td><strong style={{ color: 'var(--text-primary)' }}>Room {r.room_number}</strong></td>
+                    <td style={{ color: 'var(--text-secondary)' }}>{r.issue_type}</td>
+                    <td style={{ color: 'var(--text-secondary)', fontSize: '12px', maxWidth: '200px' }}>{r.description}</td>
+                    <td><span className={getPriorityClass(r.priority)}>{r.priority}</span></td>
+                    <td style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>
+                      {r.reported_at ? new Date(r.reported_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+                    </td>
+                    <td><span className={getStatusClass(r.status)}>{r.status}</span></td>
+                    <td>
+                      {savingId === r._id ? (
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>saving…</span>
+                      ) : r.status === 'PENDING' ? (
+                        <button className="btn btn-xs btn-gold" onClick={() => updateStatus(r._id, 'IN PROGRESS')}>Start</button>
+                      ) : r.status === 'IN PROGRESS' ? (
+                        <button className="btn btn-xs" onClick={() => updateStatus(r._id, 'COMPLETED')}>Complete</button>
+                      ) : (
+                        <span style={{ fontSize: '11px', fontWeight: '700', color: '#79c996' }}>Done</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
 
+      {/* ADD MODAL */}
       {showForm && (
-        <div
-          className="modal-overlay open"
-          onClick={() => setShowForm(false)}
-        >
-          <div
-            className="modal-content"
-            onClick={(e) => e.stopPropagation()}
-            style={{ maxWidth: '440px' }}
-          >
-            <button
-              className="modal-close"
-              onClick={() => setShowForm(false)}
-            >
-              ×
-            </button>
-
-            <h3
-              style={{
-                marginBottom: '6px',
-                color: 'var(--text-primary)'
-              }}
-            >
-              Report Maintenance
-            </h3>
-
-            <p
-              style={{
-                fontSize: '12px',
-                color: 'var(--text-secondary)',
-                marginBottom: '20px'
-              }}
-            >
-              Record a room maintenance issue.
-            </p>
-
+        <PortalModal maxWidth={440}>
+            <button className="modal-close" onClick={() => setShowForm(false)}>×</button>
+            <h3 style={{ marginBottom: '6px', color: 'var(--text-primary)' }}>Report Maintenance</h3>
+            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '20px' }}>Record a room maintenance issue.</p>
             <form onSubmit={handleSubmit}>
-              <div className="form-group">
-                <label>Room Number</label>
-
-                <input
-                  type="text"
-                  name="room"
-                  value={formData.room}
-                  onChange={handleChange}
-                  placeholder="Example: 205"
-                  required
-                />
+              <div className="form-grid" style={{ marginBottom: '14px' }}>
+                <div className="form-group">
+                  <label>Room Number</label>
+                  <input type="number" value={formData.room_number} onChange={e => setFormData({...formData, room_number: e.target.value})} placeholder="e.g. 205" required />
+                </div>
+                <div className="form-group">
+                  <label>Priority</label>
+                  <select value={formData.priority} onChange={e => setFormData({...formData, priority: e.target.value})}>
+                    <option value="LOW">Low</option>
+                    <option value="NORMAL">Normal</option>
+                    <option value="HIGH">High</option>
+                    <option value="URGENT">Urgent</option>
+                  </select>
+                </div>
               </div>
-
-              <div className="form-group">
-                <label>Issue</label>
-
-                <input
-                  type="text"
-                  name="issue"
-                  value={formData.issue}
-                  onChange={handleChange}
-                  placeholder="Example: Aircon not working"
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Priority</label>
-
-                <select
-                  name="priority"
-                  value={formData.priority}
-                  onChange={handleChange}
-                >
-                  <option value="Low">Low</option>
-                  <option value="Medium">Medium</option>
-                  <option value="High">High</option>
+              <div className="form-group" style={{ marginBottom: '14px' }}>
+                <label>Issue Type</label>
+                <select value={formData.issue_type} onChange={e => setFormData({...formData, issue_type: e.target.value})} required>
+                  <option value="">Select issue type...</option>
+                  <option>Plumbing</option>
+                  <option>Electrical</option>
+                  <option>Air Conditioning</option>
+                  <option>Furniture</option>
+                  <option>Door / Lock</option>
+                  <option>TV / Electronics</option>
+                  <option>Housekeeping Supply</option>
+                  <option>Other</option>
                 </select>
               </div>
-
-              <div className="form-group">
+              <div className="form-group" style={{ marginBottom: '20px' }}>
                 <label>Description</label>
-
-                <textarea
-                  name="description"
-                  value={formData.description}
-                  onChange={handleChange}
-                  placeholder="Describe the problem..."
-                  style={{ minHeight: '90px' }}
-                />
+                <textarea value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} placeholder="Describe the problem in detail..." style={{ minHeight: '80px' }} />
               </div>
-
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'flex-end',
-                  gap: '10px',
-                  marginTop: '20px'
-                }}
-              >
-                <button
-                  type="button"
-                  className="btn"
-                  onClick={() => setShowForm(false)}
-                >
-                  Cancel
-                </button>
-
-                <button
-                  type="submit"
-                  className="btn btn-gold"
-                >
-                  Submit Request
-                </button>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                <button type="button" className="btn" onClick={() => setShowForm(false)}>Cancel</button>
+                <button type="submit" className="btn btn-gold">Submit Request</button>
               </div>
             </form>
-          </div>
-        </div>
+        </PortalModal>
       )}
 
     </section>

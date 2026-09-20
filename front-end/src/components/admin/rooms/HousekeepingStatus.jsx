@@ -1,10 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, memo } from 'react';
+import { usePolling } from '../../../hooks/usePolling';
 
 function HousekeepingStatus() {
   const [isLoading, setIsLoading] = useState(true);
   const [rooms, setRooms] = useState([]);
   const [filteredRooms, setFilteredRooms] = useState([]);
   const [staff, setStaff] = useState([]);
+  const firstLoad = useRef(true);
+  const roomsSignature = useRef('');   // cheap change-detection fingerprint
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -13,48 +16,79 @@ function HousekeepingStatus() {
   const [filterStaff, setFilterStaff] = useState('all');
   const [showPriorityOnly, setShowPriorityOnly] = useState(false);
 
-  useEffect(() => { fetchData(); }, []);
   useEffect(() => { applyFilters(); }, [rooms, searchQuery, filterFloor, filterStatus, filterStaff, showPriorityOnly]);
 
   const fetchData = async () => {
-    setIsLoading(true);
+    // Only show the full loader on the very first fetch — polls refresh silently
+    if (firstLoad.current) setIsLoading(true);
     try {
-      // TODO: Replace with actual API call
-      // const res = await fetch('http://localhost:8080/api/admin/housekeeping');
-      // const data = await res.json();
-      await new Promise(resolve => setTimeout(resolve, 500));
+      const [roomsRes, empRes] = await Promise.all([
+        fetch('http://localhost:5000/api/rooms'),
+        fetch('http://localhost:5000/api/employees?department=Housekeeping'),
+      ]);
+      if (!roomsRes.ok) throw new Error(`Server error: ${roomsRes.status}`);
 
-      const mockStaff = [
+      const [roomsData, empData] = await Promise.all([
+        roomsRes.json(),
+        empRes.ok ? empRes.json() : [],
+      ]);
+
+      // Normalise rooms collection → component shape
+      const normalized = roomsData.map(r => ({
+        id:          r._id,
+        _id:         r._id,
+        number:      String(r.room_number || ''),
+        floor:       r.floor || 1,
+        type:        r.room_type_name || `Type ${r.type_id || ''}`,
+        cleanStatus: normalizeHKStatus(r.housekeeping),
+        assignedTo:  r.assigned_to || '',
+        priority:    r.priority || false,
+        notes:       r.notes || '',
+        lastCleaned: r.last_cleaned || r.updatedAt || null,
+      }));
+
+      // Build a fingerprint of just the fields the UI shows.
+      // If nothing changed since the last poll, skip setRooms entirely —
+      // this stops the whole grid from re-rendering / flickering.
+      const signature = JSON.stringify(
+        normalized.map(r => `${r._id}:${r.cleanStatus}:${r.assignedTo}:${r.priority}:${r.notes}`)
+      );
+      if (signature !== roomsSignature.current) {
+        roomsSignature.current = signature;
+        setRooms(normalized);
+      }
+
+      // Staff list (only update if changed too)
+      const staffList = empData.map(e => ({ id: e._id, name: e.full_name || '' }));
+      const finalStaff = staffList.length ? staffList : [
         { id: 1, name: 'Maria Santos' },
         { id: 2, name: 'Rosa Villanueva' },
         { id: 3, name: 'Elena Cruz' },
-        { id: 4, name: 'Carmen Diaz' }
+        { id: 4, name: 'Carmen Diaz' },
       ];
-
-      const mockRooms = [
-        { id: 1, number: '101', floor: 1, type: 'Standard', cleanStatus: 'clean', assignedTo: 'Maria Santos', priority: false, notes: '', lastCleaned: '2026-08-10T08:30:00' },
-        { id: 2, number: '102', floor: 1, type: 'Standard', cleanStatus: 'dirty', assignedTo: 'Maria Santos', priority: true, notes: 'Checkout at 11am — arrival at 2pm', lastCleaned: '2026-08-09T09:00:00' },
-        { id: 3, number: '103', floor: 1, type: 'Deluxe', cleanStatus: 'in-progress', assignedTo: 'Rosa Villanueva', priority: false, notes: '', lastCleaned: '2026-08-09T10:15:00' },
-        { id: 4, number: '104', floor: 1, type: 'Standard', cleanStatus: 'inspected', assignedTo: 'Maria Santos', priority: false, notes: '', lastCleaned: '2026-08-10T09:45:00' },
-        { id: 5, number: '201', floor: 2, type: 'Deluxe', cleanStatus: 'dirty', assignedTo: 'Rosa Villanueva', priority: true, notes: 'VIP arrival at 1pm', lastCleaned: '2026-08-09T08:00:00' },
-        { id: 6, number: '202', floor: 2, type: 'Deluxe', cleanStatus: 'clean', assignedTo: 'Rosa Villanueva', priority: false, notes: '', lastCleaned: '2026-08-10T10:30:00' },
-        { id: 7, number: '203', floor: 2, type: 'Premium', cleanStatus: 'dirty', assignedTo: 'Elena Cruz', priority: false, notes: 'Guest requested no cleaning today', lastCleaned: '2026-08-08T09:00:00' },
-        { id: 8, number: '204', floor: 2, type: 'Premium', cleanStatus: 'in-progress', assignedTo: 'Elena Cruz', priority: true, notes: 'Express turnover needed', lastCleaned: '2026-08-09T11:00:00' },
-        { id: 9, number: '301', floor: 3, type: 'Suite', cleanStatus: 'clean', assignedTo: 'Carmen Diaz', priority: false, notes: '', lastCleaned: '2026-08-10T07:45:00' },
-        { id: 10, number: '302', floor: 3, type: 'Suite', cleanStatus: 'dirty', assignedTo: 'Carmen Diaz', priority: false, notes: '', lastCleaned: '2026-08-09T10:00:00' },
-        { id: 11, number: '303', floor: 3, type: 'Premium', cleanStatus: 'inspected', assignedTo: 'Elena Cruz', priority: false, notes: '', lastCleaned: '2026-08-10T08:15:00' },
-        { id: 12, number: '304', floor: 3, type: 'Suite', cleanStatus: 'dirty', assignedTo: 'Carmen Diaz', priority: true, notes: 'Checkout + VIP check-in at 3pm', lastCleaned: '2026-08-09T09:30:00' },
-        { id: 13, number: '401', floor: 4, type: 'Presidential', cleanStatus: 'clean', assignedTo: 'Carmen Diaz', priority: false, notes: '', lastCleaned: '2026-08-10T06:30:00' },
-        { id: 14, number: '402', floor: 4, type: 'Presidential', cleanStatus: 'in-progress', assignedTo: 'Rosa Villanueva', priority: false, notes: 'Deep clean scheduled', lastCleaned: '2026-08-08T07:00:00' },
-      ];
-
-      setStaff(mockStaff);
-      setRooms(mockRooms);
+      setStaff(prev =>
+        JSON.stringify(prev) === JSON.stringify(finalStaff) ? prev : finalStaff
+      );
     } catch (err) {
       console.error('Failed to fetch housekeeping data:', err);
     } finally {
       setIsLoading(false);
+      firstLoad.current = false;
     }
+  };
+
+  usePolling(fetchData, 12000);
+
+  // Normalise DB housekeeping string → component cleanStatus key
+  // Handles all casing variants: "CLEAN", "Clean", "clean", "In Progress", "IN PROGRESS"
+  const normalizeHKStatus = (s) => {
+    if (!s) return 'dirty';
+    const l = s.toLowerCase().trim();
+    if (l === 'clean')                              return 'clean';
+    if (l === 'inspected')                          return 'inspected';
+    if (l === 'in progress' || l === 'in-progress') return 'in-progress';
+    if (l === 'dirty')                              return 'dirty';
+    return 'dirty';
   };
 
   const applyFilters = () => {
@@ -74,19 +108,60 @@ function HousekeepingStatus() {
     setFilteredRooms(result);
   };
 
+  const updateRoom = async (roomId, patch) => {
+    const room = rooms.find(r => r.id === roomId);
+    if (!room?._id) {
+      console.error('updateRoom: room not found for id', roomId);
+      return;
+    }
+
+    // Build UI-side optimistic patch — map DB field names to component field names
+    const uiPatch = { ...patch };
+    if (patch.housekeeping !== undefined) {
+      uiPatch.cleanStatus = normalizeHKStatus(patch.housekeeping);
+    }
+    if (patch.assigned_to !== undefined) {
+      uiPatch.assignedTo = patch.assigned_to;
+    }
+    if (patch.notes !== undefined) {
+      uiPatch.notes = patch.notes;
+    }
+
+    // Optimistic update using UI field names
+    setRooms(prev => prev.map(r => r.id === roomId ? { ...r, ...uiPatch } : r));
+
+    try {
+      const res = await fetch(`http://localhost:5000/api/rooms/${room._id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      });
+      if (!res.ok) throw new Error(`Server error: ${res.status}`);
+    } catch (err) {
+      console.error('Failed to update room:', err);
+      alert('Failed to save change. Please try again.');
+      fetchData(); // revert by re-fetching
+    }
+  };
+
   const markStatus = (roomId, newStatus) => {
-    // TODO: PUT to API
-    setRooms(prev => prev.map(r => r.id === roomId ? { ...r, cleanStatus: newStatus, lastCleaned: newStatus === 'clean' || newStatus === 'inspected' ? new Date().toISOString() : r.lastCleaned } : r));
+    const dbStatus = {
+      clean:         'Clean',
+      inspected:     'Inspected',
+      'in-progress': 'In Progress',
+      dirty:         'Dirty',
+    }[newStatus] || newStatus;
+    const patch = { housekeeping: dbStatus };
+    if (newStatus === 'clean' || newStatus === 'inspected') patch.last_cleaned = new Date();
+    updateRoom(roomId, patch);
   };
 
   const assignStaff = (roomId, staffName) => {
-    // TODO: PUT to API
-    setRooms(prev => prev.map(r => r.id === roomId ? { ...r, assignedTo: staffName } : r));
+    updateRoom(roomId, { assigned_to: staffName });
   };
 
   const updateNote = (roomId, note) => {
-    // TODO: PUT to API
-    setRooms(prev => prev.map(r => r.id === roomId ? { ...r, notes: note } : r));
+    updateRoom(roomId, { notes: note });
   };
 
   // Stats
@@ -252,7 +327,7 @@ function HousekeepingStatus() {
 /* ============================================================
    ROOM CARD
    ============================================================ */
-function RoomCard({ room, staff, getStatusColor, getStatusLabel, onMarkStatus, onAssignStaff, onUpdateNote }) {
+const RoomCard = memo(function RoomCard({ room, staff, getStatusColor, getStatusLabel, onMarkStatus, onAssignStaff, onUpdateNote }) {
   const [showNoteInput, setShowNoteInput] = useState(false);
   const [noteValue, setNoteValue] = useState(room.notes);
   const colors = getStatusColor(room.cleanStatus);
@@ -366,6 +441,6 @@ function RoomCard({ room, staff, getStatusColor, getStatusLabel, onMarkStatus, o
       </div>
     </div>
   );
-}
+});
 
 export default HousekeepingStatus;

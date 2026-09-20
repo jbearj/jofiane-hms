@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { usePolling } from '../../hooks/usePolling';
 
 function Arrivals() {
   // 1. UI FILTERS STATE
@@ -12,41 +13,39 @@ function Arrivals() {
   const [isLoading, setIsLoading] = useState(true);
   const [processingId, setProcessingId] = useState(null);
 
-  // 3. FETCH DATA 
-  useEffect(() => {
-    const fetchArrivals = async () => {
-      setIsLoading(true);
-      try {
-        const response = await fetch(`http://localhost:5000/api/arrivals?date=${selectedDate}`);
-        if (!response.ok) throw new Error(`Server error: ${response.status}`);
-        const data = await response.json();
-        // Normalize MongoDB field names to match UI field names
-        const normalized = data.map(a => ({
-          id: a.booking_id || a._id,
-          guestName: a.guest?.full_name || '',
-          adults: a.adults || 0,
-          children: a.children || 0,
-          nights: parseInt(a.dates?.nights) || 0,
-          roomType: a.room_number || '',
-          roomNumber: a.room_number || null,
-          status: a.status === 'Confirmed' ? 'Pending' : a.status,
-          arrivalTime: '—',
-          flight: '',
-          balance: parseFloat((a.billing?.balance_due || '0').replace(/,/g, '')) || 0,
-          prepaid: parseFloat((a.billing?.balance_due || '0').replace(/,/g, '')) === 0,
-          requests: '',
-          isVIP: false,
-          _id: a._id,
-        }));
-        setArrivals(normalized);
-      } catch (err) {
-        console.error('Failed to fetch arrivals', err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchArrivals();
-  }, [selectedDate]);
+  // 3. FETCH DATA
+  const fetchArrivals = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch(`http://localhost:5000/api/arrivals?date=${selectedDate}`);
+      if (!response.ok) throw new Error(`Server error: ${response.status}`);
+      const data = await response.json();
+      const normalized = data.map(a => ({
+        id: a.booking_id || a._id,
+        guestName: a.guest?.full_name || '',
+        adults: a.adults || 0,
+        children: a.children || 0,
+        nights: parseInt(a.dates?.nights) || 0,
+        roomType: a.room_number || '',
+        roomNumber: a.room_number || null,
+        status: a.status === 'Confirmed' ? 'Pending' : a.status,
+        arrivalTime: '—',
+        flight: '',
+        balance: parseFloat((a.billing?.balance_due || '0').replace(/,/g, '')) || 0,
+        prepaid: parseFloat((a.billing?.balance_due || '0').replace(/,/g, '')) === 0,
+        requests: '',
+        isVIP: false,
+        _id: a._id,
+      }));
+      setArrivals(normalized);
+    } catch (err) {
+      console.error('Failed to fetch arrivals', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  usePolling(fetchArrivals, 10000, [selectedDate]);
 
   // 4. ASYNC ACTION HANDLERS
   const handleCheckIn = async (bookingId) => {

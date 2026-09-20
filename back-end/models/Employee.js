@@ -5,6 +5,8 @@ const employeeSchema = new mongoose.Schema({
 
   full_name: String,         // e.g. "Ana Buenaflor"
 
+  photo: String,             // profile picture as a base64 data URL (optional)
+
   contact: {
     email: String,           // e.g. "ana@jofiane.com"
     phone: String,           // e.g. "+63 917 123 4567"

@@ -1,597 +1,266 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
+import { usePolling } from '../../hooks/usePolling';
+import PortalModal from '../common/PortalModal';
 
-function GuestRequests() {
-  const [requests, setRequests] = useState([
-    {
-      id: 'REQ-001',
-      room: '203',
-      request: 'Extra Towels',
-      requestedBy: 'Guest',
-      time: '10:35 AM',
-      priority: 'High',
-      assignedTo: 'Maria Santos',
-      status: 'Pending'
-    },
-    {
-      id: 'REQ-002',
-      room: '304',
-      request: 'Extra Pillows',
-      requestedBy: 'Front Desk',
-      time: '10:10 AM',
-      priority: 'Normal',
-      assignedTo: 'Rosa Villanueva',
-      status: 'In Progress'
-    },
-    {
-      id: 'REQ-003',
-      room: '401',
-      request: 'Make Up Room',
-      requestedBy: 'Guest',
-      time: '09:45 AM',
-      priority: 'High',
-      assignedTo: 'Elena Cruz',
-      status: 'Completed'
-    },
-    {
-      id: 'REQ-004',
-      room: '115',
-      request: 'Toiletries Refill',
-      requestedBy: 'Front Desk',
-      time: '09:20 AM',
-      priority: 'Normal',
-      assignedTo: '',
-      status: 'Pending'
-    }
-  ]);
+const API = 'http://localhost:5000/api/guest-requests';
 
+function GuestRequests({ isLead = false, employee = null }) {
+  const [requests, setRequests] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [showForm, setShowForm] = useState(false);
+  const [savingId, setSavingId] = useState(null);
 
   const [formData, setFormData] = useState({
-    room: '',
-    request: '',
-    priority: 'Normal',
-    assignedTo: ''
+    room_number: '',
+    request_type: '',
+    priority: 'NORMAL',
+    assigned_to: '',
+    description: '',
   });
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
+  const firstLoad = useRef(true);
 
-    setFormData({
-      ...formData,
-      [name]: value
-    });
+  // ── FETCH ──────────────────────────────────────────
+  const fetchRequests = async () => {
+    if (firstLoad.current) setIsLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(API);
+      if (!res.ok) throw new Error(`Server error: ${res.status}`);
+      setRequests(await res.json());
+    } catch (e) {
+      console.error(e);
+      setError('Failed to load guest requests.');
+    } finally {
+      setIsLoading(false);
+      firstLoad.current = false;
+    }
   };
 
-  const addRequest = (e) => {
+  usePolling(fetchRequests, 10000);
+
+  // ── CREATE ─────────────────────────────────────────
+  const addRequest = async (e) => {
     e.preventDefault();
-
-    const newRequest = {
-      id: `REQ-${String(requests.length + 1).padStart(3, '0')}`,
-      room: formData.room,
-      request: formData.request,
-      requestedBy: 'Front Desk',
-      time: new Date().toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit'
-      }),
-      priority: formData.priority,
-      assignedTo: formData.assignedTo,
-      status: 'Pending'
-    };
-
-    setRequests([
-      newRequest,
-      ...requests
-    ]);
-
-    setFormData({
-      room: '',
-      request: '',
-      priority: 'Normal',
-      assignedTo: ''
-    });
-
-    setShowForm(false);
+    try {
+      const res = await fetch(API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          room_number:  parseInt(formData.room_number) || 0,
+          request_type: formData.request_type,
+          description:  formData.description,
+          priority:     formData.priority,
+          assigned_to:  formData.assigned_to || null,
+          status:       'PENDING',
+        }),
+      });
+      if (!res.ok) throw new Error(`Server error: ${res.status}`);
+      await fetchRequests();
+      setFormData({ room_number: '', request_type: '', priority: 'NORMAL', assigned_to: '', description: '' });
+      setShowForm(false);
+    } catch (e) {
+      console.error(e);
+      alert('Failed to create request. Please try again.');
+    }
   };
 
-  const updateStatus = (id, newStatus) => {
-    setRequests(
-      requests.map((request) =>
-        request.id === id
-          ? {
-              ...request,
-              status: newStatus
-            }
-          : request
-      )
-    );
+  // ── UPDATE STATUS ──────────────────────────────────
+  const updateStatus = async (id, newStatus) => {
+    setSavingId(id);
+    try {
+      const res = await fetch(`${API}/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (!res.ok) throw new Error(`Server error: ${res.status}`);
+      const updated = await res.json();
+      setRequests(prev => prev.map(r => r._id === id ? updated : r));
+    } catch (e) {
+      console.error(e);
+      alert('Failed to update status.');
+    } finally {
+      setSavingId(null);
+    }
   };
 
-  const assignStaff = (id, staffName) => {
-    setRequests(
-      requests.map((request) =>
-        request.id === id
-          ? {
-              ...request,
-              assignedTo: staffName
-            }
-          : request
-      )
-    );
+  // ── ASSIGN STAFF ───────────────────────────────────
+  const assignStaff = async (id, staffName) => {
+    try {
+      const res = await fetch(`${API}/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assigned_to: staffName }),
+      });
+      if (!res.ok) throw new Error();
+      const updated = await res.json();
+      setRequests(prev => prev.map(r => r._id === id ? updated : r));
+    } catch (e) {
+      console.error(e);
+    }
   };
 
+  // ── HELPERS ────────────────────────────────────────
   const getStatusClass = (status) => {
-    if (status === 'Completed') {
-      return 'status-tag tag-success';
-    }
-
-    if (status === 'In Progress') {
-      return 'status-tag tag-gold';
-    }
-
+    if (status === 'COMPLETED') return 'status-tag tag-success';
+    if (status === 'IN PROGRESS') return 'status-tag tag-gold';
     return 'status-tag tag-warning';
   };
 
-  const pendingCount = requests.filter(
-    (request) => request.status === 'Pending'
-  ).length;
+  // A lead sees all requests; a cleaner sees only the ones assigned to them.
+  const myName = (employee?.name || '').trim().toLowerCase();
+  const visibleRequests = isLead
+    ? requests
+    : requests.filter(r => myName && (r.assigned_to || '').trim().toLowerCase() === myName);
 
-  const inProgressCount = requests.filter(
-    (request) => request.status === 'In Progress'
-  ).length;
-
-  const completedCount = requests.filter(
-    (request) => request.status === 'Completed'
-  ).length;
+  const pendingCount    = visibleRequests.filter(r => r.status === 'PENDING').length;
+  const inProgressCount = visibleRequests.filter(r => r.status === 'IN PROGRESS').length;
+  const completedCount  = visibleRequests.filter(r => r.status === 'COMPLETED').length;
 
   return (
     <main className="main-content employee-content">
       <section className="admin-tab-content active housekeeping-module">
 
-        <div
-          className="employee-dashboard-header"
-          style={{ marginBottom: '28px' }}
-        >
+        <div className="employee-dashboard-header" style={{ marginBottom: '28px' }}>
           <div>
-            <h2
-              style={{
-                fontSize: '28px',
-                fontWeight: '700',
-                color: 'var(--text-primary)',
-                margin: '0 0 6px 0'
-              }}
-            >
+            <h2 style={{ fontSize: '28px', fontWeight: '700', color: 'var(--text-primary)', margin: '0 0 6px 0' }}>
               Guest Requests
             </h2>
-
-            <p
-              style={{
-                margin: 0,
-                fontSize: '14px',
-                color: 'var(--text-secondary)'
-              }}
-            >
+            <p style={{ margin: 0, fontSize: '14px', color: 'var(--text-secondary)' }}>
               Manage housekeeping requests from guests and the front desk.
             </p>
           </div>
-
-          <button
-            className="btn btn-gold"
-            onClick={() => setShowForm(true)}
-          >
-            + New Request
-          </button>
+          {isLead && (
+            <button className="btn btn-gold" onClick={() => setShowForm(true)}>+ New Request</button>
+          )}
         </div>
 
-        <div
-          className="kpi-grid"
-          style={{
-            gridTemplateColumns: 'repeat(4, 1fr)',
-            marginBottom: '22px'
-          }}
-        >
-          <div className="kpi-card">
-            <span
-              className="lbl"
-              style={{ color: 'var(--text-muted)' }}
-            >
-              TOTAL REQUESTS
-            </span>
-
-            <span
-              className="val"
-              style={{ color: 'var(--text-primary)' }}
-            >
-              {requests.length}
-            </span>
-
-            <span
-              className="sub"
-              style={{ color: 'var(--text-secondary)' }}
-            >
-              Today's requests
-            </span>
-          </div>
-
-          <div className="kpi-card">
-            <span
-              className="lbl"
-              style={{ color: 'var(--text-muted)' }}
-            >
-              PENDING
-            </span>
-
-            <span
-              className="val"
-              style={{ color: 'var(--text-primary)' }}
-            >
-              {pendingCount}
-            </span>
-
-            <span
-              className="sub"
-              style={{ color: 'var(--text-secondary)' }}
-            >
-              Waiting for action
-            </span>
-          </div>
-
-          <div className="kpi-card">
-            <span
-              className="lbl"
-              style={{ color: 'var(--text-muted)' }}
-            >
-              IN PROGRESS
-            </span>
-
-            <span
-              className="val"
-              style={{ color: 'var(--text-primary)' }}
-            >
-              {inProgressCount}
-            </span>
-
-            <span
-              className="sub"
-              style={{ color: 'var(--text-secondary)' }}
-            >
-              Currently being handled
-            </span>
-          </div>
-
-          <div className="kpi-card">
-            <span
-              className="lbl"
-              style={{ color: 'var(--text-muted)' }}
-            >
-              COMPLETED
-            </span>
-
-            <span
-              className="val"
-              style={{ color: 'var(--text-primary)' }}
-            >
-              {completedCount}
-            </span>
-
-            <span
-              className="sub"
-              style={{ color: 'var(--text-secondary)' }}
-            >
-              Finished requests
-            </span>
-          </div>
+        {/* KPIs */}
+        <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', marginBottom: '22px' }}>
+          <div className="kpi-card"><span className="lbl">TOTAL</span><span className="val">{visibleRequests.length}</span><span className="sub">Today's requests</span></div>
+          <div className="kpi-card"><span className="lbl">PENDING</span><span className="val">{pendingCount}</span><span className="sub">Waiting for action</span></div>
+          <div className="kpi-card"><span className="lbl">IN PROGRESS</span><span className="val">{inProgressCount}</span><span className="sub">Currently handled</span></div>
+          <div className="kpi-card"><span className="lbl">COMPLETED</span><span className="val">{completedCount}</span><span className="sub">Finished</span></div>
         </div>
 
+        {/* TABLE */}
         <div className="panel">
-          <div
-            className="panel-header"
-            style={{
-              borderBottom: '1px solid var(--border-light)',
-              paddingBottom: '18px'
-            }}
-          >
-            <h3
-              style={{
-                color: 'var(--text-primary)'
-              }}
-            >
-              Request Queue
-            </h3>
+          <div className="panel-header" style={{ borderBottom: '1px solid var(--border-light)', paddingBottom: '18px' }}>
+            <h3 style={{ color: 'var(--text-primary)' }}>Request Queue</h3>
           </div>
-
           <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Request ID</th>
-                  <th>Room</th>
-                  <th>Request</th>
-                  <th>Priority</th>
-                  <th>Assigned To</th>
-                  <th>Time</th>
-                  <th>Status</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {requests.map((request) => (
-                  <tr
-                    key={request.id}
-                    className="table-row-hover"
-                  >
-                    <td>
-                      <strong
-                        style={{
-                          color: 'var(--text-primary)'
-                        }}
-                      >
-                        {request.id}
-                      </strong>
-                    </td>
-
-                    <td
-                      style={{
-                        color: 'var(--text-secondary)'
-                      }}
-                    >
-                      Room {request.room}
-                    </td>
-
-                    <td>
-                      <strong
-                        style={{
-                          color: 'var(--text-primary)'
-                        }}
-                      >
-                        {request.request}
-                      </strong>
-
-                      <div
-                        style={{
-                          fontSize: '11px',
-                          color: 'var(--text-muted)',
-                          marginTop: '3px'
-                        }}
-                      >
-                        From: {request.requestedBy}
-                      </div>
-                    </td>
-
-                    <td>
-                      <span
-                        className={
-                          request.priority === 'High'
-                            ? 'status-tag tag-danger'
-                            : 'status-tag tag-neutral'
-                        }
-                      >
-                        {request.priority}
-                      </span>
-                    </td>
-
-                    <td>
-                      <select
-                        className="floor-dropdown"
-                        value={request.assignedTo}
-                        onChange={(e) =>
-                          assignStaff(
-                            request.id,
-                            e.target.value
-                          )
-                        }
-                        style={{
-                          color: 'var(--text-primary)'
-                        }}
-                      >
-                        <option value="">
-                          Unassigned
-                        </option>
-
-                        <option>
-                          Maria Santos
-                        </option>
-
-                        <option>
-                          Rosa Villanueva
-                        </option>
-
-                        <option>
-                          Elena Cruz
-                        </option>
-
-                        <option>
-                          Carmen Diaz
-                        </option>
-                      </select>
-                    </td>
-
-                    <td
-                      style={{
-                        color: 'var(--text-secondary)'
-                      }}
-                    >
-                      {request.time}
-                    </td>
-
-                    <td>
-                      <span
-                        className={getStatusClass(request.status)}
-                      >
-                        {request.status}
-                      </span>
-                    </td>
-
-                    <td>
-                      {request.status === 'Pending' && (
-                        <button
-                          className="btn btn-xs btn-gold"
-                          onClick={() =>
-                            updateStatus(
-                              request.id,
-                              'In Progress'
-                            )
-                          }
-                        >
-                          Start
-                        </button>
-                      )}
-
-                      {request.status === 'In Progress' && (
-                        <button
-                          className="btn btn-xs"
-                          onClick={() =>
-                            updateStatus(
-                              request.id,
-                              'Completed'
-                            )
-                          }
-                        >
-                          Complete
-                        </button>
-                      )}
-
-                      {request.status === 'Completed' && (
-                        <span
-                          style={{
-                            fontSize: '11px',
-                            color: '#79c996',
-                            fontWeight: '700'
-                          }}
-                        >
-                          Done
-                        </span>
-                      )}
-                    </td>
+            {isLoading ? (
+              <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading requests...</div>
+            ) : error ? (
+              <div style={{ padding: '20px', color: '#dc2626' }}>{error}</div>
+            ) : visibleRequests.length === 0 ? (
+              <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>{isLead ? 'No requests yet.' : 'You have no assigned requests.'}</div>
+            ) : (
+              <table>
+                <thead>
+                  <tr>
+                    <th>ID</th><th>Room</th><th>Request</th><th>Priority</th>
+                    <th>Assigned To</th><th>Status</th><th>Action</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {visibleRequests.map(r => (
+                    <tr key={r._id} className="table-row-hover">
+                      <td><strong style={{ color: 'var(--text-primary)' }}>REQ-{String(r.request_id).padStart(3,'0')}</strong></td>
+                      <td style={{ color: 'var(--text-secondary)' }}>Room {r.room_number}</td>
+                      <td>
+                        <strong style={{ color: 'var(--text-primary)' }}>{r.request_type}</strong>
+                        {r.description && <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '3px' }}>{r.description}</div>}
+                      </td>
+                      <td>
+                        <span className={r.priority === 'HIGH' || r.priority === 'URGENT' ? 'status-tag tag-danger' : 'status-tag tag-neutral'}>
+                          {r.priority}
+                        </span>
+                      </td>
+                      <td>
+                        <select
+                          className="floor-dropdown"
+                          value={r.assigned_to || ''}
+                          onChange={e => assignStaff(r._id, e.target.value)}
+                          style={{ color: 'var(--text-primary)' }}
+                        >
+                          <option value="">Unassigned</option>
+                          <option>Maria Santos</option>
+                          <option>Rosa Villanueva</option>
+                          <option>Elena Cruz</option>
+                          <option>Carmen Diaz</option>
+                          <option>Liza Fernandez</option>
+                        </select>
+                      </td>
+                      <td><span className={getStatusClass(r.status)}>{r.status}</span></td>
+                      <td>
+                        {savingId === r._id ? (
+                          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>saving…</span>
+                        ) : r.status === 'PENDING' ? (
+                          <button className="btn btn-xs btn-gold" onClick={() => updateStatus(r._id, 'IN PROGRESS')}>Start</button>
+                        ) : r.status === 'IN PROGRESS' ? (
+                          <button className="btn btn-xs" onClick={() => updateStatus(r._id, 'COMPLETED')}>Complete</button>
+                        ) : (
+                          <span style={{ fontSize: '11px', color: '#79c996', fontWeight: '700' }}>Done</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
 
+        {/* ADD MODAL */}
         {showForm && (
-          <div
-            className="modal-overlay open"
-            onClick={() => setShowForm(false)}
-          >
-            <div
-              className="modal-content"
-              onClick={(e) => e.stopPropagation()}
-              style={{ maxWidth: '440px' }}
-            >
-              <button
-                className="modal-close"
-                onClick={() => setShowForm(false)}
-              >
-                ×
-              </button>
-
-              <h3
-                style={{
-                  color: 'var(--text-primary)'
-                }}
-              >
-                New Guest Request
-              </h3>
-
-              <p
-                style={{
-                  color: 'var(--text-secondary)',
-                  fontSize: '12px'
-                }}
-              >
-                Record a new housekeeping request.
-              </p>
-
+          <PortalModal maxWidth={440}>
+              <button className="modal-close" onClick={() => setShowForm(false)}>×</button>
+              <h3 style={{ color: 'var(--text-primary)' }}>New Guest Request</h3>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Record a new housekeeping request.</p>
               <form onSubmit={addRequest}>
-
-                <div className="form-group">
-                  <label>Room Number</label>
-
-                  <input
-                    type="text"
-                    name="room"
-                    value={formData.room}
-                    onChange={handleChange}
-                    placeholder="Example: 203"
-                    required
-                  />
+                <div className="form-grid" style={{ marginBottom: '14px' }}>
+                  <div className="form-group">
+                    <label>Room Number</label>
+                    <input type="number" value={formData.room_number} onChange={e => setFormData({...formData, room_number: e.target.value})} placeholder="e.g. 203" required />
+                  </div>
+                  <div className="form-group">
+                    <label>Priority</label>
+                    <select value={formData.priority} onChange={e => setFormData({...formData, priority: e.target.value})}>
+                      <option value="LOW">Low</option>
+                      <option value="NORMAL">Normal</option>
+                      <option value="HIGH">High</option>
+                      <option value="URGENT">Urgent</option>
+                    </select>
+                  </div>
                 </div>
-
-                <div className="form-group">
-                  <label>Request</label>
-
-                  <input
-                    type="text"
-                    name="request"
-                    value={formData.request}
-                    onChange={handleChange}
-                    placeholder="Example: Extra towels"
-                    required
-                  />
+                <div className="form-group" style={{ marginBottom: '14px' }}>
+                  <label>Request Type</label>
+                  <input type="text" value={formData.request_type} onChange={e => setFormData({...formData, request_type: e.target.value})} placeholder="e.g. Extra Towels" required />
                 </div>
-
-                <div className="form-group">
-                  <label>Priority</label>
-
-                  <select
-                    name="priority"
-                    value={formData.priority}
-                    onChange={handleChange}
-                  >
-                    <option>Normal</option>
-                    <option>High</option>
-                  </select>
-                </div>
-
-                <div className="form-group">
+                <div className="form-group" style={{ marginBottom: '14px' }}>
                   <label>Assign To</label>
-
-                  <select
-                    name="assignedTo"
-                    value={formData.assignedTo}
-                    onChange={handleChange}
-                  >
-                    <option value="">
-                      Unassigned
-                    </option>
-
+                  <select value={formData.assigned_to} onChange={e => setFormData({...formData, assigned_to: e.target.value})}>
+                    <option value="">Unassigned</option>
                     <option>Maria Santos</option>
                     <option>Rosa Villanueva</option>
                     <option>Elena Cruz</option>
                     <option>Carmen Diaz</option>
+                    <option>Liza Fernandez</option>
                   </select>
                 </div>
-
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'flex-end',
-                    gap: '10px',
-                    marginTop: '20px'
-                  }}
-                >
-                  <button
-                    type="button"
-                    className="btn"
-                    onClick={() => setShowForm(false)}
-                  >
-                    Cancel
-                  </button>
-
-                  <button
-                    type="submit"
-                    className="btn btn-gold"
-                  >
-                    Create Request
-                  </button>
+                <div className="form-group" style={{ marginBottom: '20px' }}>
+                  <label>Notes (optional)</label>
+                  <textarea value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} placeholder="Additional details..." style={{ minHeight: '70px' }} />
                 </div>
-
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                  <button type="button" className="btn" onClick={() => setShowForm(false)}>Cancel</button>
+                  <button type="submit" className="btn btn-gold">Create Request</button>
+                </div>
               </form>
-            </div>
-          </div>
+          </PortalModal>
         )}
 
       </section>

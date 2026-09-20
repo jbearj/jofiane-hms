@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
+import { authFetch, readError } from '../../utils/api';
+import ChangePasswordModal from '../common/ChangePasswordModal';
 
-function EmployeeSettings({ isDarkMode, setIsDarkMode, employee }) {
+function EmployeeSettings({ isDarkMode, setIsDarkMode, employee, onUpdateProfile }) {
   const [profile, setProfile] = useState({
     fullName: employee?.name || 'Employee',
     email: employee?.email || '',
@@ -12,9 +14,39 @@ function EmployeeSettings({ isDarkMode, setIsDarkMode, employee }) {
     photo: employee?.photo || null
   });
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(false);
 
-  const handleSaveProfile = (updatedProfile) => {
-    setProfile(updatedProfile);
+  const handleSaveProfile = async (updatedProfile) => {
+    // Password changes are handled by their own modal — this only saves the
+    // profile info (name / email / photo).
+    const { currentPassword, newPassword, confirmPassword, ...cleanProfile } = updatedProfile;
+    setProfile(cleanProfile);
+
+    // Propagate to the portal's shared profile so the sidebar + dashboard
+    // header update live (mirrors the admin onUpdateProfile pattern).
+    if (onUpdateProfile) onUpdateProfile(cleanProfile);
+
+    // Persist name/email/photo via the self-profile route (works for non-admins;
+    // it only updates the caller's own record and never their role/username).
+    try {
+      const res = await authFetch('/api/auth/me', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          expectUsername: employee?.username,   // guard: token must match this account
+          full_name: cleanProfile.fullName,
+          email: cleanProfile.email,
+          photo: cleanProfile.photo || '',
+        }),
+      });
+      if (!res.ok) {
+        alert(await readError(res, 'Failed to save profile.'));
+      }
+    } catch (err) {
+      console.error('Failed to persist profile to database:', err);
+      alert('Cannot reach the server to save your profile.');
+    }
+
     setShowEditModal(false);
   };
 
@@ -137,10 +169,21 @@ function EmployeeSettings({ isDarkMode, setIsDarkMode, employee }) {
         {showEditModal && createPortal(
           <EditProfileModal
             profile={profile}
+            isDarkMode={isDarkMode}
             onClose={() => setShowEditModal(false)}
             onSave={handleSaveProfile}
+            onChangePassword={() => { setShowEditModal(false); setShowChangePassword(true); }}
           />,
           document.body
+        )}
+
+        {/* CHANGE PASSWORD MODAL (shared component, self-portals) */}
+        {showChangePassword && (
+          <ChangePasswordModal
+            isDarkMode={isDarkMode}
+            shellClass="employee-portal-shell"
+            onClose={() => setShowChangePassword(false)}
+          />
         )}
       </section>
     </main>
@@ -150,54 +193,51 @@ function EmployeeSettings({ isDarkMode, setIsDarkMode, employee }) {
 /* ============================================================
    EDIT PROFILE MODAL
    ============================================================ */
-function EditProfileModal({ profile, onClose, onSave }) {
+function EditProfileModal({ profile, isDarkMode, onClose, onSave, onChangePassword }) {
   const [form, setForm] = useState({
     fullName: profile.fullName,
     email: profile.email,
     photo: profile.photo,
-    currentPassword: '',
-    newPassword: '',
-    confirmPassword: ''
   });
   const [photoPreview, setPhotoPreview] = useState(profile.photo || null);
 
   const handlePhotoChange = (e) => {
     const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPhotoPreview(reader.result);
-        setForm(prev => ({ ...prev, photo: reader.result }));
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      alert('Please choose an image file.');
+      return;
     }
+    if (file.size > 2 * 1024 * 1024) {
+      alert('Image is too large. Please choose a file under 2MB.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setPhotoPreview(reader.result);
+      setForm(prev => ({ ...prev, photo: reader.result }));
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-
-    if (form.newPassword && form.newPassword !== form.confirmPassword) {
-      alert('New password and confirm password do not match.');
-      return;
-    }
-
-    if (form.newPassword && !form.currentPassword) {
-      alert('Please enter your current password to change it.');
-      return;
-    }
-
     onSave({
       ...profile,
       fullName: form.fullName,
       email: form.email,
-      photo: form.photo
+      photo: form.photo,
     });
   };
 
   return (
-    <div className="modal-overlay open">
-      <div className="modal-content" style={{ maxWidth: '500px' }}>
-        <button className="modal-close" onClick={onClose}>&times;</button>
+    // Carry the shell theme onto the portaled modal so it matches the other
+    // popups (translucent beige card). Clicking the backdrop is intentionally
+    // ignored (the modal only closes via Cancel / X).
+    <div className={`portal-shell employee-portal-shell settings-edit-modal ${isDarkMode ? 'theme-dark' : 'theme-light'}`}>
+      <div className="modal-overlay open" onMouseDown={(e) => e.stopPropagation()}>
+        <div className="modal-content" style={{ maxWidth: '500px' }} onMouseDown={(e) => e.stopPropagation()}>
+          <button className="modal-close" onClick={onClose}>&times;</button>
         <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '4px' }}>Edit Profile</h3>
         <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '24px' }}>Update your profile information</p>
 
@@ -251,39 +291,18 @@ function EditProfileModal({ profile, onClose, onSave }) {
             />
           </div>
 
-          {/* Password Section */}
-          <h4 style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--gold-dark)', marginBottom: '12px' }}>Change Password</h4>
-          <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '12px' }}>Leave blank if you don't want to change it</p>
-
-          <div className="form-group" style={{ marginBottom: '16px' }}>
-            <label>Current Password</label>
-            <input
-              type="password"
-              value={form.currentPassword}
-              onChange={(e) => setForm({ ...form, currentPassword: e.target.value })}
-              placeholder="Enter current password"
-            />
-          </div>
-
-          <div className="form-grid" style={{ marginBottom: '24px' }}>
-            <div className="form-group">
-              <label>New Password</label>
-              <input
-                type="password"
-                value={form.newPassword}
-                onChange={(e) => setForm({ ...form, newPassword: e.target.value })}
-                placeholder="New password"
-              />
-            </div>
-            <div className="form-group">
-              <label>Confirm Password</label>
-              <input
-                type="password"
-                value={form.confirmPassword}
-                onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
-                placeholder="Confirm new password"
-              />
-            </div>
+          {/* Password Section — opens a dedicated Change Password modal */}
+          <div className="form-group" style={{ marginBottom: '24px' }}>
+            <label>Password</label>
+            <button
+              type="button"
+              className="btn"
+              style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+              onClick={onChangePassword}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+              Change Password
+            </button>
           </div>
 
           {/* Actions */}
@@ -292,6 +311,7 @@ function EditProfileModal({ profile, onClose, onSave }) {
             <button type="submit" className="btn btn-gold">Save Changes</button>
           </div>
         </form>
+        </div>
       </div>
     </div>
   );

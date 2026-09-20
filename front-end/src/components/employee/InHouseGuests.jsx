@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { usePolling } from '../../hooks/usePolling';
 
 
 function InHouseGuests() {
@@ -8,34 +9,32 @@ function InHouseGuests() {
   const [processingId, setProcessingId] = useState(null);
 
   // DATA FETCHING
-  useEffect(() => {
-    const fetchGuests = async () => {
-      setIsLoading(true);
-      try {
-        const res = await fetch('http://localhost:5000/api/guests/in-house');
-        if (!res.ok) throw new Error(`Server error: ${res.status}`);
-        const data = await res.json();
-        // Normalize MongoDB field names to match UI field names
-        const normalized = data.map(g => ({
-          id: g._id,
-          guestName: g.guest?.full_name || '',
-          roomNumber: g.room_number || '',
-          roomType: g.room_number || '',
-          checkIn: g.dates?.check_in || '',
-          expectedDeparture: g.dates?.check_out || '',
-          balance: parseFloat((g.billing?.balance_due || '0').replace(/,/g, '')) || 0,
-          housekeeping: 'Unknown',
-          _id: g._id,
-        }));
-        setGuests(normalized);
-      } catch (error) {
-        console.error('Failed to fetch in-house guests:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchGuests();
-  }, []);
+  const fetchGuests = async () => {
+    setIsLoading(true);
+    try {
+      const res = await fetch('http://localhost:5000/api/guests/in-house');
+      if (!res.ok) throw new Error(`Server error: ${res.status}`);
+      const data = await res.json();
+      const normalized = data.map(g => ({
+        id: g._id,
+        guestName: g.guest?.full_name || '',
+        roomNumber: g.room_number || '',
+        roomType: g.room_number || '',
+        checkIn: g.dates?.check_in || '',
+        expectedDeparture: g.dates?.check_out || '',
+        balance: parseFloat((g.billing?.balance_due || '0').replace(/,/g, '')) || 0,
+        housekeeping: 'Unknown',
+        _id: g._id,
+      }));
+      setGuests(normalized);
+    } catch (error) {
+      console.error('Failed to fetch in-house guests:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  usePolling(fetchGuests, 10000);
 
   // ASYNC CHECKOUT
   const handleCheckOut = async (id) => {

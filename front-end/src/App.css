@@ -55,6 +55,9 @@
 html {
   font-size: 14px;
   scroll-behavior: smooth;
+  height: 100%;
+  overflow: hidden;               /* the document itself never scrolls / bounces */
+  overscroll-behavior: none;
 }
 
 body {
@@ -63,9 +66,13 @@ body {
   color: var(--text-primary);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
-  min-height: 100vh;
+  height: 100%;
+  overflow: hidden;               /* no body-level scroll/rubber-band */
+  overscroll-behavior: none;
+}
 
- overscroll-behavior: none;
+#root {
+  height: 100%;
 }
 
 h1,
@@ -120,7 +127,9 @@ textarea {
    ============================================================ */
 .portal-shell {
   display: flex;
-  min-height: 100vh;
+  height: 100vh;          /* lock to viewport so only inner content scrolls */
+  max-height: 100vh;
+  overflow: hidden;
   position: relative;
 }
 
@@ -317,12 +326,12 @@ textarea {
   flex: 1;
   padding: 32px 40px 60px;
   overflow-y: auto;
-  min-height: 100vh;
+  height: 100vh;              /* bounded so overflow-y actually scrolls here */
+  max-height: 100vh;
+  overscroll-behavior: contain;
   background: var(--bg-body);
   margin-left: 260px;
   transition: margin-left 0.3s cubic-bezier(0.22, 1, 0.36, 1);
-
- 
 }
 
 /* ============================================================
@@ -623,7 +632,7 @@ tr:last-child td {
   transition: var(--transition);
 }
 .table-row-hover:hover {
-  background: #FAF9F7;
+   background: var(--bg-hover, #FAF9F7);
 }
 
 .guest-name {
@@ -5848,7 +5857,8 @@ tr:last-child td {
 
 
 .admin-portal-shell .main-content {
-  overflow: visible !important;
+  overflow-x: visible;
+  overflow-y: auto !important;   /* allow vertical scrolling of the content */
   min-width: 0;
   padding: 40px 32px 44px;
   transform: none !important;
@@ -6971,4 +6981,230 @@ tr:last-child td {
     animation: none !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* ============================================================
+   BOOKING MANAGEMENT — dark mode row colours
+   Overrides the default teal accentLight (#e0f2fe) that bleeds
+   through when --bg-hover is not set in dark theme.
+   ============================================================ */
+
+/* Dark: general table row hover */
+.employee-portal-shell.theme-dark .table-row-hover:hover {
+  background: rgba(255, 255, 255, 0.045) !important;
+}
+
+/* Dark: selected booking row — amber tint instead of teal */
+.employee-portal-shell.theme-dark .booking-module .selected-booking-row {
+  background: rgba(245, 158, 11, 0.12) !important;
+}
+.employee-portal-shell.theme-dark .booking-module .selected-booking-row:hover {
+  background: rgba(245, 158, 11, 0.18) !important;
+}
+
+
+/* ============================================================
+   CONSISTENT MODAL / POP-UP THEME  (admin + employee)
+   Every popup shares the same look. In dark mode the card is a
+   light brown (never black) with readable text and inputs. This
+   applies to portaled modals (rendered on <body>, flagged via
+   body.app-dark) and to modals inside the app shell alike.
+   ============================================================ */
+
+/* Shared light-brown palette used by all popups in dark mode */
+:root {
+  --modal-card-brown:   #efe4d3;  /* light brown card */
+  --modal-input-brown:  #fbf6ee;  /* slightly lighter field */
+  --modal-ink:          #3a2b20;  /* dark brown text */
+  --modal-ink-muted:    #8c7663;
+  --modal-border-brown: rgba(111, 83, 61, 0.28);
+  --modal-scrim:        rgba(58, 43, 33, 0.55); /* warm brown, not black */
+}
+
+/* ---- Overlay: full-screen, blocks clicks behind, warm scrim ---- */
+.modal-theme-scope .modal-overlay,
+body.app-dark .modal-overlay {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 10000;
+  background: var(--modal-scrim) !important;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+/* ---- Card + text (dark mode, all popups) ---- */
+.modal-theme-scope.theme-dark .modal-content,
+body.app-dark .modal-content {
+  background: var(--modal-card-brown) !important;
+  color: var(--modal-ink) !important;
+  border: 1px solid var(--modal-border-brown) !important;
+}
+.modal-theme-scope.theme-dark .modal-content h1,
+.modal-theme-scope.theme-dark .modal-content h2,
+.modal-theme-scope.theme-dark .modal-content h3,
+.modal-theme-scope.theme-dark .modal-content h4,
+.modal-theme-scope.theme-dark .modal-content p,
+.modal-theme-scope.theme-dark .modal-content span,
+.modal-theme-scope.theme-dark .modal-content label,
+.modal-theme-scope.theme-dark .modal-content .modal-close,
+body.app-dark .modal-content h1,
+body.app-dark .modal-content h2,
+body.app-dark .modal-content h3,
+body.app-dark .modal-content h4,
+body.app-dark .modal-content label,
+body.app-dark .modal-content .modal-close {
+  color: var(--modal-ink) !important;
+}
+
+/* ---- Inputs / selects / textareas (dark mode, all popups) ---- */
+.modal-theme-scope.theme-dark .modal-content input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):not([type="file"]),
+.modal-theme-scope.theme-dark .modal-content select,
+.modal-theme-scope.theme-dark .modal-content textarea,
+body.app-dark .modal-content input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):not([type="file"]),
+body.app-dark .modal-content select,
+body.app-dark .modal-content textarea {
+  background: var(--modal-input-brown) !important;
+  color: var(--modal-ink) !important;
+  border: 1.5px solid rgba(111, 83, 61, 0.30) !important;
+  color-scheme: light;
+}
+body.app-dark .modal-content select option {
+  background: var(--modal-input-brown) !important;
+  color: var(--modal-ink) !important;
+}
+
+
+/* ============================================================
+   ADMIN SETTINGS "EDIT PROFILE" MODAL
+   Use the standard admin-shell translucent beige card (matching
+   the Record Payment / other admin popups) instead of the opaque
+   light-brown. Overrides the global body.app-dark modal rule.
+   ============================================================ */
+/* Redefine the theme vars INSIDE the modal so every element that reads
+   var(--text-*) / var(--gold-dark) resolves to dark, readable colors on
+   the light beige card (the card is light even while the app is dark). */
+body.app-dark .settings-edit-modal,
+.settings-edit-modal.theme-dark {
+  --text-primary: #3a2b20;
+  --text-secondary: #6f5a48;
+  --text-muted: #7a6857;
+  --gold-dark: #9f7c29;
+  --border-light: rgba(111, 83, 61, 0.20);
+}
+body.app-dark .settings-edit-modal .modal-content,
+.settings-edit-modal.theme-dark .modal-content {
+  /* translucent light beige card, matching the Record Payment popup */
+  background: rgba(250, 246, 238, 0.92) !important;
+  color: #3a2b20 !important;
+  border: 1px solid rgba(111, 83, 61, 0.20) !important;
+}
+/* Force all text elements dark (covers headings, muted hints, close X) */
+body.app-dark .settings-edit-modal .modal-content h1,
+body.app-dark .settings-edit-modal .modal-content h2,
+body.app-dark .settings-edit-modal .modal-content h3,
+body.app-dark .settings-edit-modal .modal-content h4,
+body.app-dark .settings-edit-modal .modal-content p,
+body.app-dark .settings-edit-modal .modal-content span,
+body.app-dark .settings-edit-modal .modal-content label,
+body.app-dark .settings-edit-modal .modal-content div,
+body.app-dark .settings-edit-modal .modal-content .modal-close,
+.settings-edit-modal.theme-dark .modal-content h1,
+.settings-edit-modal.theme-dark .modal-content h2,
+.settings-edit-modal.theme-dark .modal-content h3,
+.settings-edit-modal.theme-dark .modal-content h4,
+.settings-edit-modal.theme-dark .modal-content p,
+.settings-edit-modal.theme-dark .modal-content span,
+.settings-edit-modal.theme-dark .modal-content label,
+.settings-edit-modal.theme-dark .modal-content .modal-close {
+  color: #3a2b20 !important;
+}
+/* "CHANGE PASSWORD" gold heading — keep the gold but darker so it reads */
+body.app-dark .settings-edit-modal .modal-content h4,
+.settings-edit-modal.theme-dark .modal-content h4 {
+  color: #9f7c29 !important;
+}
+/* Muted helper text (the password-rule line) — mid brown, still readable */
+body.app-dark .settings-edit-modal .modal-content p,
+.settings-edit-modal.theme-dark .modal-content p {
+  color: #6f5a48 !important;
+}
+/* Inputs */
+body.app-dark .settings-edit-modal .modal-content input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):not([type="file"]),
+body.app-dark .settings-edit-modal .modal-content select,
+body.app-dark .settings-edit-modal .modal-content textarea,
+.settings-edit-modal.theme-dark .modal-content input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):not([type="file"]),
+.settings-edit-modal.theme-dark .modal-content select,
+.settings-edit-modal.theme-dark .modal-content textarea {
+  background: rgba(255, 255, 255, 0.92) !important;
+  color: #3a2b20 !important;
+  border: 1.5px solid rgba(111, 83, 61, 0.30) !important;
+  color-scheme: light;
+}
+/* Cancel button (the plain .btn) — dark text on the light card */
+body.app-dark .settings-edit-modal .modal-content .btn:not(.btn-gold):not(.btn-primary),
+.settings-edit-modal.theme-dark .modal-content .btn:not(.btn-gold):not(.btn-primary) {
+  color: #3a2b20 !important;
+  background: rgba(255, 255, 255, 0.7) !important;
+  border: 1px solid rgba(111, 83, 61, 0.28) !important;
+}
+/* Input placeholders — visible grey-brown, not near-white */
+body.app-dark .settings-edit-modal .modal-content input::placeholder,
+.settings-edit-modal.theme-dark .modal-content input::placeholder {
+  color: #9c8b7c !important;
+  opacity: 1;
+}
+
+
+/* ============================================================
+   PORTALED MODAL OVERLAY (full-viewport blur)
+   For modals portaled to <body>. Blurs the ENTIRE screen
+   (sidebar included) and sits above everything. Background
+   scroll is locked via JS while the modal is open.
+   ============================================================ */
+.modal-portal-overlay,
+.modal-portal-overlay.open {
+  position: fixed !important;
+  inset: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  margin: 0 !important;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 100000 !important;
+  background: rgba(40, 27, 18, 0.45) !important;
+  backdrop-filter: blur(6px) !important;
+  -webkit-backdrop-filter: blur(6px) !important;
+}
+
+
+/* ============================================================
+   ADMIN SCROLL CONTAINMENT
+   Lock the admin shell to the viewport so the whole page can't
+   scroll / rubber-band. Only the main content area scrolls,
+   keeping the sidebar fixed. Scoped to the admin view so the
+   employee portal is unaffected.
+   ============================================================ */
+.admin-portal-shell.admin-view {
+  height: 100vh;
+  max-height: 100vh;
+  overflow: hidden;
+}
+.admin-portal-shell.admin-view .main-content {
+  height: 100vh;
+  max-height: 100vh;
+  min-height: 0;          /* override the base min-height:100vh */
+  overflow-y: auto;       /* the ONLY vertical scroller now */
+  overscroll-behavior: contain;  /* don't chain scroll to the page */
 }

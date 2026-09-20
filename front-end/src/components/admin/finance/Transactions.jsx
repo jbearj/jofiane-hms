@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { usePolling } from '../../../hooks/usePolling';
+import { authFetch, readError } from '../../../utils/api';
 
 function Transactions() {
   const [isLoading, setIsLoading] = useState(true);
@@ -26,13 +28,7 @@ function Transactions() {
   // Export Dropdown State
   const [showExportMenu, setShowExportMenu] = useState(false);
 
-  useEffect(() => {
-    fetchTransactions();
-  }, [filterPeriod]);
-
-  useEffect(() => {
-    applyFilters();
-  }, [transactions, searchQuery, filterMethod, filterStatus, filterType]);
+  useEffect(() => { applyFilters(); }, [transactions, searchQuery, filterMethod, filterStatus, filterType]);
 
   const fetchTransactions = async () => {
     if (!kpis) {
@@ -70,6 +66,8 @@ function Transactions() {
       setIsRefreshing(false);
     }
   };
+
+  usePolling(fetchTransactions, 10000, [filterPeriod]);
 
   const applyFilters = () => {
     let result = [...transactions];
@@ -189,11 +187,11 @@ function Transactions() {
       return;
     }
     try {
-      const res = await fetch(
-        `http://localhost:5000/api/bookings/${transaction._bookingObjectId}/transactions/${transaction.id}/void`,
+      const res = await authFetch(
+        `/api/bookings/${transaction._bookingObjectId}/transactions/${transaction.id}/void`,
         { method: 'PATCH' }
       );
-      if (!res.ok) throw new Error(`Server error: ${res.status}`);
+      if (!res.ok) throw new Error(await readError(res, 'Failed to void transaction.'));
 
       // Update UI immediately without a full refetch
       setTransactions(prev =>
@@ -201,7 +199,7 @@ function Transactions() {
       );
     } catch (err) {
       console.error('Failed to void transaction:', err);
-      alert('Failed to void transaction. Please try again.');
+      alert(err.message || 'Failed to void transaction. Please try again.');
     }
   };
 

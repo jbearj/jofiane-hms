@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { usePolling } from '../../../hooks/usePolling';
+import { authFetch } from '../../../utils/api';
 
 function AllBookings() {
   const [isLoading, setIsLoading] = useState(true);
@@ -14,11 +16,13 @@ function AllBookings() {
   const [filterSource, setFilterSource] = useState('all');
   const [filterRoomType, setFilterRoomType] = useState('all');
 
-  useEffect(() => { fetchBookings(); }, []);
   useEffect(() => { applyFilters(); }, [bookings, searchQuery, filterStatus, filterSource, filterRoomType]);
 
+  const firstLoad = useRef(true);
+
   const fetchBookings = async () => {
-    setIsLoading(true);
+    // Only show the full-page skeleton on the first load; polls refresh silently.
+    if (firstLoad.current) setIsLoading(true);
     try {
       const res = await fetch('http://localhost:5000/api/bookings');
       if (!res.ok) throw new Error(`Server error: ${res.status}`);
@@ -49,8 +53,11 @@ function AllBookings() {
       console.error('Failed to fetch bookings:', err);
     } finally {
       setIsLoading(false);
+      firstLoad.current = false;
     }
   };
+
+  usePolling(fetchBookings, 10000);
 
   const applyFilters = () => {
     let result = [...bookings];
@@ -342,10 +349,10 @@ function BookingDetailModal({ booking, getStatusTag, formatDate, onClose, onDele
     if (!window.confirm(`Delete booking ${booking.id} for ${booking.guest}? This cannot be undone.`)) return;
     setIsDeleting(true);
     try {
-      const res = await fetch(`http://localhost:5000/api/bookings/${booking._id}`, {
+      const res = await authFetch(`/api/bookings/${booking._id}`, {
         method: 'DELETE',
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         alert(data.error || 'Failed to delete booking.');
         setIsDeleting(false);

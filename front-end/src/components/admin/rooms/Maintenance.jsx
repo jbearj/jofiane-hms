@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { usePolling } from '../../../hooks/usePolling';
 
 function Maintenance() {
   const [isLoading, setIsLoading] = useState(true);
@@ -18,63 +19,59 @@ function Maintenance() {
   const [editingOrder, setEditingOrder] = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
 
-  useEffect(() => { fetchWorkOrders(); }, []);
   useEffect(() => { applyFilters(); }, [workOrders, filterPriority, filterStatus, filterTech, searchQuery]);
 
-  const fetchWorkOrders = async () => {
-    setIsLoading(true);
-    try {
-      // TODO: Replace with actual API call
-      // const res = await fetch('http://localhost:8080/api/admin/maintenance');
-      // const data = await res.json();
-      await new Promise(resolve => setTimeout(resolve, 500));
+  const firstLoad = useRef(true);
 
-      const mockTechs = [
+  const fetchWorkOrders = async () => {
+    // Only show the full-page skeleton on the first load; polls refresh silently.
+    if (firstLoad.current) setIsLoading(true);
+    try {
+      const [mainRes, empRes] = await Promise.all([
+        fetch('http://localhost:5000/api/maintenance-requests'),
+        fetch('http://localhost:5000/api/employees?department=Maintenance'),
+      ]);
+      if (!mainRes.ok) throw new Error(`Server error: ${mainRes.status}`);
+
+      const [mainData, empData] = await Promise.all([mainRes.json(), empRes.ok ? empRes.json() : []]);
+
+      // Normalise maintenance_requests → work order shape
+      const normalized = mainData.map(r => ({
+        id:             `MNT-${String(r.maintenance_id).padStart(3, '0')}`,
+        _id:            r._id,
+        room:           String(r.room_number || ''),
+        issue:          `${r.issue_type || ''}${r.description ? ` — ${r.description}` : ''}`,
+        issue_type:     r.issue_type || '',
+        description:    r.description || '',
+        priority:       (r.priority || 'NORMAL').toLowerCase()
+                          .replace('urgent', 'critical')
+                          .replace('normal', 'medium'),
+        assignedTo:     r.assigned_to_name || '',
+        assigned_id:    r.assigned_to || null,
+        status:         (r.status || 'PENDING').toLowerCase()
+                          .replace('pending', 'open')
+                          .replace('in progress', 'in-progress'),
+        dateReported:   r.reported_at || r.createdAt || new Date().toISOString(),
+        completedAt:    r.completed_at || null,
+        roomOutOfOrder: r.room_out_of_order || false,
+        notes:          r.notes || '',
+        history:        r.history || [{ date: r.reported_at || r.createdAt, action: 'Work order created', by: 'System' }],
+      }));
+
+      // Build technician list from maintenance-dept employees
+      const techs = empData.map(e => ({ id: e._id, name: e.full_name || '' }));
+
+      setTechnicians(techs.length ? techs : [
         { id: 1, name: 'Ronnie Cruz' },
         { id: 2, name: 'Jessie Ramos' },
-        { id: 3, name: 'Carlo Aquino' }
-      ];
-
-      const mockOrders = [
-        { id: 'WO-001', room: '204', issue: 'AC unit not cooling — compressor noise', priority: 'critical', assignedTo: 'Ronnie Cruz', status: 'in-progress', dateReported: '2026-08-09T08:30:00', roomOutOfOrder: true, history: [
-          { date: '2026-08-09T08:30:00', action: 'Work order created', by: 'Ana Buenaflor' },
-          { date: '2026-08-09T09:00:00', action: 'Assigned to Ronnie Cruz', by: 'Admin' },
-          { date: '2026-08-09T14:00:00', action: 'Status changed to In Progress', by: 'Ronnie Cruz' },
-          { date: '2026-08-10T08:00:00', action: 'Parts ordered — waiting on delivery', by: 'Ronnie Cruz' }
-        ]},
-        { id: 'WO-002', room: '115', issue: 'Bathroom faucet leaking', priority: 'high', assignedTo: 'Jessie Ramos', status: 'open', dateReported: '2026-08-10T07:15:00', roomOutOfOrder: false, history: [
-          { date: '2026-08-10T07:15:00', action: 'Work order created', by: 'Maria Santos' },
-          { date: '2026-08-10T07:30:00', action: 'Assigned to Jessie Ramos', by: 'Admin' }
-        ]},
-        { id: 'WO-003', room: '302', issue: 'TV remote not working', priority: 'low', assignedTo: 'Carlo Aquino', status: 'completed', dateReported: '2026-08-08T16:00:00', roomOutOfOrder: false, history: [
-          { date: '2026-08-08T16:00:00', action: 'Work order created', by: 'Front Desk' },
-          { date: '2026-08-08T16:30:00', action: 'Assigned to Carlo Aquino', by: 'Admin' },
-          { date: '2026-08-08T17:00:00', action: 'Replaced batteries — resolved', by: 'Carlo Aquino' },
-          { date: '2026-08-08T17:05:00', action: 'Status changed to Completed', by: 'Carlo Aquino' }
-        ]},
-        { id: 'WO-004', room: '303', issue: 'Balcony door lock jammed', priority: 'high', assignedTo: 'Ronnie Cruz', status: 'open', dateReported: '2026-08-10T10:20:00', roomOutOfOrder: false, history: [
-          { date: '2026-08-10T10:20:00', action: 'Work order created', by: 'Guest (Room 303)' }
-        ]},
-        { id: 'WO-005', room: '401', issue: 'Water heater inconsistent temperature', priority: 'medium', assignedTo: 'Jessie Ramos', status: 'deferred', dateReported: '2026-08-07T11:00:00', roomOutOfOrder: false, history: [
-          { date: '2026-08-07T11:00:00', action: 'Work order created', by: 'Housekeeping' },
-          { date: '2026-08-07T14:00:00', action: 'Inspected — needs part replacement', by: 'Jessie Ramos' },
-          { date: '2026-08-08T09:00:00', action: 'Deferred — guest currently checked in, will fix on checkout', by: 'Admin' }
-        ]},
-        { id: 'WO-006', room: '201', issue: 'Ceiling light flickering', priority: 'medium', assignedTo: 'Carlo Aquino', status: 'in-progress', dateReported: '2026-08-09T14:30:00', roomOutOfOrder: false, history: [
-          { date: '2026-08-09T14:30:00', action: 'Work order created', by: 'Housekeeping' },
-          { date: '2026-08-10T08:00:00', action: 'Status changed to In Progress', by: 'Carlo Aquino' }
-        ]},
-        { id: 'WO-007', room: '104', issue: 'Carpet stain — deep cleaning needed', priority: 'low', assignedTo: '', status: 'open', dateReported: '2026-08-10T12:00:00', roomOutOfOrder: false, history: [
-          { date: '2026-08-10T12:00:00', action: 'Work order created', by: 'Rosa Villanueva' }
-        ]},
-      ];
-
-      setTechnicians(mockTechs);
-      setWorkOrders(mockOrders);
+        { id: 3, name: 'Carlo Aquino' },
+      ]);
+      setWorkOrders(normalized);
     } catch (err) {
       console.error('Failed to fetch maintenance data:', err);
     } finally {
       setIsLoading(false);
+      firstLoad.current = false;
     }
   };
 
@@ -90,40 +87,84 @@ function Maintenance() {
     setFilteredOrders(result);
   };
 
+  usePolling(fetchWorkOrders, 15000);
+
   const handleCreateOrder = () => { setEditingOrder(null); setShowModal(true); };
 
-  const handleSaveOrder = (orderData) => {
-    if (editingOrder) {
-      // TODO: PUT to API
-      setWorkOrders(prev => prev.map(o => o.id === editingOrder.id ? { ...o, ...orderData } : o));
-    } else {
-      // TODO: POST to API
-      const newOrder = {
-        ...orderData,
-        id: `WO-${String(workOrders.length + 1).padStart(3, '0')}`,
-        dateReported: new Date().toISOString(),
-        history: [{ date: new Date().toISOString(), action: 'Work order created', by: 'Admin' }]
+  const handleSaveOrder = async (orderData) => {
+    try {
+      const priorityMap = { low: 'LOW', medium: 'NORMAL', high: 'HIGH', critical: 'URGENT' };
+      const statusMap   = { open: 'PENDING', 'in-progress': 'IN PROGRESS', completed: 'COMPLETED', deferred: 'PENDING' };
+
+      const payload = {
+        room_number:      parseInt(orderData.room) || 0,
+        issue_type:       orderData.issue_type || orderData.issue,
+        description:      orderData.description || orderData.issue,
+        priority:         priorityMap[orderData.priority] || 'NORMAL',
+        status:           statusMap[orderData.status] || 'PENDING',
+        assigned_to_name: orderData.assignedTo || '',
+        room_out_of_order: orderData.roomOutOfOrder || false,
+        notes:            orderData.notes || '',
       };
-      setWorkOrders(prev => [newOrder, ...prev]);
+
+      if (editingOrder?._id) {
+        const res = await fetch(`http://localhost:5000/api/maintenance-requests/${editingOrder._id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) throw new Error(`Server error: ${res.status}`);
+      } else {
+        const res = await fetch('http://localhost:5000/api/maintenance-requests', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) throw new Error(`Server error: ${res.status}`);
+      }
+      await fetchWorkOrders();
+    } catch (err) {
+      console.error('Failed to save work order:', err);
+      alert('Failed to save work order. Please try again.');
     }
     setShowModal(false);
     setEditingOrder(null);
   };
 
-  const updateStatus = (orderId, newStatus) => {
-    // TODO: PUT to API
-    setWorkOrders(prev => prev.map(o => o.id === orderId ? {
-      ...o, status: newStatus,
-      history: [...o.history, { date: new Date().toISOString(), action: `Status changed to ${getStatusLabel(newStatus)}`, by: 'Admin' }]
-    } : o));
+  const updateStatus = async (orderId, newStatus) => {
+    const order = workOrders.find(o => o.id === orderId);
+    if (!order?._id) return;
+    const statusMap = { open: 'PENDING', 'in-progress': 'IN PROGRESS', completed: 'COMPLETED', deferred: 'PENDING' };
+    try {
+      const res = await fetch(`http://localhost:5000/api/maintenance-requests/${order._id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: statusMap[newStatus] || 'PENDING' }),
+      });
+      if (!res.ok) throw new Error(`Server error: ${res.status}`);
+      // Update local state immediately for responsive UI
+      setWorkOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
+    } catch (err) {
+      console.error('Failed to update status:', err);
+      alert('Failed to update status.');
+    }
   };
 
-  const toggleOutOfOrder = (orderId) => {
-    // TODO: PUT to API
-    setWorkOrders(prev => prev.map(o => o.id === orderId ? {
-      ...o, roomOutOfOrder: !o.roomOutOfOrder,
-      history: [...o.history, { date: new Date().toISOString(), action: o.roomOutOfOrder ? 'Room returned to inventory' : 'Room marked as out-of-order', by: 'Admin' }]
-    } : o));
+  const toggleOutOfOrder = async (orderId) => {
+    const order = workOrders.find(o => o.id === orderId);
+    if (!order?._id) return;
+    const newVal = !order.roomOutOfOrder;
+    try {
+      const res = await fetch(`http://localhost:5000/api/maintenance-requests/${order._id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ room_out_of_order: newVal }),
+      });
+      if (!res.ok) throw new Error(`Server error: ${res.status}`);
+      setWorkOrders(prev => prev.map(o => o.id === orderId ? { ...o, roomOutOfOrder: newVal } : o));
+    } catch (err) {
+      console.error('Failed to toggle OOO:', err);
+    }
   };
 
   // Helpers
@@ -327,10 +368,18 @@ function Maintenance() {
           formatDateTime={formatDateTime}
           onUpdateStatus={(status) => { updateStatus(selectedOrder.id, status); setSelectedOrder({ ...selectedOrder, status }); }}
           onToggleOOO={() => { toggleOutOfOrder(selectedOrder.id); setSelectedOrder({ ...selectedOrder, roomOutOfOrder: !selectedOrder.roomOutOfOrder }); }}
-          onAssign={(tech) => {
-            setWorkOrders(prev => prev.map(o => o.id === selectedOrder.id ? { ...o, assignedTo: tech } : o));
-            setSelectedOrder({ ...selectedOrder, assignedTo: tech });
-          }}
+          onAssign={async (tech) => {
+              const order = workOrders.find(o => o.id === selectedOrder.id);
+              if (order?._id) {
+                await fetch(`http://localhost:5000/api/maintenance-requests/${order._id}`, {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ assigned_to_name: tech }),
+                });
+              }
+              setWorkOrders(prev => prev.map(o => o.id === selectedOrder.id ? { ...o, assignedTo: tech } : o));
+              setSelectedOrder({ ...selectedOrder, assignedTo: tech });
+            }}
           onClose={() => setSelectedOrder(null)}
         />,
         document.body

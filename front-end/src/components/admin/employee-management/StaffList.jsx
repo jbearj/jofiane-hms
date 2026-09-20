@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import employee1 from '../../../assets/employee1.jpeg';
+import { usePolling } from '../../../hooks/usePolling';
+import { authFetch, readError, validatePassword, PASSWORD_RULE_TEXT } from '../../../utils/api';
 
 function StaffList() {
   const [isLoading, setIsLoading] = useState(true);
@@ -19,11 +21,14 @@ function StaffList() {
 
   const departments = ['Front Desk', 'Housekeeping', 'Maintenance', 'F&B', 'Admin'];
 
-  useEffect(() => { fetchEmployees(); }, []);
   useEffect(() => { applyFilters(); }, [employees, searchQuery, filterDept, filterStatus]);
 
+  const hasLoadedOnce = useRef(false);
+
   const fetchEmployees = async () => {
-    setIsLoading(true);
+    // Only show the full-page skeleton on the very first load. Background
+    // poll refreshes update the data silently so the view doesn't flicker.
+    if (!hasLoadedOnce.current) setIsLoading(true);
     try {
       const today = new Date().toISOString().slice(0, 10);
 
@@ -65,7 +70,8 @@ function StaffList() {
               : e.employment_details?.status === 'TERMINATED' ? 'Terminated'
               : e.employment_details?.status || '',
         hireDate: e.employment_details?.hire_date || '',
-        photo: employee1,
+        // Use the employee's saved profile photo; fall back to the placeholder.
+        photo: e.photo || employee1,
         portalAccess: e.portal_access?.has_access ?? false,
         username: e.portal_access?.username || '',
         password: e.portal_access?.password || '',
@@ -76,8 +82,11 @@ function StaffList() {
       console.error('Failed to fetch employees:', err);
     } finally {
       setIsLoading(false);
+      hasLoadedOnce.current = true;
     }
   };
+
+  usePolling(fetchEmployees, 15000);
 
   const applyFilters = () => {
     let result = [...employees];
@@ -96,13 +105,16 @@ function StaffList() {
   const handleDelete = async (emp) => {
     if (!window.confirm(`Delete ${emp.name}? This cannot be undone.`)) return;
     try {
-      const res = await fetch(`http://localhost:5000/api/employees/${emp._id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error(`Server error: ${res.status}`);
+      const res = await authFetch(`/api/employees/${emp._id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        // Surface the server's specific reason (last admin, has shifts, no access...).
+        throw new Error(await readError(res, 'Failed to delete employee.'));
+      }
       setEmployees(prev => prev.filter(e => e.id !== emp.id));
       setSelectedEmployee(null);
     } catch (err) {
       console.error('Failed to delete employee:', err);
-      alert('Failed to delete employee. Please try again.');
+      alert(err.message || 'Failed to delete employee. Please try again.');
     }
   };
 
@@ -130,12 +142,14 @@ function StaffList() {
       };
 
       if (editingEmployee) {
-        const res = await fetch(`http://localhost:5000/api/employees/${editingEmployee._id}`, {
+        const res = await authFetch(`/api/employees/${editingEmployee._id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         });
-        if (!res.ok) throw new Error(`Server error: ${res.status}`);
+        if (!res.ok) {
+          throw new Error(await readError(res, 'Failed to update employee.'));
+        }
       } else {
         // For new employees send a clean object without $set wrapper
         const newPayload = {
@@ -161,17 +175,19 @@ function StaffList() {
             },
           },
         };
-        const res = await fetch('http://localhost:5000/api/employees', {
+        const res = await authFetch('/api/employees', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(newPayload),
         });
-        if (!res.ok) throw new Error(`Server error: ${res.status}`);
+        if (!res.ok) {
+          throw new Error(await readError(res, 'Failed to create employee.'));
+        }
       }
       await fetchEmployees();
     } catch (err) {
       console.error('Failed to save employee:', err);
-      alert('Failed to save employee. Please try again.');
+      alert(err.message || 'Failed to save employee. Please try again.');
     }
     setShowAddEdit(false);
     setEditingEmployee(null);
@@ -186,7 +202,7 @@ function StaffList() {
         : newStatus === 'On Leave'  ? 'ON LEAVE'
         : newStatus === 'Terminated'? 'TERMINATED'
         : newStatus;
-      const res = await fetch(`http://localhost:5000/api/employees/${emp._id}`, {
+      const res = await authFetch(`/api/employees/${emp._id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -196,7 +212,7 @@ function StaffList() {
           },
         }),
       });
-      if (!res.ok) throw new Error(`Server error: ${res.status}`);
+      if (!res.ok) throw new Error(await readError(res, 'Failed to update status.'));
       const portalAccess = newStatus === 'Active';
       setEmployees(prev => prev.map(e =>
         e.id === empId ? { ...e, status: newStatus, portalAccess } : e
@@ -206,7 +222,7 @@ function StaffList() {
       }
     } catch (err) {
       console.error('Failed to update status:', err);
-      alert('Failed to update status. Please try again.');
+      alert(err.message || 'Failed to update status. Please try again.');
     }
   };
 
@@ -345,7 +361,7 @@ function StaffList() {
                   <tr key={emp.id} className="table-row-hover" onClick={() => setSelectedEmployee(emp)} style={{ cursor: 'pointer' }}>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <img src={emp.photo} alt={emp.name} style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover' }} />
+                        <img src={emp.photo || employee1} alt={emp.name} onError={(ev) => { ev.currentTarget.src = employee1; }} style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover' }} />
                         <div>
                           <span className="guest-name">{emp.name}</span>
                           <span className="guest-sub">{emp.email}</span>
@@ -398,7 +414,6 @@ function StaffList() {
    ============================================================ */
 function ProfileModal({ employee, getStatusTag, onEdit, onDelete, onStatusChange, onClose }) {
   const [showCredentials, setShowCredentials] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
 
   const empIdDisplay = employee.employeeId
     ? `EMP-${String(employee.employeeId).padStart(4, '0')}`
@@ -411,7 +426,7 @@ function ProfileModal({ employee, getStatusTag, onEdit, onDelete, onStatusChange
 
         {/* Profile Header */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginBottom: '24px' }}>
-          <img src={employee.photo} alt={employee.name} style={{ width: '72px', height: '72px', borderRadius: '50%', objectFit: 'cover', border: '3px solid var(--border-light)' }} />
+          <img src={employee.photo || employee1} alt={employee.name} onError={(ev) => { ev.currentTarget.src = employee1; }} style={{ width: '72px', height: '72px', borderRadius: '50%', objectFit: 'cover', border: '3px solid var(--border-light)' }} />
           <div>
             <h3 style={{ fontSize: '20px', fontWeight: '700', margin: '0 0 4px 0' }}>{employee.name}</h3>
             <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{employee.role} · {employee.department}</div>
@@ -454,27 +469,14 @@ function ProfileModal({ employee, getStatusTag, onEdit, onDelete, onStatusChange
                 </div>
                 <div>
                   <div style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '600', textTransform: 'uppercase', marginBottom: '4px' }}>Password</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '13px', fontFamily: 'monospace', color: 'var(--text-primary)' }}>
-                      {employee.password
-                        ? (showPassword ? employee.password : '••••••••')
-                        : <span style={{ fontStyle: 'italic', color: 'var(--text-muted)' }}>Not set</span>
-                      }
-                    </span>
-                    {employee.password && (
-                      <button
-                        className="btn btn-xs"
-                        style={{ padding: '2px 7px', fontSize: '10px' }}
-                        onClick={() => setShowPassword(p => !p)}
-                      >
-                        {showPassword ? 'Hide' : 'Show'}
-                      </button>
-                    )}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                    Encrypted &amp; hidden
                   </div>
                 </div>
               </div>
               <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                To change credentials, use Edit Profile.
+                Passwords are stored encrypted and can't be viewed. To set a new one, use Edit Profile.
               </div>
             </div>
           )}
@@ -522,6 +524,17 @@ function DetailItem({ label, value }) {
 /* ============================================================
    ADD / EDIT EMPLOYEE MODAL
    ============================================================ */
+
+// Preset role/position options per department. Keeps titles consistent so the
+// app's role detection (e.g. housekeeping "lead" vs "cleaner") works reliably.
+const ROLES_BY_DEPARTMENT = {
+  'Front Desk':   ['Front Desk Concierge', 'Front Desk Agent', 'Receptionist', 'Night Auditor', 'Front Desk Supervisor'],
+  'Housekeeping': ['Housekeeping Lead', 'Housekeeper / Cleaner', 'Room Attendant', 'Laundry Attendant', 'Public Area Cleaner'],
+  'Maintenance':  ['Maintenance Technician', 'Maintenance Lead', 'Electrician', 'Plumber', 'Groundskeeper'],
+  'F&B':          ['Waiter / Server', 'Bartender', 'Cook', 'Chef', 'F&B Supervisor'],
+  'Admin':        ['Admin', 'Admin Manager', 'General Manager', 'HR Officer', 'Accountant'],
+};
+
 function EmployeeFormModal({ employee, departments, existingEmployees = [], onClose, onSave }) {
   const isEdit = !!employee;
 
@@ -529,7 +542,7 @@ function EmployeeFormModal({ employee, departments, existingEmployees = [], onCl
     name:         employee?.name        || '',
     email:        employee?.email       || '',
     phone:        employee?.phone       || '',
-    role:         employee?.role        || '',
+    role:         employee?.role        || (ROLES_BY_DEPARTMENT[employee?.department || departments[0]] || [])[0] || '',
     department:   employee?.department  || departments[0],
     salary:       employee?.salary      || '',
     status:       employee?.status      || 'Active',
@@ -539,48 +552,59 @@ function EmployeeFormModal({ employee, departments, existingEmployees = [], onCl
   });
 
   const [showPassword, setShowPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
 
-  // ── USERNAME — purely derived, never stored in formData ──
-  // Format: firstname@jofiane-department.com  (e.g. jennifer@jofiane-frontdesk.com)
-  // If that's taken, append 2, 3, ...  → jennifer2@jofiane-frontdesk.com
-  const computeUsername = (name, department) => {
+  // ── AUTO-GENERATED CREDENTIAL (email = login username) ──
+  // Format: firstname@jofiane-department.com (e.g. jennifer@jofiane-frontdesk.com)
+  // If that's taken, append 2, 3, ... The email and login username are the
+  // SAME merged value, generated from name + department — the admin doesn't type it.
+  const computeCredential = (name, department) => {
     const firstName = name.trim().split(/\s+/)[0].toLowerCase().replace(/[^a-z0-9]/g, '');
     const deptSlug  = department.trim().toLowerCase()
       .replace(/\s+/g, '-')
       .replace(/[^a-z0-9-]/g, '');
     if (!firstName) return '';
     const domain = deptSlug ? `jofiane-${deptSlug}.com` : 'jofiane.com';
-    const base   = firstName;
 
-    // Collect taken usernames, excluding the employee currently being edited
+    // Usernames already taken (exclude the employee being edited).
     const taken = new Set(
       existingEmployees
         .filter(e => e._id !== employee?._id)
         .map(e => (e.username || '').toLowerCase())
     );
-
-    if (!taken.has(`${base}@${domain}`)) return `${base}@${domain}`;
+    if (!taken.has(`${firstName}@${domain}`)) return `${firstName}@${domain}`;
     let n = 2;
-    while (taken.has(`${base}${n}@${domain}`)) n++;
-    return `${base}${n}@${domain}`;
+    while (taken.has(`${firstName}${n}@${domain}`)) n++;
+    return `${firstName}${n}@${domain}`;
   };
 
-  // Compute live — updates instantly as name/department fields change
-  const generatedUsername = isEdit
-    ? (employee?.username || '')
-    : computeUsername(formData.name, formData.department);
+  // On edit, keep the existing credential. On add, generate live from name + dept.
+  const loginUsername = isEdit
+    ? ((employee?.username || employee?.email || '').toLowerCase())
+    : computeCredential(formData.name, formData.department);
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!formData.name.trim())  { alert('Full name is required.'); return; }
-    if (!formData.email.trim()) { alert('Email is required.'); return; }
     if (!formData.role.trim())  { alert('Role / Position is required.'); return; }
+    if (!loginUsername) { alert('Enter a name and department to generate the login.'); return; }
+
     if (!isEdit && formData.portalAccess && !formData.password) {
-      alert('Please set a password for the portal account.'); return;
+      setPasswordError('Please set a password for the portal account.');
+      return;
     }
+    // Validate the password whenever one is entered (required on add,
+    // optional on edit where blank means "keep current"). Shown inline
+    // under the field rather than in a popup.
+    if (formData.password) {
+      const pwError = validatePassword(formData.password);
+      if (pwError) { setPasswordError(pwError); return; }
+    }
+    setPasswordError('');
     onSave({
       ...formData,
-      username: generatedUsername,          // always pass the computed username
+      email: loginUsername,      // email = the auto-generated credential
+      username: loginUsername,   // login username = same value
       salary: parseFloat(formData.salary) || 0,
     });
   };
@@ -609,8 +633,24 @@ function EmployeeFormModal({ employee, departments, existingEmployees = [], onCl
               <input type="text" value={formData.name} onChange={set('name')} placeholder="e.g. Juan Dela Cruz" />
             </div>
             <div className="form-group">
-              <label>Email <span className="required">*</span></label>
-              <input type="email" value={formData.email} onChange={set('email')} placeholder="juan@jofiane.com" />
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                Email / Login
+                <span style={{ fontSize: '10px', fontWeight: '600', background: 'rgba(201,168,76,0.12)', color: 'var(--gold-dark)', padding: '2px 7px', borderRadius: '10px' }}>
+                  Auto-generated
+                </span>
+              </label>
+              <input
+                type="text"
+                value={loginUsername}
+                readOnly
+                placeholder="Fill in name and department"
+                style={{
+                  background: 'var(--bg-body)',
+                  cursor: 'default',
+                  color: loginUsername ? 'var(--text-primary)' : 'var(--text-muted)',
+                  fontStyle: loginUsername ? 'normal' : 'italic',
+                }}
+              />
             </div>
           </div>
           <div className="form-grid" style={{ marginBottom: '22px' }}>
@@ -628,13 +668,30 @@ function EmployeeFormModal({ employee, departments, existingEmployees = [], onCl
           <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--gold-dark)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>Employment Details</div>
           <div className="form-grid" style={{ marginBottom: '18px' }}>
             <div className="form-group">
-              <label>Role / Position <span className="required">*</span></label>
-              <input type="text" value={formData.role} onChange={set('role')} placeholder="e.g. Front Desk Concierge" />
+              <label>Department</label>
+              <select
+                value={formData.department}
+                onChange={(e) => {
+                  const dept = e.target.value;
+                  // Reset the role when department changes so it stays valid for the new dept.
+                  const opts = ROLES_BY_DEPARTMENT[dept] || [];
+                  setFormData(prev => ({ ...prev, department: dept, role: opts[0] || '' }));
+                }}
+              >
+                {departments.map(d => <option key={d} value={d}>{d}</option>)}
+              </select>
             </div>
             <div className="form-group">
-              <label>Department</label>
-              <select value={formData.department} onChange={set('department')}>
-                {departments.map(d => <option key={d} value={d}>{d}</option>)}
+              <label>Role / Position <span className="required">*</span></label>
+              <select value={formData.role} onChange={set('role')}>
+                <option value="" disabled>Select a role…</option>
+                {/* Preserve a legacy/custom role that isn't in the preset list (on edit) */}
+                {formData.role && !(ROLES_BY_DEPARTMENT[formData.department] || []).includes(formData.role) && (
+                  <option value={formData.role}>{formData.role}</option>
+                )}
+                {(ROLES_BY_DEPARTMENT[formData.department] || []).map(r => (
+                  <option key={r} value={r}>{r}</option>
+                ))}
               </select>
             </div>
           </div>
@@ -668,27 +725,30 @@ function EmployeeFormModal({ employee, departments, existingEmployees = [], onCl
               </label>
             </div>
 
-            {/* USERNAME — read-only, auto-generated */}
+            {/* LOGIN USERNAME — auto-generated, same as the email */}
             <div className="form-group" style={{ marginBottom: '14px' }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                Username
+                Login Username
                 <span style={{ fontSize: '10px', fontWeight: '600', background: 'rgba(201,168,76,0.12)', color: 'var(--gold-dark)', padding: '2px 7px', borderRadius: '10px' }}>
                   Auto-generated
                 </span>
               </label>
               <input
                 type="text"
-                value={generatedUsername}
+                value={loginUsername}
                 readOnly
                 style={{
                   background: 'var(--bg-body)',
                   cursor: 'default',
-                  color: generatedUsername ? 'var(--text-primary)' : 'var(--text-muted)',
-                  fontStyle: generatedUsername ? 'normal' : 'italic',
+                  color: loginUsername ? 'var(--text-primary)' : 'var(--text-muted)',
+                  fontStyle: loginUsername ? 'normal' : 'italic',
                   opacity: formData.portalAccess ? 1 : 0.45,
                 }}
                 placeholder="Fill in name and department above"
               />
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', fontStyle: 'italic' }}>
+                Generated from the employee's first name and department. This is their login.
+              </div>
             </div>
 
             {/* PASSWORD */}
@@ -701,10 +761,21 @@ function EmployeeFormModal({ employee, departments, existingEmployees = [], onCl
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={formData.password}
-                  onChange={set('password')}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setFormData(prev => ({ ...prev, password: val }));
+                    // Live-validate: show the rule error while typing, clear it
+                    // once the password is valid (or the field is emptied).
+                    setPasswordError(val ? (validatePassword(val) || '') : '');
+                  }}
                   placeholder={isEdit ? 'Leave blank to keep current' : 'Set a password'}
                   disabled={!formData.portalAccess}
-                  style={{ opacity: formData.portalAccess ? 1 : 0.45, paddingRight: '60px', width: '100%' }}
+                  style={{
+                    opacity: formData.portalAccess ? 1 : 0.45,
+                    paddingRight: '60px',
+                    width: '100%',
+                    borderColor: passwordError ? 'var(--status-occ)' : undefined,
+                  }}
                 />
                 <button
                   type="button"
@@ -714,9 +785,16 @@ function EmployeeFormModal({ employee, departments, existingEmployees = [], onCl
                   {showPassword ? 'Hide' : 'Show'}
                 </button>
               </div>
-              {isEdit && (
+              {/* Inline validation error (replaces the popup alert) */}
+              {passwordError && (
+                <div style={{ fontSize: '11px', color: 'var(--status-occ)', marginTop: '4px', fontWeight: '600' }}>
+                  {passwordError}
+                </div>
+              )}
+              {formData.portalAccess && !passwordError && (
                 <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', fontStyle: 'italic' }}>
-                  Leave blank to keep the existing password unchanged.
+                  {isEdit && 'Leave blank to keep the existing password unchanged. '}
+                  Must be {PASSWORD_RULE_TEXT}
                 </div>
               )}
             </div>
