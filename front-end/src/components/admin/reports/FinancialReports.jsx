@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE } from '../../../utils/api';
 
 function FinancialReports() {
   const [isLoading, setIsLoading] = useState(true);
@@ -10,7 +11,7 @@ function FinancialReports() {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch('http://localhost:5000/api/reports/financial');
+      const res = await fetch(`${API_BASE}/api/reports/financial`);
       if (!res.ok) throw new Error(`Server error: ${res.status}`);
       setData(await res.json());
     } catch (err) {

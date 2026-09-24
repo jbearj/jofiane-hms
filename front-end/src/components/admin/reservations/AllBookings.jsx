@@ -24,7 +24,7 @@ function AllBookings() {
     // Only show the full-page skeleton on the first load; polls refresh silently.
     if (firstLoad.current) setIsLoading(true);
     try {
-      const res = await fetch('http://localhost:5000/api/bookings');
+      const res = await authFetch('/api/bookings');
       if (!res.ok) throw new Error(`Server error: ${res.status}`);
       const data = await res.json();
       // Normalize MongoDB field names to match the UI field names
@@ -142,7 +142,7 @@ function AllBookings() {
         transactions: initialTransactions,
       };
 
-      const res = await fetch('http://localhost:5000/api/bookings', {
+      const res = await authFetch('/api/bookings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -333,7 +333,7 @@ function BookingDetailModal({ booking, getStatusTag, formatDate, onClose, onDele
     const fetchTxns = async () => {
       setLoadingTxns(true);
       try {
-        const res = await fetch(`http://localhost:5000/api/bookings/${booking._id}`);
+        const res = await authFetch(`/api/bookings/${booking._id}`);
         const data = await res.json();
         setTransactions(data?.transactions || []);
       } catch (err) {
@@ -377,7 +377,7 @@ function BookingDetailModal({ booking, getStatusTag, formatDate, onClose, onDele
     if (!cancelForm.reason) { alert('Please select a cancellation reason.'); return; }
     setIsCancelling(true);
     try {
-      const res = await fetch(`http://localhost:5000/api/bookings/${booking._id}/cancel`, {
+      const res = await authFetch(`/api/bookings/${booking._id}/cancel`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

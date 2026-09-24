@@ -1,27 +1,35 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { usePolling } from '../../hooks/usePolling';
+import { authFetch } from '../../utils/api';
+import { todayISO } from '../../utils/dateUtils';
+import ConfirmModal from '../common/ConfirmModal';
 
 // ─── Accent colour adapts to dark/light mode
 // Dark mode: amber/gold (matches the overall dark theme warmth)
-// Light mode: teal (fresh, distinct from admin gold)
+// Light mode: gold/amber (matches the sidebar logo and active menu items)
 const getAccent = (dark) => dark
   ? { accent: '#f59e0b', accentLight: 'rgba(245,158,11,0.12)', accentDark: '#d97706' }
-  : { accent: '#0891b2', accentLight: '#e0f2fe',               accentDark: '#0e7490' };
+  : { accent: '#b8860b', accentLight: 'rgba(184,134,11,0.12)', accentDark: '#d97706' };
 
 const parseAmount = (str) => parseFloat((str || '0').replace(/,/g, '')) || 0;
 
 function BookingManagement({ employee }) {
-  // Read dark mode from localStorage (written by App.js Settings toggle)
+  // Dark mode for the front-desk portal is signalled by the 'app-dark' class
+  // that EmployeePortal toggles on <body>. Reading that (instead of the admin
+  // localStorage key this used to read) keeps this view's accent in step with
+  // the rest of the front-desk UI, including same-tab theme toggles.
   const [isDark, setIsDark] = useState(
-    () => window.localStorage.getItem('jofiane-admin-theme') === 'dark'
+    () => document.body.classList.contains('app-dark')
   );
 
-  // Keep in sync if the user toggles dark mode while this view is open
   useEffect(() => {
-    const onStorage = () => setIsDark(window.localStorage.getItem('jofiane-admin-theme') === 'dark');
-    window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
+    const sync = () => setIsDark(document.body.classList.contains('app-dark'));
+    // Observe body class changes so a theme toggle updates the accent instantly.
+    const observer = new MutationObserver(sync);
+    observer.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+    sync();
+    return () => observer.disconnect();
   }, []);
 
   const FD = getAccent(isDark);
@@ -32,22 +40,24 @@ function BookingManagement({ employee }) {
   const [showWalkIn, setShowWalkIn]       = useState(false);
   const [processingId, setProcessingId]   = useState(null);
   const [error, setError]                 = useState(null);
+  const [confirmAction, setConfirmAction] = useState(null); // { type: 'checkin'|'checkout', booking }
 
   // Filters
   const [searchQuery, setSearchQuery]     = useState('');
   const [filterStatus, setFilterStatus]   = useState('all');
-  const [dateFrom, setDateFrom]           = useState('');
-  const [dateTo, setDateTo]               = useState('');
-
-  usePolling(fetchBookings, 10000);
-  useEffect(() => { applyFilters(); }, [bookings, searchQuery, filterStatus, dateFrom, dateTo]);
+  // Default the date range to today so opening Booking Management shows
+  // today's reservations without having to pick the date manually.
+  const [dateFrom, setDateFrom]           = useState(todayISO());
+  const [dateTo, setDateTo]               = useState(todayISO());
 
   // ── FETCH ────────────────────────────────────────
-  const fetchBookings = async () => {
-    setIsLoading(true);
+  // `background` = true for polling refreshes: don't flip the loading state,
+  // so the table stays on screen instead of flashing "Loading…" every 10s.
+  const fetchBookings = async ({ background = false } = {}) => {
+    if (!background) setIsLoading(true);
     setError(null);
     try {
-      const res = await fetch('http://localhost:5000/api/bookings');
+      const res = await authFetch('/api/bookings');
       if (!res.ok) throw new Error(`Server error: ${res.status}`);
       const data = await res.json();
       const normalized = data.map(b => ({
@@ -74,7 +84,7 @@ function BookingManagement({ employee }) {
       console.error(err);
       setError('Failed to connect to server.');
     } finally {
-      setIsLoading(false);
+      if (!background) setIsLoading(false);
     }
   };
 
@@ -90,29 +100,32 @@ function BookingManagement({ employee }) {
     setFiltered(r);
   };
 
-  // ── CHECK-IN ─────────────────────────────────────
-  const handleCheckIn = async (booking) => {
-    if (!window.confirm(`Check in ${booking.guest} to Room ${booking.room}?`)) return;
-    setProcessingId(booking._id);
-    try {
-      const res = await fetch(`http://localhost:5000/api/bookings/${booking._id}/checkin`, { method: 'POST' });
-      if (!res.ok) throw new Error();
-      setBookings(prev => prev.map(b => b._id === booking._id ? { ...b, status: 'Checked In' } : b));
-      if (selectedBooking?._id === booking._id) setSelectedBooking(prev => ({ ...prev, status: 'Checked In' }));
-    } catch { alert('Check-in failed. Please try again.'); }
-    finally { setProcessingId(null); }
-  };
+  // Initial foreground load (shows the "Loading…" placeholder once)
+  useEffect(() => { fetchBookings(); }, []);
+  // Background polling refreshes (silent — no loading flash)
+  usePolling(() => fetchBookings({ background: true }), 10000);
+  useEffect(() => { applyFilters(); }, [bookings, searchQuery, filterStatus, dateFrom, dateTo]);
 
-  // ── CHECK-OUT ────────────────────────────────────
-  const handleCheckOut = async (booking) => {
-    if (!window.confirm(`Check out ${booking.guest} from Room ${booking.room}?`)) return;
+  // ── CHECK-IN ─────────────────────────────────────
+  // Clicking Check In / Check Out opens a styled confirmation modal; the
+  // request runs only after the user confirms (see runConfirmedAction).
+  const handleCheckIn = (booking) => setConfirmAction({ type: 'checkin', booking });
+  const handleCheckOut = (booking) => setConfirmAction({ type: 'checkout', booking });
+
+  const runConfirmedAction = async () => {
+    if (!confirmAction) return;
+    const { type, booking } = confirmAction;
+    const isCheckin = type === 'checkin';
+    const endpoint = isCheckin ? 'checkin' : 'checkout';
+    const nextStatus = isCheckin ? 'Checked In' : 'Checked Out';
     setProcessingId(booking._id);
     try {
-      const res = await fetch(`http://localhost:5000/api/bookings/${booking._id}/checkout`, { method: 'POST' });
+      const res = await authFetch(`/api/bookings/${booking._id}/${endpoint}`, { method: 'POST' });
       if (!res.ok) throw new Error();
-      setBookings(prev => prev.map(b => b._id === booking._id ? { ...b, status: 'Checked Out' } : b));
-      if (selectedBooking?._id === booking._id) setSelectedBooking(prev => ({ ...prev, status: 'Checked Out' }));
-    } catch { alert('Check-out failed. Please try again.'); }
+      setBookings(prev => prev.map(b => b._id === booking._id ? { ...b, status: nextStatus } : b));
+      if (selectedBooking?._id === booking._id) setSelectedBooking(prev => ({ ...prev, status: nextStatus }));
+      setConfirmAction(null);
+    } catch { alert(`${isCheckin ? 'Check-in' : 'Check-out'} failed. Please try again.`); }
     finally { setProcessingId(null); }
   };
 
@@ -143,7 +156,7 @@ function BookingManagement({ employee }) {
           status:         'COMPLETED',
         }] : [],
       };
-      const res = await fetch('http://localhost:5000/api/bookings', {
+      const res = await authFetch('/api/bookings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -186,10 +199,6 @@ function BookingManagement({ employee }) {
       <div className="page-header employee-page-header" style={{ marginBottom: '24px' }}>
         <div className="left">
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
-            <span style={{ padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: '700',
-              background: FD.accentLight, color: FD.accentDark }}>
-              Front Desk
-            </span>
             <h2 style={{ fontSize: '26px', fontWeight: '700', margin: 0 }}>Booking Management</h2>
           </div>
           <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '13px' }}>
@@ -250,12 +259,37 @@ function BookingManagement({ employee }) {
           <option value="Cancelled">Cancelled</option>
           <option value="No Show">No Show</option>
         </select>
+        {/* Quick date scope: Today (default) or All dates. */}
+        {(() => {
+          const isToday = dateFrom === todayISO() && dateTo === todayISO();
+          const isAll = !dateFrom && !dateTo;
+          return (
+            <div style={{ display: 'inline-flex', border: '1px solid var(--border-light, #d1d5db)', borderRadius: '8px', overflow: 'hidden' }}>
+              <button
+                type="button"
+                onClick={() => { setDateFrom(todayISO()); setDateTo(todayISO()); }}
+                style={{ padding: '8px 14px', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: 600,
+                  background: isToday ? 'var(--gold, #c5a059)' : 'transparent', color: isToday ? '#fff' : 'var(--text-secondary, #4b5563)' }}
+              >
+                Today
+              </button>
+              <button
+                type="button"
+                onClick={() => { setDateFrom(''); setDateTo(''); }}
+                style={{ padding: '8px 14px', border: 'none', borderLeft: '1px solid var(--border-light, #d1d5db)', cursor: 'pointer', fontSize: '13px', fontWeight: 600,
+                  background: isAll ? 'var(--gold, #c5a059)' : 'transparent', color: isAll ? '#fff' : 'var(--text-secondary, #4b5563)' }}
+              >
+                All Dates
+              </button>
+            </div>
+          );
+        })()}
         <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
           className="floor-dropdown" title="Check-in from" />
         <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
           className="floor-dropdown" title="Check-in to" />
-        {(searchQuery || filterStatus !== 'all' || dateFrom || dateTo) && (
-          <button className="btn btn-xs" onClick={() => { setSearchQuery(''); setFilterStatus('all'); setDateFrom(''); setDateTo(''); }}>
+        {(searchQuery || filterStatus !== 'all') && (
+          <button className="btn btn-xs" onClick={() => { setSearchQuery(''); setFilterStatus('all'); }}>
             Clear
           </button>
         )}
@@ -275,7 +309,7 @@ function BookingManagement({ employee }) {
           ) : error ? (
             <div style={{ padding: '20px', color: '#dc2626' }}>{error}</div>
           ) : filtered.length === 0 ? (
-            <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>No reservations match your filters.</div>
+            <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>No reservations match the current filters.</div>
           ) : (
             <table>
               <thead>
@@ -456,6 +490,23 @@ function BookingManagement({ employee }) {
       {showWalkIn && createPortal(
         <WalkInModal onClose={() => setShowWalkIn(false)} onSave={handleWalkIn} accentColor={FD.accent} />,
         document.body
+      )}
+
+      {/* ── CHECK-IN / CHECK-OUT CONFIRMATION ── */}
+      {confirmAction && (
+        <ConfirmModal
+          title={confirmAction.type === 'checkin' ? 'Confirm Check-In' : 'Confirm Check-Out'}
+          message={
+            confirmAction.type === 'checkin'
+              ? <>Check in <strong>{confirmAction.booking.guest}</strong> to Room <strong>{confirmAction.booking.room}</strong>?</>
+              : <>Check out <strong>{confirmAction.booking.guest}</strong> from Room <strong>{confirmAction.booking.room}</strong>?</>
+          }
+          confirmLabel={confirmAction.type === 'checkin' ? 'Check In' : 'Check Out'}
+          tone={confirmAction.type === 'checkin' ? 'primary' : 'danger'}
+          busy={processingId === confirmAction.booking._id}
+          onConfirm={runConfirmedAction}
+          onCancel={() => setConfirmAction(null)}
+        />
       )}
     </section>
   );

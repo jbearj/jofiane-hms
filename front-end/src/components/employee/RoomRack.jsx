@@ -1,4 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
+import { API_BASE, authFetch } from '../../utils/api';
+import GuestDetailModal from './GuestDetailModal';
+import PortalModal from '../common/PortalModal';
 
 // Normalise housekeeping string from DB → RoomRack pill class
 const toHKStatus = (s) => {
@@ -20,6 +23,42 @@ function RoomRack() {
   const [query, setQuery]           = useState('');
   const [selectedRoom, setSelectedRoom]   = useState(null);
   const [selectedStay, setSelectedStay]   = useState(null);
+  const [viewingBooking, setViewingBooking] = useState(null);
+  const [blockingId, setBlockingId]       = useState(null);
+
+  // Adapt a RoomRack stay (+ its room) into the shape GuestDetailModal expects.
+  const stayToBooking = (room, stay) => ({
+    guestName:  stay.guest,
+    bookingId:  stay.bookingId,
+    id:         stay.bookingId,
+    roomNumber: room?.number,
+    roomType:   room?.type,
+    status:     stay.status === 'inhouse' ? 'Checked In' : 'Reserved',
+    balance:    parseFloat(String(stay.balance || '0').replace(/,/g, '')) || 0,
+    _id:        stay._id,
+  });
+
+  // Block a room for maintenance (sets Room.status = "Maintenance").
+  const blockRoom = async (room) => {
+    if (!room?._id) return;
+    if (!window.confirm(`Block Room ${room.number} for maintenance? It will be marked out of service.`)) return;
+    setBlockingId(room._id);
+    try {
+      const res = await authFetch(`/api/rooms/${room._id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'Maintenance', housekeeping: 'Maintenance' }),
+      });
+      if (!res.ok) throw new Error(`Server error: ${res.status}`);
+      setRoomsData(prev => prev.map(r => r._id === room._id ? { ...r, status: 'Maintenance', housekeeping: 'Maintenance' } : r));
+      setSelectedRoom(null);
+    } catch (err) {
+      console.error('Failed to block room:', err);
+      alert('Could not block the room. Please try again.');
+    } finally {
+      setBlockingId(null);
+    }
+  };
 
   // 5-day window starting today
   const dates = useMemo(() => Array.from({ length: 5 }, (_, i) => {
@@ -37,8 +76,8 @@ function RoomRack() {
       setIsLoading(true);
       try {
         const [roomsRes, bookingsRes] = await Promise.all([
-          fetch('http://localhost:5000/api/rooms'),
-          fetch('http://localhost:5000/api/bookings'),
+          fetch(`${API_BASE}/api/rooms`),
+          fetch(`${API_BASE}/api/bookings`),
         ]);
         const [rData, bData] = await Promise.all([
           roomsRes.ok ? roomsRes.json() : [],
@@ -178,7 +217,13 @@ function RoomRack() {
           <h2>Room Rack / Plan</h2>
           <p>Live room readiness and upcoming stays.</p>
         </div>
-        <button className="btn btn-gold" type="button">+ Block Room</button>
+        <button
+          className="btn btn-gold"
+          type="button"
+          onClick={() => alert('Select a room from the plan below, then choose “Block room (maintenance)” in its detail panel.')}
+        >
+          + Block Room
+        </button>
       </div>
 
       {/* KPI ORBs */}
@@ -278,16 +323,15 @@ function RoomRack() {
         </div>
       </div>
 
-      {/* Room detail drawer */}
+      {/* Room detail pop-up modal */}
       {selectedRoom && (
-        <div className="room-detail-drawer" role="dialog" aria-modal="true" aria-label={`Room ${selectedRoom.number} details`}>
-          <button className="drawer-backdrop" onClick={() => setSelectedRoom(null)} aria-label="Close room details" />
-          <aside>
-            <button className="drawer-close" onClick={() => setSelectedRoom(null)}>×</button>
+        <PortalModal maxWidth={420}>
+          <div className="roomrack-modal-body" role="dialog" aria-modal="true" aria-label={`Room ${selectedRoom.number} details`}>
+            <button className="drawer-close" onClick={() => setSelectedRoom(null)} aria-label="Close">×</button>
             <span className="eyebrow">Room details</span>
             <h3>Room {selectedRoom.number}</h3>
-            <p>{selectedRoom.type} · Floor {selectedRoom.floor}</p>
-            <div className={`drawer-readiness ${selectedRoom.housekeeping}`}>
+            <p style={{ color: 'var(--text-muted)' }}>{selectedRoom.type} · Floor {selectedRoom.floor}</p>
+            <div className={`drawer-readiness ${selectedRoom.housekeeping}`} style={{ marginTop: '12px' }}>
               <span className={`status-orb ${selectedRoom.housekeeping}`} />
               {selectedRoom.housekeeping}
             </div>
@@ -306,16 +350,31 @@ function RoomRack() {
                 </div>
               </div>
             ))}
-            <button className="btn btn-gold" type="button">Open room profile</button>
-          </aside>
-        </div>
+            {(() => {
+              const activeStay = selectedRoom.stays.find(s => s.status !== 'available' && s._id);
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '18px' }}>
+                  {activeStay && (
+                    <button className="btn btn-gold" type="button" onClick={() => { setViewingBooking(stayToBooking(selectedRoom, activeStay)); setSelectedRoom(null); }}>
+                      Open room profile
+                    </button>
+                  )}
+                  {selectedRoom.housekeeping !== 'maintenance' && (
+                    <button className="btn" type="button" disabled={blockingId === selectedRoom._id} onClick={() => blockRoom(selectedRoom)}>
+                      {blockingId === selectedRoom._id ? 'Blocking…' : 'Block room (maintenance)'}
+                    </button>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
+        </PortalModal>
       )}
 
-      {/* Stay peek overlay */}
+      {/* Stay peek pop-up modal */}
       {selectedStay && (
-        <div className="stay-peek-overlay" role="dialog" aria-modal="true" aria-label={`${selectedStay.stay.guest} reservation quick actions`}>
-          <button className="stay-peek-backdrop" onClick={() => setSelectedStay(null)} aria-label="Close" />
-          <div className="stay-peek-card">
+        <PortalModal maxWidth={420}>
+          <div className="stay-peek-card" role="dialog" aria-modal="true" aria-label={`${selectedStay.stay.guest} reservation quick actions`}>
             <div className="stay-peek-heading">
               <div>
                 <span className="eyebrow">Quick reservation peek</span>
@@ -348,16 +407,24 @@ function RoomRack() {
               <div><dt>Booking</dt><dd>{selectedStay.stay.bookingId || '—'}</dd></div>
             </dl>
             <div className="peek-actions">
-              <button className="btn" type="button">
+              <button className="btn" type="button" onClick={() => { setViewingBooking(stayToBooking(selectedStay.room, selectedStay.stay)); setSelectedStay(null); }}>
                 <i className="fas fa-pen" /> Edit stay
               </button>
-              <button className="btn" type="button">
+              <button className="btn" type="button" onClick={() => window.print()}>
                 <i className="fas fa-print" /> Print folio
               </button>
-              <button className="btn btn-gold" type="button">View booking</button>
+              <button className="btn btn-gold" type="button" onClick={() => { setViewingBooking(stayToBooking(selectedStay.room, selectedStay.stay)); setSelectedStay(null); }}>View booking</button>
             </div>
           </div>
-        </div>
+        </PortalModal>
+      )}
+
+      {viewingBooking && (
+        <GuestDetailModal
+          booking={viewingBooking}
+          title="Booking Details"
+          onClose={() => setViewingBooking(null)}
+        />
       )}
     </section>
   );

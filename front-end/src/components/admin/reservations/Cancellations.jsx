@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE } from '../../../utils/api';
 
 function Cancellations() {
   const [isLoading, setIsLoading] = useState(true);
@@ -16,7 +17,7 @@ function Cancellations() {
   const fetchCancellations = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch('http://localhost:5000/api/bookings?status=Cancelled');
+      const res = await fetch(`${API_BASE}/api/bookings?status=Cancelled`);
       if (!res.ok) throw new Error(`Server error: ${res.status}`);
       const data = await res.json();
 

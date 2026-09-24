@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { usePolling } from '../../../hooks/usePolling';
+import { authFetch } from '../../../utils/api';
 
 function Maintenance() {
   const [isLoading, setIsLoading] = useState(true);
@@ -28,8 +29,8 @@ function Maintenance() {
     if (firstLoad.current) setIsLoading(true);
     try {
       const [mainRes, empRes] = await Promise.all([
-        fetch('http://localhost:5000/api/maintenance-requests'),
-        fetch('http://localhost:5000/api/employees?department=Maintenance'),
+        authFetch('/api/maintenance-requests'),
+        authFetch('/api/employees?department=Maintenance'),
       ]);
       if (!mainRes.ok) throw new Error(`Server error: ${mainRes.status}`);
 
@@ -108,14 +109,14 @@ function Maintenance() {
       };
 
       if (editingOrder?._id) {
-        const res = await fetch(`http://localhost:5000/api/maintenance-requests/${editingOrder._id}`, {
+        const res = await authFetch(`/api/maintenance-requests/${editingOrder._id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         });
         if (!res.ok) throw new Error(`Server error: ${res.status}`);
       } else {
-        const res = await fetch('http://localhost:5000/api/maintenance-requests', {
+        const res = await authFetch('/api/maintenance-requests', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
@@ -136,7 +137,7 @@ function Maintenance() {
     if (!order?._id) return;
     const statusMap = { open: 'PENDING', 'in-progress': 'IN PROGRESS', completed: 'COMPLETED', deferred: 'PENDING' };
     try {
-      const res = await fetch(`http://localhost:5000/api/maintenance-requests/${order._id}`, {
+      const res = await authFetch(`/api/maintenance-requests/${order._id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: statusMap[newStatus] || 'PENDING' }),
@@ -155,7 +156,7 @@ function Maintenance() {
     if (!order?._id) return;
     const newVal = !order.roomOutOfOrder;
     try {
-      const res = await fetch(`http://localhost:5000/api/maintenance-requests/${order._id}`, {
+      const res = await authFetch(`/api/maintenance-requests/${order._id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ room_out_of_order: newVal }),
@@ -371,7 +372,7 @@ function Maintenance() {
           onAssign={async (tech) => {
               const order = workOrders.find(o => o.id === selectedOrder.id);
               if (order?._id) {
-                await fetch(`http://localhost:5000/api/maintenance-requests/${order._id}`, {
+                await authFetch(`/api/maintenance-requests/${order._id}`, {
                   method: 'PUT',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ assigned_to_name: tech }),

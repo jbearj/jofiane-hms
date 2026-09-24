@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE } from '../../../utils/api';
 
 function AuditTrail() {
   const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -29,7 +30,7 @@ function AuditTrail() {
       setIsRefreshing(true);
     }
     try {
-      const res = await fetch(`http://localhost:5000/api/audits?period=${filterPeriod}`);
+      const res = await fetch(`${API_BASE}/api/audits?period=${filterPeriod}`);
       if (!res.ok) throw new Error(`Server error: ${res.status}`);
       const data = await res.json();
 

@@ -1,8 +1,9 @@
 import React, { useState, useRef } from 'react';
 import { usePolling } from '../../hooks/usePolling';
 import PortalModal from '../common/PortalModal';
+import { authFetch } from '../../utils/api';
 
-const API = 'http://localhost:5000/api/lost-and-found';
+const API = '/api/lost-and-found';
 
 function LostAndFound() {
   const [items, setItems] = useState([]);
@@ -27,7 +28,7 @@ function LostAndFound() {
     if (firstLoad.current) setIsLoading(true);
     setError(null);
     try {
-      const res = await fetch(API);
+      const res = await authFetch(API);
       if (!res.ok) throw new Error(`Server error: ${res.status}`);
       setItems(await res.json());
     } catch (e) {
@@ -45,7 +46,7 @@ function LostAndFound() {
   const addItem = async (e) => {
     e.preventDefault();
     try {
-      const res = await fetch(API, {
+      const res = await authFetch(API, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -74,7 +75,7 @@ function LostAndFound() {
     try {
       const body = { status: newStatus };
       if (newStatus === 'RETURNED' || newStatus === 'CLAIMED') body.claimed_date = new Date();
-      const res = await fetch(`${API}/${id}`, {
+      const res = await authFetch(`${API}/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -94,7 +95,7 @@ function LostAndFound() {
   const deleteItem = async (id) => {
     if (!window.confirm('Delete this Lost & Found record?')) return;
     try {
-      await fetch(`${API}/${id}`, { method: 'DELETE' });
+      await authFetch(`${API}/${id}`, { method: 'DELETE' });
       setItems(prev => prev.filter(i => i._id !== id));
     } catch (e) {
       console.error(e);

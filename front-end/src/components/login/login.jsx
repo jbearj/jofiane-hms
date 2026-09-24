@@ -19,23 +19,15 @@ const Login = ({ onLoginSuccess }) => {
     setIsLoading(true);
     setError('');
 
-    // ── HARDCODED TEST ACCOUNTS (always available, no server needed) ──
-    const TEST_ACCOUNTS = [
-      { username: 'ana@jofiane.com',   password: 'ana2026secure',  name: 'Ana Buenaflor',   role: 'Front Desk Concierge', department: 'Front Desk',  module: 'frontdesk' },
-      { username: 'marco@jofiane.com', password: 'marcoNight123',  name: 'Marco Diaz',       role: 'Night Auditor',        department: 'Front Desk',  module: 'frontdesk' },
-      { username: 'liza@jofiane.com',  password: 'lizaClean99',    name: 'Liza Fernandez',   role: 'Housekeeping Lead',    department: 'Housekeeping',module: 'housekeeping' },
-      { username: 'maria@jofiane.com', password: 'mariaClean22',   name: 'Maria Santos',     role: 'Housekeeper',          department: 'Housekeeping',module: 'housekeeping' },
-      { username: 'ronnie@jofiane.com',password: 'wrench2026',     name: 'Ronnie Cruz',      role: 'Maintenance Tech',     department: 'Maintenance', module: 'frontdesk' },
-    ];
-
+    // Authentication is handled entirely by the server. Credentials are never
+    // embedded in the client, and there is no offline/backdoor login path.
     try {
-      // First: try the live API
       const res = await fetch('http://localhost:5000/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: formData.username, password: formData.password }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
 
       if (res.ok) {
         // Always replace the token for THIS login so a previous user's token
@@ -47,42 +39,13 @@ const Login = ({ onLoginSuccess }) => {
         return;
       }
 
-      // API returned an auth error — check test accounts before showing the error
-      const testMatch = TEST_ACCOUNTS.find(
-        a => a.username.toLowerCase() === formData.username.toLowerCase()
-           && a.password === formData.password
-      );
-      if (testMatch) {
-        localStorage.removeItem('jofiane-token'); // test accounts have no server token
-        onLoginSuccess('employee', {
-          name: testMatch.name, role: testMatch.role,
-          email: testMatch.username, department: testMatch.department,
-        }, testMatch.module);
-        return;
-      }
-
+      // Any non-ok response is an auth failure — never fall back to a local grant.
+      localStorage.removeItem('jofiane-token');
       setError(data.error || 'Invalid credentials. Please try again.');
     } catch (err) {
-      // Server is unreachable — fall back to test accounts
-      const testMatch = TEST_ACCOUNTS.find(
-        a => a.username.toLowerCase() === formData.username.toLowerCase()
-           && a.password === formData.password
-      );
-      if (testMatch) {
-        localStorage.removeItem('jofiane-token'); // no server token → clear any stale one
-        onLoginSuccess('employee', {
-          name: testMatch.name, role: testMatch.role,
-          email: testMatch.username, department: testMatch.department,
-        }, testMatch.module);
-        return;
-      }
-      // Also check admin shortcut offline (exact @admin suffix only)
-      if (/^.+@admin$/.test(formData.username.toLowerCase())) {
-        localStorage.removeItem('jofiane-token'); // no server token → clear any stale one
-        onLoginSuccess('admin', null, null);
-        return;
-      }
-      setError('Cannot reach the server. Check your back-end, or use a test account.');
+      // Server unreachable → surface the error. There is intentionally no
+      // offline login fallback, since that would bypass authentication.
+      setError('Cannot reach the server. Please check your connection and try again.');
     } finally {
       setIsLoading(false);
     }

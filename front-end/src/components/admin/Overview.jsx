@@ -1,7 +1,8 @@
 import React, { useState, useRef } from 'react';
 import { usePolling } from '../../hooks/usePolling';
+import { authFetch } from '../../utils/api';
 
-const API = 'http://localhost:5000/api/dashboard/admin-operations';
+const API = '/api/dashboard/admin-operations';
 
 function Overview({ setActiveTab, adminProfile }) {
   const [isLoading, setIsLoading] = useState(true);
@@ -13,7 +14,7 @@ function Overview({ setActiveTab, adminProfile }) {
     if (firstLoad.current) setIsLoading(true);
     setError(null);
     try {
-      const res = await fetch(API);
+      const res = await authFetch(API);
       if (!res.ok) throw new Error(`Server error: ${res.status}`);
       setData(await res.json());
     } catch (err) {

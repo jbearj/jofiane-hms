@@ -3,7 +3,7 @@ import { usePolling } from '../../hooks/usePolling';
 import { authFetch, readError } from '../../utils/api';
 import PortalModal from '../common/PortalModal';
 
-const API = 'http://localhost:5000/api/housekeeping-logs';
+const API = '/api/housekeeping-logs';
 
 function HousekeepingLogs() {
   const [logs, setLogs] = useState([]);
@@ -28,8 +28,8 @@ function HousekeepingLogs() {
     setError(null);
     try {
       const [logsRes, staffRes] = await Promise.all([
-        fetch(`${API}?today=1`),
-        fetch('http://localhost:5000/api/employees?department=Housekeeping'),
+        authFetch(`${API}?today=1`),
+        authFetch('/api/employees?department=Housekeeping'),
       ]);
       if (!logsRes.ok) throw new Error(`Server error: ${logsRes.status}`);
       setLogs(await logsRes.json());

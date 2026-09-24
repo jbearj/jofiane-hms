@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { authFetch } from '../../../utils/api';
 
 const SHIFT_TYPES = [
   { id: 'morning',   label: 'Morning',   time: '6am–2pm',   color: '#fef3c7', textColor: '#92400e', dot: '#f59e0b' },
@@ -82,9 +83,9 @@ function ShiftSchedules() {
       const endDate   = weekDates[6].toISOString().slice(0, 10);
 
       const [empRes, shiftsRes, assignRes] = await Promise.all([
-        fetch('http://localhost:5000/api/employees'),
-        fetch('http://localhost:5000/api/shifts'),
-        fetch(`http://localhost:5000/api/shift-assignments?startDate=${startDate}&endDate=${endDate}`),
+        authFetch('/api/employees'),
+        authFetch('/api/shifts'),
+        authFetch(`/api/shift-assignments?startDate=${startDate}&endDate=${endDate}`),
       ]);
       if (!empRes.ok || !shiftsRes.ok || !assignRes.ok) throw new Error('API request failed');
 
@@ -142,7 +143,7 @@ function ShiftSchedules() {
         // If there's a saved assignment, delete it; otherwise nothing to do
         const existingId = assignmentIds[key];
         if (existingId) {
-          const res = await fetch(`http://localhost:5000/api/shift-assignments/${existingId}`, {
+          const res = await authFetch(`/api/shift-assignments/${existingId}`, {
             method: 'DELETE',
           });
           if (!res.ok) throw new Error(`DELETE failed: ${res.status}`);
@@ -157,7 +158,7 @@ function ShiftSchedules() {
           return;
         }
 
-        const res = await fetch('http://localhost:5000/api/shift-assignments/upsert', {
+        const res = await authFetch('/api/shift-assignments/upsert', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

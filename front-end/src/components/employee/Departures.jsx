@@ -1,9 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { usePolling } from '../../hooks/usePolling';
+import { authFetch } from '../../utils/api';
+import { todayISO, shiftISODate } from '../../utils/dateUtils';
+import GuestDetailModal from './GuestDetailModal';
 
 function Departures() {
   // 1. UI FILTERS STATE
-  const [selectedDate, setSelectedDate] = useState('2026-08-08'); 
+  const [selectedDate, setSelectedDate] = useState(todayISO());
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [roomTypeFilter, setRoomTypeFilter] = useState('All');
@@ -13,13 +16,17 @@ function Departures() {
   const [isLoading, setIsLoading] = useState(true);
   const [processingId, setProcessingId] = useState(null);
   const [error, setError] = useState(null);
+  const [viewingFolio, setViewingFolio] = useState(null);
+  const firstLoad = useRef(true);   // full loader only on first load / date change
 
   // 3. FETCH DATA
   const fetchDepartures = async () => {
-    setIsLoading(true);
+    // Loader on first load / date change; background polls refresh silently
+    // so the table doesn't flicker every 10 seconds.
+    if (firstLoad.current) setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch(`http://localhost:5000/api/departures?date=${selectedDate}`);
+      const response = await authFetch(`/api/departures?date=${selectedDate}`);
       if (!response.ok) throw new Error(`Server error: ${response.status}`);
       const data = await response.json();
       const normalized = data.map(d => ({
@@ -52,8 +59,12 @@ function Departures() {
       setError('Failed to connect to the server.');
     } finally {
       setIsLoading(false);
+      firstLoad.current = false;
     }
   };
+
+  // Re-arm the full loader when the viewed date changes.
+  useEffect(() => { firstLoad.current = true; }, [selectedDate]);
 
   usePolling(fetchDepartures, 10000, [selectedDate]);
 
@@ -63,7 +74,7 @@ function Departures() {
     if (!departure) return;
     setProcessingId(id);
     try {
-      const res = await fetch(`http://localhost:5000/api/guests/${departure._id}/checkout`, { method: 'POST' });
+      const res = await authFetch(`/api/bookings/${departure._id}/checkout`, { method: 'POST' });
       if (!res.ok) throw new Error(`Server error: ${res.status}`);
       // Update status locally for instant UI feedback
       setDepartures(prev => prev.map(d => d.id === id ? { ...d, status: 'Checked-Out' } : d));
@@ -75,8 +86,10 @@ function Departures() {
     }
   };
 
-  const handleViewFolio = (id) => console.log('View folio for:', id);
-  const handlePostCharge = (id) => console.log('Post charge for', id);
+  const handleViewFolio = (id) => {
+    const departure = departures.find(d => d.id === id);
+    if (departure) setViewingFolio(departure);
+  };
 
   // Filter Logic (Runs on the fetched data)[cite: 11]
   const filteredDepartures = departures.filter((d) => {
@@ -110,14 +123,11 @@ function Departures() {
           <p>Manage today's expected departures, final billing, and room turnovers.</p>
         </div>
         <div className="right employee-page-actions" style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <div className="date-navigator" style={{ display: 'flex', background: '#f3f4f6', borderRadius: '8px', padding: '4px', alignItems: 'center' }}>
-            <button 
-              className="btn btn-sm"
+          <div className="date-navigator" style={{ display: 'flex', alignItems: 'center' }}>
+            <button
+              type="button"
               aria-label="Previous day"
-              style={{ background: 'transparent', border: 'none', boxShadow: 'none', color: '#4b5563' }}
-              onClick={() => setSelectedDate(prev => {
-                const d = new Date(prev); d.setDate(d.getDate() - 1); return d.toISOString().slice(0, 10);
-              })}
+              onClick={() => setSelectedDate(prev => shiftISODate(prev, -1))}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
             </button>
@@ -125,20 +135,16 @@ function Departures() {
               type="date"
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
-              style={{ padding: '4px 8px', fontSize: '13px', border: 'none', background: 'transparent', outline: 'none', fontWeight: '600', color: '#111827' }}
             />
-            <button 
-              className="btn btn-sm"
+            <button
+              type="button"
               aria-label="Next day"
-              style={{ background: 'transparent', border: 'none', boxShadow: 'none', color: '#4b5563' }}
-              onClick={() => setSelectedDate(prev => {
-                const d = new Date(prev); d.setDate(d.getDate() + 1); return d.toISOString().slice(0, 10);
-              })}
+              onClick={() => setSelectedDate(prev => shiftISODate(prev, 1))}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
             </button>
           </div>
-          <button className="btn btn-sm btn-gold" style={{ borderRadius: '8px', padding: '8px 16px' }} onClick={() => setSelectedDate(new Date().toISOString().slice(0, 10))}>
+          <button className="btn btn-sm btn-gold" style={{ borderRadius: '8px', padding: '8px 16px' }} onClick={() => setSelectedDate(todayISO())}>
             Today
           </button>
         </div>
@@ -242,7 +248,7 @@ function Departures() {
               ) : filteredDepartures.length === 0 ? (
                 <tr>
                   <td colSpan="7" style={{ textAlign: 'center', padding: '40px', color: '#6b7280' }}>
-                    No departures match your current filters.
+                    No departures match the current filters.
                   </td>
                 </tr>
               ) : (
@@ -360,6 +366,14 @@ function Departures() {
           </table>
         </div>
       </div>
+
+      {viewingFolio && (
+        <GuestDetailModal
+          booking={viewingFolio}
+          title="Guest Folio"
+          onClose={() => setViewingFolio(null)}
+        />
+      )}
     </section>
   );
 }

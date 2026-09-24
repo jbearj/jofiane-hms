@@ -1,9 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { usePolling } from '../../hooks/usePolling';
+import { authFetch } from '../../utils/api';
+import { todayISO, shiftISODate } from '../../utils/dateUtils';
+import GuestDetailModal from './GuestDetailModal';
+import ConfirmModal from '../common/ConfirmModal';
 
 function Arrivals() {
   // 1. UI FILTERS STATE
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
+  const [selectedDate, setSelectedDate] = useState(todayISO());
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [roomTypeFilter, setRoomTypeFilter] = useState('All');
@@ -12,12 +16,17 @@ function Arrivals() {
   const [arrivals, setArrivals] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [processingId, setProcessingId] = useState(null);
+  const [viewingArrival, setViewingArrival] = useState(null);
+  const [confirmingArrival, setConfirmingArrival] = useState(null);
+  const firstLoad = useRef(true);   // full loader only on first load / date change
 
   // 3. FETCH DATA
   const fetchArrivals = async () => {
-    setIsLoading(true);
+    // Show the loader on the first load (and after a date change); background
+    // polls refresh silently so the table doesn't flicker every 10 seconds.
+    if (firstLoad.current) setIsLoading(true);
     try {
-      const response = await fetch(`http://localhost:5000/api/arrivals?date=${selectedDate}`);
+      const response = await authFetch(`/api/arrivals?date=${selectedDate}`);
       if (!response.ok) throw new Error(`Server error: ${response.status}`);
       const data = await response.json();
       const normalized = data.map(a => ({
@@ -42,21 +51,34 @@ function Arrivals() {
       console.error('Failed to fetch arrivals', err);
     } finally {
       setIsLoading(false);
+      firstLoad.current = false;
     }
   };
+
+  // Re-arm the full loader when the viewed date changes (the next fetch will
+  // show it once), then polling continues silently.
+  useEffect(() => { firstLoad.current = true; }, [selectedDate]);
 
   usePolling(fetchArrivals, 10000, [selectedDate]);
 
   // 4. ASYNC ACTION HANDLERS
-  const handleCheckIn = async (bookingId) => {
+  // Clicking "Check-In" opens a confirmation modal; the actual request runs
+  // only after the user confirms.
+  const requestCheckIn = (bookingId) => {
     const arrival = arrivals.find(a => a.id === bookingId);
+    if (arrival) setConfirmingArrival(arrival);
+  };
+
+  const confirmCheckIn = async () => {
+    const arrival = confirmingArrival;
     if (!arrival) return;
-    setProcessingId(bookingId);
+    setProcessingId(arrival.id);
     try {
-      const res = await fetch(`http://localhost:5000/api/bookings/${arrival._id}/checkin`, { method: 'POST' });
+      const res = await authFetch(`/api/bookings/${arrival._id}/checkin`, { method: 'POST' });
       if (!res.ok) throw new Error(`Server error: ${res.status}`);
       // Update status locally for instant UI feedback
-      setArrivals(prev => prev.map(a => a.id === bookingId ? { ...a, status: 'Checked-In' } : a));
+      setArrivals(prev => prev.map(a => a.id === arrival.id ? { ...a, status: 'Checked-In' } : a));
+      setConfirmingArrival(null);
     } catch (error) {
       console.error('Check-in failed:', error);
       alert('Error checking in guest.');
@@ -66,7 +88,8 @@ function Arrivals() {
   };
 
   const handleViewDetails = (bookingId) => {
-    console.log('Viewing details for booking:', bookingId);
+    const arrival = arrivals.find(a => a.id === bookingId);
+    if (arrival) setViewingArrival(arrival);
   };
 
   // Filter Logic (Runs on the fetched data)
@@ -98,14 +121,11 @@ function Arrivals() {
           <p>Manage today's expected arrivals, VIPs, and room assignments.</p>
         </div>
         <div className="right employee-page-actions" style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <div className="date-navigator" style={{ display: 'flex', background: '#f3f4f6', borderRadius: '8px', padding: '4px', alignItems: 'center' }}>
-            <button 
-              className="btn btn-sm"
+          <div className="date-navigator" style={{ display: 'flex', alignItems: 'center' }}>
+            <button
+              type="button"
               aria-label="Previous day"
-              style={{ background: 'transparent', border: 'none', boxShadow: 'none', color: '#4b5563' }}
-              onClick={() => setSelectedDate(prev => {
-                const d = new Date(prev); d.setDate(d.getDate() - 1); return d.toISOString().slice(0, 10);
-              })}
+              onClick={() => setSelectedDate(prev => shiftISODate(prev, -1))}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
             </button>
@@ -113,20 +133,16 @@ function Arrivals() {
               type="date"
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
-              style={{ padding: '4px 8px', fontSize: '13px', border: 'none', background: 'transparent', outline: 'none', fontWeight: '600', color: '#111827' }}
             />
-            <button 
-              className="btn btn-sm"
+            <button
+              type="button"
               aria-label="Next day"
-              style={{ background: 'transparent', border: 'none', boxShadow: 'none', color: '#4b5563' }}
-              onClick={() => setSelectedDate(prev => {
-                const d = new Date(prev); d.setDate(d.getDate() + 1); return d.toISOString().slice(0, 10);
-              })}
+              onClick={() => setSelectedDate(prev => shiftISODate(prev, 1))}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
             </button>
           </div>
-          <button className="btn btn-sm btn-gold" style={{ borderRadius: '8px', padding: '8px 16px' }} onClick={() => setSelectedDate(new Date().toISOString().slice(0, 10))}>
+          <button className="btn btn-sm btn-gold" style={{ borderRadius: '8px', padding: '8px 16px' }} onClick={() => setSelectedDate(todayISO())}>
             Today
           </button>
         </div>
@@ -205,7 +221,7 @@ function Arrivals() {
               ) : filteredArrivals.length === 0 ? (
                 <tr>
                   <td colSpan="7" style={{ textAlign: 'center', padding: '40px', color: '#6b7280' }}>
-                    No arrivals match your current filters.
+                    No arrivals match the current filters.
                   </td>
                 </tr>
               ) : (
@@ -232,7 +248,7 @@ function Arrivals() {
                       ) : (
                         <div>
                           <div className="secondary-table-text" style={{ fontSize: '12px', color: '#6b7280', marginBottom: '6px' }}>{arrival.roomType}</div>
-                          <button style={{ background: '#f3f4f6', border: 'none', padding: '4px 10px', borderRadius: '4px', fontSize: '11px', color: '#4b5563', fontWeight: '600', cursor: 'pointer' }}>Assign Room</button>
+                          <button onClick={() => handleViewDetails(arrival.id)} style={{ background: '#f3f4f6', border: 'none', padding: '4px 10px', borderRadius: '4px', fontSize: '11px', color: '#4b5563', fontWeight: '600', cursor: 'pointer' }}>Assign Room</button>
                         </div>
                       )}
                     </td>
@@ -248,7 +264,7 @@ function Arrivals() {
                           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
                         </button>
                         {arrival.status === 'Pending' ? (
-                          <button className="btn btn-gold" onClick={() => handleCheckIn(arrival.id)} disabled={processingId === arrival.id} style={{ padding: '0 16px', height: '32px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', border: 'none' }}>
+                          <button className="btn btn-gold" onClick={() => requestCheckIn(arrival.id)} disabled={processingId === arrival.id} style={{ padding: '0 16px', height: '32px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', border: 'none' }}>
                             {processingId === arrival.id ? 'Processing...' : 'Check-In'}
                           </button>
                         ) : <div style={{ width: '85px' }}></div>}
@@ -261,6 +277,28 @@ function Arrivals() {
           </table>
         </div>
       </div>
+
+      {viewingArrival && (
+        <GuestDetailModal
+          booking={viewingArrival}
+          title="Guest Details"
+          onClose={() => setViewingArrival(null)}
+        />
+      )}
+
+      {confirmingArrival && (
+        <ConfirmModal
+          title="Confirm Check-In"
+          message={
+            <>Check in <strong>{confirmingArrival.guestName}</strong>
+            {confirmingArrival.roomNumber ? <> to Room <strong>{confirmingArrival.roomNumber}</strong></> : ''}?</>
+          }
+          confirmLabel="Check In"
+          busy={processingId === confirmingArrival.id}
+          onConfirm={confirmCheckIn}
+          onCancel={() => setConfirmingArrival(null)}
+        />
+      )}
     </section>
   );
 }

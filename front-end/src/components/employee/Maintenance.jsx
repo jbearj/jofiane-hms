@@ -1,8 +1,9 @@
 import React, { useState, useRef } from 'react';
 import { usePolling } from '../../hooks/usePolling';
 import PortalModal from '../common/PortalModal';
+import { authFetch } from '../../utils/api';
 
-const API = 'http://localhost:5000/api/maintenance-requests';
+const API = '/api/maintenance-requests';
 
 const Maintenance = () => {
   const [requests, setRequests] = useState([]);
@@ -25,7 +26,7 @@ const Maintenance = () => {
     if (firstLoad.current) setIsLoading(true);
     setError(null);
     try {
-      const res = await fetch(API);
+      const res = await authFetch(API);
       if (!res.ok) throw new Error(`Server error: ${res.status}`);
       setRequests(await res.json());
     } catch (e) {
@@ -43,7 +44,7 @@ const Maintenance = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const res = await fetch(API, {
+      const res = await authFetch(API, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -70,7 +71,7 @@ const Maintenance = () => {
     try {
       const body = { status: newStatus };
       if (newStatus === 'COMPLETED') body.completed_at = new Date();
-      const res = await fetch(`${API}/${id}`, {
+      const res = await authFetch(`${API}/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),

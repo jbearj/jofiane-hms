@@ -1,8 +1,9 @@
 import React, { useState, useRef } from 'react';
 import { usePolling } from '../../hooks/usePolling';
 import PortalModal from '../common/PortalModal';
+import { authFetch, API_BASE } from '../../utils/api';
 
-const API = 'http://localhost:5000/api/cleaning-tasks';
+const API = '/api/cleaning-tasks';
 
 const CleaningTasks = ({ isLead = false, employee = null }) => {
   const [tasks, setTasks] = useState([]);
@@ -30,8 +31,8 @@ const CleaningTasks = ({ isLead = false, employee = null }) => {
     setError(null);
     try {
       const [tasksRes, staffRes] = await Promise.all([
-        fetch(API),
-        fetch('http://localhost:5000/api/employees?department=Housekeeping'),
+        authFetch(API),
+        fetch(`${API_BASE}/api/employees?department=Housekeeping`),
       ]);
       if (!tasksRes.ok) throw new Error(`Server error: ${tasksRes.status}`);
       setTasks(await tasksRes.json());
@@ -59,7 +60,7 @@ const CleaningTasks = ({ isLead = false, employee = null }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const res = await fetch(API, {
+      const res = await authFetch(API, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -87,7 +88,7 @@ const CleaningTasks = ({ isLead = false, employee = null }) => {
   const completeTask = async (id) => {
     setSavingId(id);
     try {
-      const res = await fetch(`${API}/${id}`, {
+      const res = await authFetch(`${API}/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'COMPLETED' }),

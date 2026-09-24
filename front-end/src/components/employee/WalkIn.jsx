@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { authFetch } from '../../utils/api';
 
 const roomOptions = [
   { id: '102', type: 'Deluxe King', rate: 4200, floor: '1st Floor', feature: 'Garden view' },
@@ -14,6 +15,9 @@ function WalkIn({ onViewBooking }) {
   const [step, setStep] = useState(1);
   const [selectedRoom, setSelectedRoom] = useState(roomOptions[0]);
   const [confirmed, setConfirmed] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(null);
+  const [confirmedId, setConfirmedId] = useState('');
   const [form, setForm] = useState({
     firstName: '', lastName: '', mobile: '', email: '', idType: 'Government ID',
     checkIn: today, checkOut: tomorrow, adults: '2', children: '0', payment: 'Credit Card', deposit: '2000', notes: ''
@@ -23,6 +27,54 @@ function WalkIn({ onViewBooking }) {
   const total = useMemo(() => selectedRoom.rate * nights, [selectedRoom, nights]);
   const update = (field) => (event) => setForm((current) => ({ ...current, [field]: event.target.value }));
   const canContinue = step !== 1 || (form.firstName.trim() && form.lastName.trim() && form.mobile.trim());
+
+  // Persist the walk-in as a real booking so it appears in Booking Management.
+  const handleConfirm = async () => {
+    setSaving(true);
+    setSaveError(null);
+    const fmtAmt = (n) => parseFloat(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2 });
+    const bookingId = `BKG-${Date.now()}`;
+    const fullName = `${form.firstName} ${form.lastName}`.trim();
+    const deposit = parseFloat(form.deposit) || 0;
+    const balanceDue = Math.max(0, total - deposit);
+    const payload = {
+      booking_id: bookingId,
+      room_number: selectedRoom.id,
+      source: 'Walk-in',
+      status: 'Confirmed',
+      dates: { check_in: form.checkIn, check_out: form.checkOut, nights: String(nights) },
+      guest: { guest_id: String(Date.now()), full_name: fullName, email: form.email || '', phone: form.mobile || '' },
+      billing: {
+        expected_total: fmtAmt(total),
+        total_paid: fmtAmt(deposit),
+        balance_due: fmtAmt(balanceDue),
+      },
+      transactions: deposit > 0 ? [{
+        txn_id: `TXN-${Date.now()}`,
+        datetime: new Date().toLocaleString('en-CA', { hour12: false }).replace(',', ''),
+        description: `Walk-in Deposit (Rm ${selectedRoom.id})`,
+        amount: fmtAmt(deposit),
+        payment_method: form.payment || 'Cash',
+        payment_details: 'Front Desk',
+        status: 'COMPLETED',
+      }] : [],
+    };
+    try {
+      const res = await authFetch('/api/bookings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error(`Server error: ${res.status}`);
+      setConfirmedId(bookingId);
+      setConfirmed(true);
+    } catch (err) {
+      console.error('Failed to save walk-in booking:', err);
+      setSaveError('Could not save the booking. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <section className="admin-tab-content active employee-module walkin-module">
@@ -48,9 +100,9 @@ function WalkIn({ onViewBooking }) {
           <div className="success-icon">✓</div>
           <span className="eyebrow">Reservation confirmed</span>
           <h3>{form.firstName} {form.lastName} is ready for check-in</h3>
-          <p>Booking <strong>BKG-8024</strong> · Room {selectedRoom.id} · {nights} night{nights > 1 ? 's' : ''}</p>
+          <p>Booking <strong>{confirmedId}</strong> · Room {selectedRoom.id} · {nights} night{nights > 1 ? 's' : ''}</p>
           <div className="success-actions">
-            <button className="btn" type="button" onClick={() => { setConfirmed(false); setStep(1); }}>Create another</button>
+            <button className="btn" type="button" onClick={() => { setConfirmed(false); setStep(1); setConfirmedId(''); }}>Create another</button>
             <button className="btn btn-gold" type="button" onClick={onViewBooking}>View booking</button>
           </div>
         </div>
@@ -106,9 +158,14 @@ function WalkIn({ onViewBooking }) {
               </div>
             )}
 
+            {saveError && (
+              <div style={{ color: '#dc2626', fontSize: '13px', marginTop: '14px' }}>{saveError}</div>
+            )}
             <div className="walkin-form-actions">
-              <button className="btn" type="button" disabled={step === 1} onClick={() => setStep((current) => current - 1)}>Back</button>
-              {step < 3 ? <button className="btn btn-gold" type="button" disabled={!canContinue} onClick={() => setStep((current) => current + 1)}>Continue</button> : <button className="btn btn-gold" type="button" onClick={() => setConfirmed(true)}>Confirm booking</button>}
+              <button className="btn" type="button" disabled={step === 1 || saving} onClick={() => setStep((current) => current - 1)}>Back</button>
+              {step < 3
+                ? <button className="btn btn-gold" type="button" disabled={!canContinue} onClick={() => setStep((current) => current + 1)}>Continue</button>
+                : <button className="btn btn-gold" type="button" disabled={saving} onClick={handleConfirm}>{saving ? 'Saving…' : 'Confirm booking'}</button>}
             </div>
           </div>
 

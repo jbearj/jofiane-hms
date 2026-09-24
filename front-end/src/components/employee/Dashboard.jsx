@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { usePolling } from '../../hooks/usePolling';
+import { API_BASE } from '../../utils/api';
 
 function Dashboard({ employee, setActiveTab }) {
   const [isLoading, setIsLoading] = useState(true);
@@ -10,7 +11,7 @@ function Dashboard({ employee, setActiveTab }) {
   const fetchDashboard = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch('http://localhost:5000/api/dashboard/overview');
+      const res = await fetch(`${API_BASE}/api/dashboard/overview`);
       if (!res.ok) throw new Error(`Server error: ${res.status}`);
       const data = await res.json();
       setStats({
@@ -133,8 +134,8 @@ const occupancyRate = stats.rooms.total > 0 ? Math.round((stats.rooms.occupied /
           <div className="employee-glass-card activity-card dashboard-link-card" onClick={() => setActiveTab('logbook')} onKeyDown={(event) => event.key === 'Enter' && setActiveTab('logbook')} role="link" tabIndex="0" aria-label="Open Front Desk Log" style={{ background: '#fff', borderRadius: '12px', border: '1px solid #edebe7', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
                 <div className="card-section-heading"><span className="card-eyebrow">Live feed</span><h3 style={{ margin: '0 0 16px 0', fontSize: '15px', fontWeight: '700', color: '#1a1917' }}>Recent Activity</h3></div>
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  {recentActivity.map((item) => (
-                    <div className="activity-item" key={item.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '10px 0', borderBottom: '1px solid #f3f4f6' }}>
+                  {recentActivity.map((item, idx) => (
+                    <div className="activity-item" key={item.id || `activity-${idx}`} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '10px 0', borderBottom: '1px solid #f3f4f6' }}>
                       <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#f9fafb', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                         <i className={`fas ${item.icon}`} style={{ fontSize: '11px', color: '#6b7280' }}></i>
                       </div>

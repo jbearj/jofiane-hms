@@ -34,9 +34,9 @@ function StaffList() {
 
       // Fetch employees and today's shift assignments in parallel
       const [empRes, shiftsRes, assignRes] = await Promise.all([
-        fetch('http://localhost:5000/api/employees'),
-        fetch('http://localhost:5000/api/shifts'),
-        fetch(`http://localhost:5000/api/shift-assignments?startDate=${today}&endDate=${today}`),
+        authFetch('/api/employees'),
+        authFetch('/api/shifts'),
+        authFetch(`/api/shift-assignments?startDate=${today}&endDate=${today}`),
       ]);
       if (!empRes.ok) throw new Error(`Server error: ${empRes.status}`);
       const [empData, shiftsData, assignData] = await Promise.all([

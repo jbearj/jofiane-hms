@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
+import { authFetch } from '../../utils/api';
+import { todayISO, shiftISODate } from '../../utils/dateUtils';
 
 function FrontDeskLog({ employee = null }) {
   // Logged-in agent's identity for attributing new entries / comments.
   const currentName = employee?.name || 'Staff';
   const currentStaffId = employee?.employee_id || 'STAFF';
 
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
+  const [selectedDate, setSelectedDate] = useState(todayISO());
   const [selectedShift, setSelectedShift] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState('All');
@@ -24,7 +26,7 @@ function FrontDeskLog({ employee = null }) {
       setIsLoading(true);
       setError(null);
       try {
-        const res = await fetch(`http://localhost:5000/api/front-desk-logs?date=${selectedDate}`);
+        const res = await authFetch(`/api/front-desk-logs?date=${selectedDate}`);
         if (!res.ok) throw new Error(`Server error: ${res.status}`);
         const data = await res.json();
 
@@ -99,7 +101,7 @@ function FrontDeskLog({ employee = null }) {
     setEntries(prev => prev.filter(e => e.id !== id));
     if (entry?._dbId) {
       try {
-        await fetch(`http://localhost:5000/api/front-desk-logs/${entry._dbId}`, { method: 'DELETE' });
+        await authFetch(`/api/front-desk-logs/${entry._dbId}`, { method: 'DELETE' });
       } catch (e) {
         console.error('Failed to delete log entry:', e);
       }
@@ -164,7 +166,7 @@ function FrontDeskLog({ employee = null }) {
     };
 
     try {
-      const res = await fetch('http://localhost:5000/api/front-desk-logs', {
+      const res = await authFetch('/api/front-desk-logs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -212,16 +214,16 @@ function FrontDeskLog({ employee = null }) {
           <p style={{ margin: 0, fontSize: '14px', color: '#6b7280' }}>Track shift handovers, incidents, maintenance requests, and daily notes.</p>
         </div>
         <div className="employee-page-actions logbook-actions" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <div className="date-navigator" style={{ display: 'flex', background: '#f9fafb', borderRadius: '8px', padding: '4px', alignItems: 'center', border: '1px solid #e5e7eb' }}>
-            <button aria-label="Previous day" onClick={() => setSelectedDate(prev => { const d = new Date(prev); d.setDate(d.getDate() - 1); return d.toISOString().slice(0, 10); })} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '6px 10px', fontSize: '14px', color: '#374151' }}>
-              <i className="fas fa-chevron-left"></i>
+          <div className="date-navigator" style={{ display: 'flex', alignItems: 'center' }}>
+            <button type="button" aria-label="Previous day" onClick={() => setSelectedDate(prev => shiftISODate(prev, -1))}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
             </button>
-            <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} style={{ border: 'none', background: 'transparent', fontSize: '13px', fontWeight: '600', outline: 'none', color: '#1f2937' }} />
-            <button aria-label="Next day" onClick={() => setSelectedDate(prev => { const d = new Date(prev); d.setDate(d.getDate() + 1); return d.toISOString().slice(0, 10); })} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '6px 10px', fontSize: '14px', color: '#374151' }}>
-              <i className="fas fa-chevron-right"></i>
+            <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} />
+            <button type="button" aria-label="Next day" onClick={() => setSelectedDate(prev => shiftISODate(prev, 1))}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
             </button>
           </div>
-          <button className="btn btn-sm btn-gold" onClick={() => setSelectedDate(new Date().toISOString().slice(0, 10))} style={{ borderRadius: '6px', padding: '8px 14px', fontSize: '13px' }}>Today</button>
+          <button className="btn btn-sm btn-gold" onClick={() => setSelectedDate(todayISO())} style={{ borderRadius: '6px', padding: '8px 14px', fontSize: '13px' }}>Today</button>
           <select value={selectedShift} onChange={e => setSelectedShift(e.target.value)} style={{ padding: '8px 12px', fontSize: '13px', borderRadius: '6px', border: '1px solid #d1d5db', outline: 'none', color: '#374151', background: '#fff' }}>
             <option value="all">All Shifts</option>
             <option value="morning">Morning (7am-3pm)</option>
@@ -331,7 +333,7 @@ function FrontDeskLog({ employee = null }) {
               {filteredEntries.length === 0 && (
                 <div style={{ textAlign: 'center', padding: '48px 20px', color: '#9ca3af' }}>
                   <i className="fas fa-inbox" style={{ fontSize: '24px', display: 'block', marginBottom: '10px' }}></i>
-                  No log entries match your filters.
+                  No log entries match the current filters.
                 </div>
               )}
             </>

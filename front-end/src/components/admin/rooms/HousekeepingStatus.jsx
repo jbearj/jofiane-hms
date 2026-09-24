@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, memo } from 'react';
 import { usePolling } from '../../../hooks/usePolling';
+import { authFetch } from '../../../utils/api';
 
 function HousekeepingStatus() {
   const [isLoading, setIsLoading] = useState(true);
@@ -23,8 +24,8 @@ function HousekeepingStatus() {
     if (firstLoad.current) setIsLoading(true);
     try {
       const [roomsRes, empRes] = await Promise.all([
-        fetch('http://localhost:5000/api/rooms'),
-        fetch('http://localhost:5000/api/employees?department=Housekeeping'),
+        authFetch('/api/rooms'),
+        authFetch('/api/employees?department=Housekeeping'),
       ]);
       if (!roomsRes.ok) throw new Error(`Server error: ${roomsRes.status}`);
 
@@ -131,7 +132,7 @@ function HousekeepingStatus() {
     setRooms(prev => prev.map(r => r.id === roomId ? { ...r, ...uiPatch } : r));
 
     try {
-      const res = await fetch(`http://localhost:5000/api/rooms/${room._id}`, {
+      const res = await authFetch(`/api/rooms/${room._id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(patch),

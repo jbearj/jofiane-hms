@@ -1,8 +1,9 @@
 import React, { useState, useRef } from 'react';
 import { usePolling } from '../../hooks/usePolling';
 import PortalModal from '../common/PortalModal';
+import { authFetch } from '../../utils/api';
 
-const API = 'http://localhost:5000/api/guest-requests';
+const API = '/api/guest-requests';
 
 function GuestRequests({ isLead = false, employee = null }) {
   const [requests, setRequests] = useState([]);
@@ -26,7 +27,7 @@ function GuestRequests({ isLead = false, employee = null }) {
     if (firstLoad.current) setIsLoading(true);
     setError(null);
     try {
-      const res = await fetch(API);
+      const res = await authFetch(API);
       if (!res.ok) throw new Error(`Server error: ${res.status}`);
       setRequests(await res.json());
     } catch (e) {
@@ -44,7 +45,7 @@ function GuestRequests({ isLead = false, employee = null }) {
   const addRequest = async (e) => {
     e.preventDefault();
     try {
-      const res = await fetch(API, {
+      const res = await authFetch(API, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -70,7 +71,7 @@ function GuestRequests({ isLead = false, employee = null }) {
   const updateStatus = async (id, newStatus) => {
     setSavingId(id);
     try {
-      const res = await fetch(`${API}/${id}`, {
+      const res = await authFetch(`${API}/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus }),
@@ -89,7 +90,7 @@ function GuestRequests({ isLead = false, employee = null }) {
   // ── ASSIGN STAFF ───────────────────────────────────
   const assignStaff = async (id, staffName) => {
     try {
-      const res = await fetch(`${API}/${id}`, {
+      const res = await authFetch(`${API}/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ assigned_to: staffName }),

@@ -11,7 +11,21 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 require('dotenv').config();
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-fallback-secret-set-JWT_SECRET-in-env';
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+
+// The JWT secret MUST be provided via the environment. In production we refuse
+// to start without it — falling back to a hardcoded, publicly-known secret would
+// let anyone forge admin tokens. In development we allow a clearly-labelled
+// fallback but warn loudly so it's never mistaken for a real secret.
+let JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  if (IS_PRODUCTION) {
+    console.error('❌ JWT_SECRET is not set. Refusing to start in production without it.');
+    process.exit(1);
+  }
+  console.warn('⚠️  JWT_SECRET is not set — using an INSECURE development fallback. Set JWT_SECRET before deploying.');
+  JWT_SECRET = 'dev-fallback-secret-set-JWT_SECRET-in-env';
+}
 const TOKEN_TTL = '12h'; // tokens expire after a shift-length window
 
 
@@ -30,7 +44,21 @@ const HousekeepingLog = require('./models/HousekeepingLog');
 
 
 const app = express();
-app.use(cors());
+
+// Restrict CORS to known front-end origins instead of allowing any site to call
+// the API. Set CORS_ORIGIN to a comma-separated list of allowed origins in
+// production (e.g. "https://hms.jofiane.com"). Defaults to the CRA dev server.
+const ALLOWED_ORIGINS = (process.env.CORS_ORIGIN || 'http://localhost:3000')
+  .split(',')
+  .map(o => o.trim())
+  .filter(Boolean);
+app.use(cors({
+  origin(origin, callback) {
+    // Allow non-browser clients (curl, server-to-server) that send no Origin.
+    if (!origin || ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
+    return callback(new Error(`Origin ${origin} not allowed by CORS`));
+  },
+}));
 // Raised from the 100kb default so base64 profile photos (a 2MB image is
 // ~2.7MB once base64-encoded) fit in the request body.
 app.use(express.json({ limit: '5mb' }));
@@ -392,7 +420,7 @@ app.get('/api/rooms', async (req, res) => {
 });
 
 // PUT update a room by _id (housekeeping status, assignment, notes, etc.)
-app.put('/api/rooms/:id', async (req, res) => {
+app.put('/api/rooms/:id', requireAuth, async (req, res) => {
   try {
     const updated = await Room.findByIdAndUpdate(req.params.id, req.body, { new: true });
     if (!updated) return res.status(404).json({ error: 'Room not found' });
@@ -520,7 +548,7 @@ app.delete('/api/bookings/:id', requireAuth, requireAdmin, async (req, res) => {
 
 
 
-app.post('/api/bookings/:id/cancel', async (req, res) => {
+app.post('/api/bookings/:id/cancel', requireAuth, async (req, res) => {
   try {
     const { reason, cancelled_by, penalty_applied, penalty_amount } = req.body;
     const booking = await Booking.findById(req.params.id);
@@ -576,7 +604,7 @@ app.post('/api/bookings/:id/cancel', async (req, res) => {
 
 
 
-app.post('/api/bookings', async (req, res) => {
+app.post('/api/bookings', requireAuth, async (req, res) => {
   try {
     const booking = new Booking(req.body);
     const saved = await booking.save();
@@ -625,7 +653,7 @@ app.put('/api/bookings/:id', requireAuth, requireAdmin, async (req, res) => {
 
 
 
-app.post('/api/bookings/:id/checkin', async (req, res) => {
+app.post('/api/bookings/:id/checkin', requireAuth, async (req, res) => {
   try {
     const updated = await Booking.findByIdAndUpdate(
       req.params.id,
@@ -649,7 +677,7 @@ app.post('/api/bookings/:id/checkin', async (req, res) => {
 
 
 // POST check-out: set status to "Checked Out"
-app.post('/api/bookings/:id/checkout', async (req, res) => {
+app.post('/api/bookings/:id/checkout', requireAuth, async (req, res) => {
   try {
     const updated = await Booking.findByIdAndUpdate(
       req.params.id,
@@ -676,7 +704,7 @@ app.post('/api/bookings/:id/checkout', async (req, res) => {
 
 
 
-app.post('/api/bookings/:id/transactions', async (req, res) => {
+app.post('/api/bookings/:id/transactions', requireAuth, requireAdmin, async (req, res) => {
   try {
     const updated = await Booking.findByIdAndUpdate(
       req.params.id,
@@ -992,7 +1020,7 @@ app.get('/api/shift-assignments', async (req, res) => {
 
 
 
-app.patch('/api/shift-assignments/upsert', async (req, res) => {
+app.patch('/api/shift-assignments/upsert', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { employee_id, shift_date, shift_id, status } = req.body;
     const dateObj = new Date(shift_date);
@@ -1033,7 +1061,7 @@ app.patch('/api/shift-assignments/upsert', async (req, res) => {
 
 
 
-app.put('/api/shift-assignments/:id', async (req, res) => {
+app.put('/api/shift-assignments/:id', requireAuth, requireAdmin, async (req, res) => {
   try {
     const updated = await ShiftAssignment.findByIdAndUpdate(req.params.id, req.body, { new: true });
     if (!updated) return res.status(404).json({ error: 'Assignment not found' });
@@ -1046,7 +1074,7 @@ app.put('/api/shift-assignments/:id', async (req, res) => {
 
 
 
-app.delete('/api/shift-assignments/:id', async (req, res) => {
+app.delete('/api/shift-assignments/:id', requireAuth, requireAdmin, async (req, res) => {
   try {
     const deleted = await ShiftAssignment.findByIdAndDelete(req.params.id);
     if (!deleted) return res.status(404).json({ error: 'Assignment not found' });
@@ -1059,7 +1087,7 @@ app.delete('/api/shift-assignments/:id', async (req, res) => {
 
 
 
-app.post('/api/shift-assignments', async (req, res) => {
+app.post('/api/shift-assignments', requireAuth, requireAdmin, async (req, res) => {
   try {
     const assignment = new ShiftAssignment(req.body);
     const saved = await assignment.save();
@@ -1087,7 +1115,7 @@ app.get('/api/audits', async (req, res) => {
 });
 
 
-app.post('/api/audits', async (req, res) => {
+app.post('/api/audits', requireAuth, requireAdmin, async (req, res) => {
   try {
     const audit = new Audit(req.body);
     const saved = await audit.save();
@@ -1663,7 +1691,7 @@ app.get('/api/guest-requests', async (req, res) => {
   } catch (e) { res.status(500).json({ error: 'Failed to fetch guest requests', detail: e.message }); }
 });
 
-app.post('/api/guest-requests', async (req, res) => {
+app.post('/api/guest-requests', requireAuth, async (req, res) => {
   try {
     const max = await GuestRequest.findOne().sort({ request_id: -1 });
     const body = { ...req.body, request_id: (max?.request_id || 0) + 1, requested_at: new Date() };
@@ -1672,7 +1700,7 @@ app.post('/api/guest-requests', async (req, res) => {
   } catch (e) { res.status(500).json({ error: 'Failed to create guest request', detail: e.message }); }
 });
 
-app.put('/api/guest-requests/:id', async (req, res) => {
+app.put('/api/guest-requests/:id', requireAuth, async (req, res) => {
   try {
     const updated = await GuestRequest.findByIdAndUpdate(req.params.id, req.body, { new: true });
     if (!updated) return res.status(404).json({ error: 'Not found' });
@@ -1680,7 +1708,7 @@ app.put('/api/guest-requests/:id', async (req, res) => {
   } catch (e) { res.status(500).json({ error: 'Failed to update guest request', detail: e.message }); }
 });
 
-app.delete('/api/guest-requests/:id', async (req, res) => {
+app.delete('/api/guest-requests/:id', requireAuth, async (req, res) => {
   try {
     await GuestRequest.findByIdAndDelete(req.params.id);
     res.json({ success: true });
@@ -1701,7 +1729,7 @@ app.get('/api/cleaning-tasks', async (req, res) => {
   } catch (e) { res.status(500).json({ error: 'Failed to fetch cleaning tasks', detail: e.message }); }
 });
 
-app.post('/api/cleaning-tasks', async (req, res) => {
+app.post('/api/cleaning-tasks', requireAuth, async (req, res) => {
   try {
     const max = await CleaningTask.findOne().sort({ task_id: -1 });
     const body = { ...req.body, task_id: (max?.task_id || 0) + 1 };
@@ -1710,7 +1738,7 @@ app.post('/api/cleaning-tasks', async (req, res) => {
   } catch (e) { res.status(500).json({ error: 'Failed to create cleaning task', detail: e.message }); }
 });
 
-app.put('/api/cleaning-tasks/:id', async (req, res) => {
+app.put('/api/cleaning-tasks/:id', requireAuth, async (req, res) => {
   try {
     const updated = await CleaningTask.findByIdAndUpdate(req.params.id, req.body, { new: true });
     if (!updated) return res.status(404).json({ error: 'Not found' });
@@ -1718,7 +1746,7 @@ app.put('/api/cleaning-tasks/:id', async (req, res) => {
   } catch (e) { res.status(500).json({ error: 'Failed to update cleaning task', detail: e.message }); }
 });
 
-app.delete('/api/cleaning-tasks/:id', async (req, res) => {
+app.delete('/api/cleaning-tasks/:id', requireAuth, async (req, res) => {
   try {
     await CleaningTask.findByIdAndDelete(req.params.id);
     res.json({ success: true });
@@ -1785,7 +1813,7 @@ app.get('/api/lost-and-found', async (req, res) => {
   } catch (e) { res.status(500).json({ error: 'Failed to fetch lost and found', detail: e.message }); }
 });
 
-app.post('/api/lost-and-found', async (req, res) => {
+app.post('/api/lost-and-found', requireAuth, async (req, res) => {
   try {
     const max = await LostAndFound.findOne().sort({ item_id: -1 });
     const body = { ...req.body, item_id: (max?.item_id || 0) + 1, found_date: req.body.found_date || new Date() };
@@ -1794,7 +1822,7 @@ app.post('/api/lost-and-found', async (req, res) => {
   } catch (e) { res.status(500).json({ error: 'Failed to create lost and found record', detail: e.message }); }
 });
 
-app.put('/api/lost-and-found/:id', async (req, res) => {
+app.put('/api/lost-and-found/:id', requireAuth, async (req, res) => {
   try {
     const updated = await LostAndFound.findByIdAndUpdate(req.params.id, req.body, { new: true });
     if (!updated) return res.status(404).json({ error: 'Not found' });
@@ -1802,7 +1830,7 @@ app.put('/api/lost-and-found/:id', async (req, res) => {
   } catch (e) { res.status(500).json({ error: 'Failed to update lost and found record', detail: e.message }); }
 });
 
-app.delete('/api/lost-and-found/:id', async (req, res) => {
+app.delete('/api/lost-and-found/:id', requireAuth, async (req, res) => {
   try {
     await LostAndFound.findByIdAndDelete(req.params.id);
     res.json({ success: true });
@@ -1822,7 +1850,7 @@ app.get('/api/maintenance-requests', async (req, res) => {
   } catch (e) { res.status(500).json({ error: 'Failed to fetch maintenance requests', detail: e.message }); }
 });
 
-app.post('/api/maintenance-requests', async (req, res) => {
+app.post('/api/maintenance-requests', requireAuth, async (req, res) => {
   try {
     const max = await MaintenanceRequest.findOne().sort({ maintenance_id: -1 });
     const body = { ...req.body, maintenance_id: (max?.maintenance_id || 0) + 1, reported_at: new Date() };
@@ -1831,7 +1859,7 @@ app.post('/api/maintenance-requests', async (req, res) => {
   } catch (e) { res.status(500).json({ error: 'Failed to create maintenance request', detail: e.message }); }
 });
 
-app.put('/api/maintenance-requests/:id', async (req, res) => {
+app.put('/api/maintenance-requests/:id', requireAuth, async (req, res) => {
   try {
     const updated = await MaintenanceRequest.findByIdAndUpdate(req.params.id, req.body, { new: true });
     if (!updated) return res.status(404).json({ error: 'Not found' });
@@ -1839,7 +1867,7 @@ app.put('/api/maintenance-requests/:id', async (req, res) => {
   } catch (e) { res.status(500).json({ error: 'Failed to update maintenance request', detail: e.message }); }
 });
 
-app.delete('/api/maintenance-requests/:id', async (req, res) => {
+app.delete('/api/maintenance-requests/:id', requireAuth, async (req, res) => {
   try {
     await MaintenanceRequest.findByIdAndDelete(req.params.id);
     res.json({ success: true });
@@ -1863,7 +1891,7 @@ app.get('/api/front-desk-logs', async (req, res) => {
   } catch (e) { res.status(500).json({ error: 'Failed to fetch logs', detail: e.message }); }
 });
 
-app.post('/api/front-desk-logs', async (req, res) => {
+app.post('/api/front-desk-logs', requireAuth, async (req, res) => {
   try {
     const max = await Audit.findOne().sort({ audit_id: -1 });
     const nextId = `LOG-${String((parseInt((max?.audit_id || 'LOG-0').split('-')[1]) || 0) + 1).padStart(3,'0')}`;
@@ -1877,7 +1905,7 @@ app.post('/api/front-desk-logs', async (req, res) => {
   } catch (e) { res.status(500).json({ error: 'Failed to create log entry', detail: e.message }); }
 });
 
-app.put('/api/front-desk-logs/:id', async (req, res) => {
+app.put('/api/front-desk-logs/:id', requireAuth, async (req, res) => {
   try {
     const updated = await Audit.findByIdAndUpdate(req.params.id, req.body, { new: true });
     if (!updated) return res.status(404).json({ error: 'Not found' });
@@ -1885,7 +1913,7 @@ app.put('/api/front-desk-logs/:id', async (req, res) => {
   } catch (e) { res.status(500).json({ error: 'Failed to update log entry', detail: e.message }); }
 });
 
-app.delete('/api/front-desk-logs/:id', async (req, res) => {
+app.delete('/api/front-desk-logs/:id', requireAuth, async (req, res) => {
   try {
     await Audit.findByIdAndDelete(req.params.id);
     res.json({ success: true });

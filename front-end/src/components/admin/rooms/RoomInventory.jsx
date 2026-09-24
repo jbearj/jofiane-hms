@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { API_BASE } from '../../../utils/api';
 
 function RoomInventory() {
   const [isLoading, setIsLoading] = useState(true);
@@ -30,8 +31,8 @@ function RoomInventory() {
     try {
       // 1. Fetch live data from your Node.js server
       const [roomsRes, typesRes] = await Promise.all([
-        fetch('http://localhost:5000/api/rooms'),
-        fetch('http://localhost:5000/api/room-types')
+        fetch(`${API_BASE}/api/rooms`),
+        fetch(`${API_BASE}/api/room-types`)
       ]);
 
       if (!roomsRes.ok || !typesRes.ok) {

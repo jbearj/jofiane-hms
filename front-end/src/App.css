@@ -4199,18 +4199,6 @@ tr:last-child td {
   padding: 0 0px 0 2px;
 }
 
-.employee-portal-shell .employee-page-header .left::before,
-.employee-portal-shell .logbook-header > div:first-child::before {
-  content: 'Employee workspace';
-  display: block;
-  margin-bottom: 8px;
-  color: var(--gold-dark);
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-}
-
 .employee-portal-shell .employee-page-header h2,
 .employee-portal-shell .logbook-header h2 {
   color: var(--text-primary) !important;
@@ -4241,24 +4229,52 @@ tr:last-child td {
   box-shadow: 0 5px 16px rgba(52, 30, 18, 0.05);
 }
 
-.employee-portal-shell .date-navigator input {
+.employee-portal-shell .date-navigator input[type="date"] {
   min-height: 32px;
+  padding: 0 8px !important;
   background: transparent !important;
   border: 0 !important;
   box-shadow: none !important;
+  outline: none !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  color: var(--text-primary) !important;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+/* Tint the browser's built-in calendar picker icon to the gold accent */
+.employee-portal-shell .date-navigator input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.6;
+  filter: sepia(1) saturate(3) hue-rotate(5deg);
+  transition: opacity 0.18s ease;
+}
+.employee-portal-shell .date-navigator input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
 }
 
 .employee-portal-shell .date-navigator button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 34px;
   min-width: 34px;
   min-height: 34px;
   padding: 0 !important;
+  border: 0 !important;
   border-radius: 9px !important;
+  background: transparent !important;
+  color: var(--text-secondary, #6b5a48) !important;
+  box-shadow: none !important;
+  cursor: pointer;
+  transition: background-color 0.18s ease, color 0.18s ease;
 }
 
 .employee-portal-shell .date-navigator button:hover {
   color: var(--espresso) !important;
-  background: rgba(201, 168, 76, 0.15) !important;
+  background: rgba(201, 168, 76, 0.18) !important;
 }
 
 /* Shared, restrained glass surfaces */
@@ -6912,6 +6928,67 @@ tr:last-child td {
   .peek-actions { grid-template-columns:1fr; }
   .peek-actions .btn-gold { grid-column:auto; }
 }
+
+/* ============================================================
+   ROOM RACK POP-UP MODALS
+   The room-detail and stay-peek panels now render inside the shared
+   centered PortalModal (.modal-content), which already supplies the card
+   surface. So we strip the peek card's own box and give the room-detail
+   body clean typography/spacing.
+   ============================================================ */
+
+/* Stay peek: let PortalModal be the single card surface. */
+.modal-content .stay-peek-card {
+  position: static;
+  width: 100%;
+  max-width: none;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+/* Room detail pop-up body */
+.roomrack-modal-body { position: relative; color: var(--text-primary); }
+.roomrack-modal-body .drawer-close {
+  position: absolute; top: -4px; right: -4px;
+  width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
+  background: transparent; border: 0; border-radius: 8px;
+  color: var(--text-muted); font-size: 22px; line-height: 1; cursor: pointer;
+  transition: background-color .18s ease, color .18s ease;
+}
+.roomrack-modal-body .drawer-close:hover { background: var(--employee-surface-muted, rgba(0,0,0,.05)); color: var(--text-primary); }
+.roomrack-modal-body .eyebrow {
+  display: block; font-size: 10px; font-weight: 800; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--gold-dark, #b8860b);
+}
+.roomrack-modal-body > h3 { font-size: 22px; font-weight: 750; letter-spacing: -.01em; }
+.roomrack-modal-body > p { font-size: 12px; }
+.roomrack-modal-body h4 {
+  font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--text-muted); margin: 20px 0 12px;
+}
+.roomrack-modal-body .drawer-readiness {
+  display: flex; align-items: center; gap: 9px; padding: 11px 13px;
+  background: var(--employee-surface-muted, rgba(0,0,0,.04));
+  border: 1px solid var(--employee-line, rgba(0,0,0,.08));
+  border-radius: 10px; font-size: 11px; font-weight: 800; text-transform: capitalize;
+}
+.roomrack-modal-body .drawer-stay {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 0; border-bottom: 1px solid var(--employee-line, rgba(0,0,0,.06));
+}
+.roomrack-modal-body .drawer-stay > span { width: 9px; height: 9px; border-radius: 3px; flex: 0 0 auto; }
+.roomrack-modal-body .drawer-stay .inhouse { background:#5a4030; }
+.roomrack-modal-body .drawer-stay .reserved { background:#d5b95c; }
+.roomrack-modal-body .drawer-stay .available { background:#70a888; }
+.roomrack-modal-body .drawer-stay .turnover { background:#d8a883; }
+.roomrack-modal-body .drawer-stay .maintenance { background:#9b5c55; }
+.roomrack-modal-body .drawer-stay strong { display: block; font-size: 13px; }
+.roomrack-modal-body .drawer-stay small { font-size: 11px; color: var(--text-muted); text-transform: capitalize; }
+.roomrack-modal-body .btn { justify-content: center; }
 
 /* ============================================================
    EMPLOYEE MODULE PAGE TRANSITIONS

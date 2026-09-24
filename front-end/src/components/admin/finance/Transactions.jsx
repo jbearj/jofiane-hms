@@ -37,7 +37,7 @@ function Transactions() {
       setIsRefreshing(true);
     }
     try {
-      const res = await fetch(`http://localhost:5000/api/transactions?period=${filterPeriod}`);
+      const res = await authFetch(`/api/transactions?period=${filterPeriod}`);
       if (!res.ok) throw new Error(`Server error: ${res.status}`);
       const data = await res.json();
 
@@ -109,7 +109,7 @@ function Transactions() {
   const handleRecordPayment = async (paymentData) => {
     try {
       // Find a checked-in booking matching the given room number
-      const bookingsRes = await fetch(`http://localhost:5000/api/bookings?status=Checked In`);
+      const bookingsRes = await authFetch(`/api/bookings?status=Checked In`);
       if (!bookingsRes.ok) throw new Error('Could not fetch bookings');
       const bookings = await bookingsRes.json();
       const match = bookings.find(b => b.room_number === paymentData.room);
@@ -129,7 +129,7 @@ function Transactions() {
         status: 'COMPLETED',
       };
 
-      const res = await fetch(`http://localhost:5000/api/bookings/${match._id}/transactions`, {
+      const res = await authFetch(`/api/bookings/${match._id}/transactions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(txn),
@@ -161,8 +161,8 @@ function Transactions() {
         status: 'COMPLETED',
       };
 
-      const res = await fetch(
-        `http://localhost:5000/api/bookings/${selectedTransaction._bookingObjectId}/transactions`,
+      const res = await authFetch(
+        `/api/bookings/${selectedTransaction._bookingObjectId}/transactions`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -200,18 +200,6 @@ function Transactions() {
     } catch (err) {
       console.error('Failed to void transaction:', err);
       alert(err.message || 'Failed to void transaction. Please try again.');
-    }
-  };
-
-  const toggleRow = (txnId) => {
-    const txn = filteredTransactions.find(t => t.id === txnId);
-    setViewingTxn(txn || null);
-  };
-
-  // Escape key closes the detail modal
-  const handleRowKeyDown = (e) => {
-    if (e.key === 'Escape' && viewingTxn) {
-      setViewingTxn(null);
     }
   };
 

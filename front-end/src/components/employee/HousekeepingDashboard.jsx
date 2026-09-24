@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { usePolling } from '../../hooks/usePolling';
+import { API_BASE } from '../../utils/api';
 
 function HousekeepingDashboard({ employee, setActiveTab, isLead = false }) {
   const [todayDate] = useState(
@@ -17,9 +18,9 @@ function HousekeepingDashboard({ employee, setActiveTab, isLead = false }) {
     if (firstLoad.current) setIsLoading(true);
     try {
       const [roomsRes, tasksRes, reqRes] = await Promise.all([
-        fetch('http://localhost:5000/api/rooms'),
-        fetch('http://localhost:5000/api/cleaning-tasks?status=PENDING'),
-        fetch('http://localhost:5000/api/guest-requests?status=PENDING'),
+        fetch(`${API_BASE}/api/rooms`),
+        fetch(`${API_BASE}/api/cleaning-tasks?status=PENDING`),
+        fetch(`${API_BASE}/api/guest-requests?status=PENDING`),
       ]);
       const [roomsData, tasksData, reqData] = await Promise.all([
         roomsRes.ok ? roomsRes.json() : [],
