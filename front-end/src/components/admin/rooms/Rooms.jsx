@@ -1,3 +1,4 @@
+import { Input, Select, ValidatedForm, SubmitButton } from '../../common/FormControls';
 import React, { useState } from 'react';
 
 // Initial sample data 
@@ -146,7 +147,7 @@ function Rooms() {
               {/* SEARCH INPUT */}
               <div className="panel-search">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                <input
+                <Input
                   type="text"
                   placeholder="Search unit or type..."
                   value={searchQuery}
@@ -257,55 +258,57 @@ function Rooms() {
             <span className="text-muted" style={{ fontSize: 11 }}>#{activeRoom.id}</span>
           </div>
 
-          <form onSubmit={(e) => e.preventDefault()}>
+          <ValidatedForm onSubmit={(e) => e.preventDefault()}>
             <div className="form-grid" style={{ marginTop: 0 }}>
               <div className="form-group" style={{ marginTop: 0 }}>
                 <label>Room Number</label>
-                <input type="text" value={activeRoom.id} readOnly />
+                <Input type="text" value={activeRoom.id} readOnly />
               </div>
               <div className="form-group" style={{ marginTop: 0 }}>
                 <label>Room Type</label>
-                <select value={activeRoom.type} onChange={(e) => {
+                <Select value={activeRoom.type} onChange={(e) => {
                   setRooms(rooms.map(r => r.id === activeRoom.id ? { ...r, type: e.target.value } : r));
                 }}>
                   <option>Garden Room</option>
                   <option>Veranda Suite</option>
                   <option>Amber Loft</option>
                   <option>Presidential Suite</option>
-                </select>
+                </Select>
               </div>
             </div>
 
             <div className="form-grid">
               <div className="form-group" style={{ marginTop: 0 }}>
                 <label>Occupancy Status</label>
-                <select
+                <Select
                   value={activeRoom.occStatus}
                   onChange={(e) => setRooms(rooms.map(r => r.id === activeRoom.id ? { ...r, occStatus: e.target.value } : r))}
                 >
                   <option>Vacant</option>
                   <option>Occupied</option>
                   <option>Reserved</option>
-                </select>
+                </Select>
               </div>
               <div className="form-group" style={{ marginTop: 0 }}>
                 <label>Housekeeping Condition</label>
-                <select
+                <Select
                   value={activeRoom.hkStatus}
                   onChange={(e) => setRooms(rooms.map(r => r.id === activeRoom.id ? { ...r, hkStatus: e.target.value } : r))}
                 >
                   <option>Clean</option>
                   <option>Dirty</option>
                   <option>Maintenance</option>
-                </select>
+                </Select>
               </div>
             </div>
 
             <div className="form-group">
               <label>Base Rate (₱)</label>
-              <input
+              <Input
                 type="number"
                 value={activeRoom.rate}
+                min="0"
+                step="0.01"
                 onChange={(e) => setRooms(rooms.map(r => r.id === activeRoom.id ? { ...r, rate: Number(e.target.value) } : r))}
               />
             </div>
@@ -319,7 +322,7 @@ function Rooms() {
                     {item} <span className="remove" onClick={() => removeAmenity(index)}>×</span>
                   </span>
                 ))}
-                <input
+                <Input
                   type="text"
                   className="amenity-input"
                   placeholder="+ Add amenity…"
@@ -334,7 +337,7 @@ function Rooms() {
               <button type="button" className="btn" style={{ flex: 1 }}>Reset</button>
               <button type="button" className="btn btn-gold" style={{ flex: 2 }}><i className="fas fa-save"></i> Save Changes</button>
             </div>
-          </form>
+          </ValidatedForm>
         </div>
       </div>
 
@@ -350,10 +353,10 @@ function Rooms() {
               <span style={{ cursor: 'pointer', fontSize: 18 }} onClick={() => setShowAddModal(false)}>×</span>
             </div>
 
-            <form onSubmit={handleCreateRoom}>
+            <ValidatedForm onSubmit={handleCreateRoom}>
               <div className="form-group">
                 <label>Room Number / Code</label>
-                <input
+                <Input
                   type="text"
                   required
                   placeholder="e.g. 104"
@@ -364,7 +367,7 @@ function Rooms() {
 
               <div className="form-group">
                 <label>Floor Level</label>
-                <input
+                <Input
                   type="number"
                   required
                   min="1"
@@ -375,7 +378,7 @@ function Rooms() {
 
               <div className="form-group">
                 <label>Room Category</label>
-                <select
+                <Select
                   value={newRoomData.type}
                   onChange={(e) => setNewRoomData({ ...newRoomData, type: e.target.value })}
                 >
@@ -383,24 +386,26 @@ function Rooms() {
                   <option>Veranda Suite</option>
                   <option>Amber Loft</option>
                   <option>Presidential Suite</option>
-                </select>
+                </Select>
               </div>
 
               <div className="form-group">
                 <label>Nightly Rate (₱)</label>
-                <input
+                <Input
                   type="number"
                   required
                   value={newRoomData.rate}
+                  min="0"
+                  step="0.01"
                   onChange={(e) => setNewRoomData({ ...newRoomData, rate: e.target.value })}
                 />
               </div>
 
               <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
                 <button type="button" className="btn" style={{ flex: 1 }} onClick={() => setShowAddModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn-gold" style={{ flex: 1 }}>Create Unit</button>
+                <SubmitButton  className="btn btn-gold" style={{ flex: 1 }}>Create Unit</SubmitButton>
               </div>
-            </form>
+            </ValidatedForm>
           </div>
         </div>
       )}

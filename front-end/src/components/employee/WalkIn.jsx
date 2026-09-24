@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { authFetch } from '../../utils/api';
+import { Input, Select, Textarea, validationMessage } from '../common/FormControls';
 
 const roomOptions = [
   { id: '102', type: 'Deluxe King', rate: 4200, floor: '1st Floor', feature: 'Garden view' },
@@ -26,7 +27,10 @@ function WalkIn({ onViewBooking }) {
   const nights = Math.max(1, Math.ceil((new Date(form.checkOut) - new Date(form.checkIn)) / 86400000) || 1);
   const total = useMemo(() => selectedRoom.rate * nights, [selectedRoom, nights]);
   const update = (field) => (event) => setForm((current) => ({ ...current, [field]: event.target.value }));
-  const canContinue = step !== 1 || (form.firstName.trim() && form.lastName.trim() && form.mobile.trim());
+  const validGuest = Boolean(form.firstName.trim() && form.lastName.trim()) && !validationMessage(form.mobile, { type: 'tel', required: true }) && !validationMessage(form.email, { type: 'email' });
+  const validDates = Boolean(form.checkIn && form.checkOut && form.checkIn >= today && form.checkOut > form.checkIn);
+  const validPayment = form.deposit !== '' && !validationMessage(form.deposit, { type: 'number', min: 0, max: total, step: .01 });
+  const canContinue = step === 1 ? validGuest : step === 2 ? validDates : validGuest && validDates && validPayment;
 
   // Persist the walk-in as a real booking so it appears in Booking Management.
   const handleConfirm = async () => {
@@ -113,13 +117,13 @@ function WalkIn({ onViewBooking }) {
               <div>
                 <div className="module-section-heading"><div><span className="eyebrow">Step 1 of 3</span><h3>Guest information</h3></div><span className="required-note">* Required fields</span></div>
                 <div className="form-grid">
-                  <label><span>First name *</span><input value={form.firstName} onChange={update('firstName')} placeholder="e.g. Sofia" autoFocus /></label>
-                  <label><span>Last name *</span><input value={form.lastName} onChange={update('lastName')} placeholder="e.g. Navarro" /></label>
-                  <label><span>Mobile number *</span><input value={form.mobile} onChange={update('mobile')} placeholder="+63 9XX XXX XXXX" /></label>
-                  <label><span>Email address</span><input type="email" value={form.email} onChange={update('email')} placeholder="guest@email.com" /></label>
-                  <label><span>ID type</span><select value={form.idType} onChange={update('idType')}><option>Government ID</option><option>Passport</option><option>Driver's License</option></select></label>
-                  <label><span>ID number</span><input placeholder="Enter ID number" /></label>
-                  <label className="full-span"><span>Guest notes</span><textarea value={form.notes} onChange={update('notes')} placeholder="Accessibility needs, preferences, or special requests" rows="3" /></label>
+                  <label><span>First name *</span><Input required value={form.firstName} onChange={update('firstName')} placeholder="e.g. Sofia" autoFocus /></label>
+                  <label><span>Last name *</span><Input required value={form.lastName} onChange={update('lastName')} placeholder="e.g. Navarro" /></label>
+                  <label><span>Mobile number *</span><Input required type="tel" value={form.mobile} onChange={update('mobile')} placeholder="+63 9XX XXX XXXX" /></label>
+                  <label><span>Email address</span><Input type="email" value={form.email} onChange={update('email')} placeholder="guest@email.com" /></label>
+                  <label><span>ID type</span><Select value={form.idType} onChange={update('idType')}><option>Government ID</option><option>Passport</option><option>Driver's License</option></Select></label>
+                  <label><span>ID number</span><Input placeholder="Enter ID number" /></label>
+                  <label className="full-span"><span>Guest notes</span><Textarea value={form.notes} onChange={update('notes')} placeholder="Accessibility needs, preferences, or special requests" rows="3" /></label>
                 </div>
               </div>
             )}
@@ -128,10 +132,10 @@ function WalkIn({ onViewBooking }) {
               <div>
                 <div className="module-section-heading"><div><span className="eyebrow">Step 2 of 3</span><h3>Select an available room</h3></div></div>
                 <div className="stay-fields form-grid">
-                  <label><span>Check-in</span><input type="date" value={form.checkIn} min={today} onChange={update('checkIn')} /></label>
-                  <label><span>Check-out</span><input type="date" value={form.checkOut} min={form.checkIn} onChange={update('checkOut')} /></label>
-                  <label><span>Adults</span><select value={form.adults} onChange={update('adults')}><option>1</option><option>2</option><option>3</option><option>4</option></select></label>
-                  <label><span>Children</span><select value={form.children} onChange={update('children')}><option>0</option><option>1</option><option>2</option></select></label>
+                  <label><span>Check-in</span><Input required type="date" value={form.checkIn} min={today} onChange={update('checkIn')} /></label>
+                  <label><span>Check-out</span><Input required type="date" value={form.checkOut} min={form.checkIn} validation={(value) => value <= form.checkIn ? 'Check-out must be after check-in.' : ''} onChange={update('checkOut')} /></label>
+                  <label><span>Adults</span><Select value={form.adults} onChange={update('adults')}><option>1</option><option>2</option><option>3</option><option>4</option></Select></label>
+                  <label><span>Children</span><Select value={form.children} onChange={update('children')}><option>0</option><option>1</option><option>2</option></Select></label>
                 </div>
                 <div className="available-room-grid">
                   {roomOptions.map((room) => (
@@ -151,10 +155,10 @@ function WalkIn({ onViewBooking }) {
                   {['Credit Card', 'Cash', 'E-Wallet', 'Bank Transfer'].map((method) => <button type="button" className={form.payment === method ? 'selected' : ''} key={method} onClick={() => setForm((current) => ({ ...current, payment: method }))}>{method}</button>)}
                 </div>
                 <div className="form-grid">
-                  <label><span>Deposit received</span><div className="money-input"><b>₱</b><input type="number" min="0" value={form.deposit} onChange={update('deposit')} /></div></label>
-                  <label><span>Payment reference</span><input placeholder="Optional reference number" /></label>
+                  <label><span>Deposit received</span><div className="money-input"><b>₱</b><Input required type="number" min="0" max={total} step="0.01" value={form.deposit} onChange={update('deposit')} /></div></label>
+                  <label><span>Payment reference</span><Input placeholder="Optional reference number" /></label>
                 </div>
-                <label className="consent-row"><input type="checkbox" defaultChecked /><span>Guest has reviewed the booking dates, rate, and hotel policies.</span></label>
+                <label className="consent-row"><Input type="checkbox" defaultChecked /><span>Guest has reviewed the booking dates, rate, and hotel policies.</span></label>
               </div>
             )}
 
@@ -165,7 +169,7 @@ function WalkIn({ onViewBooking }) {
               <button className="btn" type="button" disabled={step === 1 || saving} onClick={() => setStep((current) => current - 1)}>Back</button>
               {step < 3
                 ? <button className="btn btn-gold" type="button" disabled={!canContinue} onClick={() => setStep((current) => current + 1)}>Continue</button>
-                : <button className="btn btn-gold" type="button" disabled={saving} onClick={handleConfirm}>{saving ? 'Saving…' : 'Confirm booking'}</button>}
+                : <button className="btn btn-gold" type="button" disabled={saving || !canContinue} onClick={handleConfirm}>{saving ? 'Saving…' : 'Confirm booking'}</button>}
             </div>
           </div>
 

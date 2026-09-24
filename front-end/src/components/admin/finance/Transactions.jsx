@@ -1,10 +1,15 @@
-import React, { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
+import React, { useState, useEffect, useRef } from 'react';
 import { usePolling } from '../../../hooks/usePolling';
 import { authFetch, readError } from '../../../utils/api';
+import { PageSkeleton, LoadingError } from '../../common/SkeletonLoader';
+import { Input, Select, Textarea, ValidatedForm, SubmitButton } from '../../common/FormControls';
+import PortalModal from '../../common/PortalModal';
+import ConfirmModal from '../../common/ConfirmModal';
+import { money, parseMoney } from '../../../utils/formatters';
 
 function Transactions() {
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [transactions, setTransactions] = useState([]);
   const [filteredTransactions, setFilteredTransactions] = useState([]);
@@ -19,6 +24,11 @@ function Transactions() {
 
   // Transaction detail modal (replaces inline row actions)
   const [viewingTxn, setViewingTxn] = useState(null);
+  const [voidingTxn, setVoidingTxn] = useState(null);
+  const [savingAction, setSavingAction] = useState(false);
+  const [actionError, setActionError] = useState('');
+  const actionLock = useRef(false);
+  const requestVersion = useRef(0);
 
   // Modals
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -31,6 +41,8 @@ function Transactions() {
   useEffect(() => { applyFilters(); }, [transactions, searchQuery, filterMethod, filterStatus, filterType]);
 
   const fetchTransactions = async () => {
+    const version = ++requestVersion.current;
+    setLoadError(false);
     if (!kpis) {
       setIsLoading(true);
     } else {
@@ -40,18 +52,20 @@ function Transactions() {
       const res = await authFetch(`/api/transactions?period=${filterPeriod}`);
       if (!res.ok) throw new Error(`Server error: ${res.status}`);
       const data = await res.json();
+      if (!Array.isArray(data.transactions) || !data.kpis) throw new Error('Incomplete transaction response');
 
+      if (version !== requestVersion.current) return;
       // Normalize aggregated transaction fields from embedded booking.transactions
       const normalized = data.transactions.map(t => ({
         id: t.txn_id || String(t.booking_object_id),
         date: t.datetime || new Date().toISOString(),
         guest: t.guest_name || '',
-        room: t.room_number || '',
+        room: String(t.room_number || ''),
         description: t.description || '',
-        amount: parseFloat((t.amount || '0').replace(/,/g, '')) || 0,
+        amount: parseMoney(t.amount),
         method: t.payment_method || '',
         methodDetail: t.payment_details || '',
-        type: parseFloat((t.amount || '0').replace(/,/g, '')) < 0 ? 'refund' : 'charge',
+        type: parseMoney(t.amount) < 0 ? 'refund' : 'charge',
         status: (t.status || '').toLowerCase(),   // "COMPLETED" → "completed"
         _bookingObjectId: t.booking_object_id,    // MongoDB _id of the parent booking
         _bookingId: t.booking_id,
@@ -61,9 +75,12 @@ function Transactions() {
       setKpis(data.kpis);
     } catch (err) {
       console.error('Failed to fetch transactions:', err);
+      if (version === requestVersion.current) setLoadError(true);
     } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
+      if (version === requestVersion.current) {
+        setIsLoading(false);
+        setIsRefreshing(false);
+      }
     }
   };
 
@@ -74,7 +91,7 @@ function Transactions() {
 
     // Search
     if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
+      const q = searchQuery.trim().toLowerCase();
       result = result.filter(t =>
         t.id.toLowerCase().includes(q) ||
         t.guest.toLowerCase().includes(q) ||
@@ -95,7 +112,7 @@ function Transactions() {
 
     // Type filter
     if (filterType !== 'all') {
-      result = result.filter(t => t.type === filterType);
+      result = result.filter(t => filterType === 'void' ? t.status === 'voided' : t.type === filterType);
     }
 
     setFilteredTransactions(result);
@@ -106,102 +123,73 @@ function Transactions() {
     alert(`Exporting ${filteredTransactions.length} transactions as ${format.toUpperCase()}`);
   };
 
-  const handleRecordPayment = async (paymentData) => {
-    try {
-      // Find a checked-in booking matching the given room number
-      const bookingsRes = await authFetch(`/api/bookings?status=Checked In`);
-      if (!bookingsRes.ok) throw new Error('Could not fetch bookings');
-      const bookings = await bookingsRes.json();
-      const match = bookings.find(b => b.room_number === paymentData.room);
-
-      if (!match) {
-        alert(`No checked-in booking found for room ${paymentData.room}. Please verify the room number.`);
-        return;
-      }
-
-      const txn = {
-        txn_id: `TXN-${Date.now()}`,
-        datetime: new Date().toLocaleString('en-CA', { hour12: false }).replace(',', ''),
-        description: paymentData.description,
-        amount: parseFloat(paymentData.amount).toLocaleString('en-US', { minimumFractionDigits: 2 }),
-        payment_method: paymentData.method,
-        payment_details: paymentData.methodDetail || '',
-        status: 'COMPLETED',
-      };
-
-      const res = await authFetch(`/api/bookings/${match._id}/transactions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(txn),
-      });
-      if (!res.ok) throw new Error(`Server error: ${res.status}`);
-
-      await fetchTransactions();
-    } catch (err) {
-      console.error('Failed to record payment:', err);
-      alert('Failed to record payment. Please try again.');
-    }
-    setShowPaymentModal(false);
+  // Keep a failed form open, and prevent repeated clicks from posting twice.
+  const runAction = async (action) => {
+    if (actionLock.current) return;
+    actionLock.current = true;
+    setSavingAction(true);
+    setActionError('');
+    try { await action(); }
+    catch (error) { setActionError(error.message || 'Unable to save. Please try again.'); }
+    finally { actionLock.current = false; setSavingAction(false); }
   };
 
-  const handleRefund = async (refundData) => {
-    if (!selectedTransaction?._bookingObjectId) {
-      alert('Cannot find the booking for this transaction.');
-      return;
+  const handleRecordPayment = (payment) => runAction(async () => {
+    const bookingsRes = await authFetch('/api/bookings?status=Checked%20In');
+    if (!bookingsRes.ok) throw new Error('Could not verify the booking. Please try again.');
+    const bookings = await bookingsRes.json();
+    const match = bookings.find(b => String(b.room_number).trim() === payment.room.trim());
+    if (!match) throw new Error(`No checked-in booking found for room ${payment.room}. Verify the room number.`);
+    const guestKey = value => value.trim().replace(/\s+/g, ' ').toLocaleLowerCase();
+    if (guestKey(match.guest?.full_name || '') !== guestKey(payment.guest)) {
+      throw new Error('The guest name does not match the checked-in booking for this room. Please verify both fields.');
     }
-    try {
-      const refundTxn = {
-        txn_id: `TXN-${Date.now()}`,
-        datetime: new Date().toLocaleString('en-CA', { hour12: false }).replace(',', ''),
-        description: `Refund - ${refundData.reason}`,
-        // Stored as negative string e.g. "-2,100.00"
-        amount: `-${Math.abs(parseFloat(refundData.amount)).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
-        payment_method: selectedTransaction.method,
-        payment_details: selectedTransaction.methodDetail || '',
-        status: 'COMPLETED',
-      };
+    const txn = {
+      txn_id: `TXN-${Date.now()}`,
+      datetime: new Date().toLocaleString('en-CA', { hour12: false }).replace(',', ''),
+      description: payment.description.trim(),
+      amount: Number(payment.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+      payment_method: payment.method,
+      payment_details: payment.methodDetail.trim(),
+      status: 'COMPLETED',
+    };
+    const res = await authFetch(`/api/bookings/${match._id}/transactions`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(txn),
+    });
+    if (!res.ok) throw new Error(await readError(res, 'Payment was not saved. Please try again.'));
+    setShowPaymentModal(false);
+    await fetchTransactions();
+  });
 
-      const res = await authFetch(
-        `/api/bookings/${selectedTransaction._bookingObjectId}/transactions`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(refundTxn),
-        }
-      );
-      if (!res.ok) throw new Error(`Server error: ${res.status}`);
-
-      await fetchTransactions();
-    } catch (err) {
-      console.error('Failed to issue refund:', err);
-      alert('Failed to issue refund. Please try again.');
-    }
+  const handleRefund = (refund) => runAction(async () => {
+    if (!selectedTransaction?._bookingObjectId) throw new Error('Cannot find the booking for this transaction.');
+    const txn = {
+      txn_id: `TXN-${Date.now()}`,
+      datetime: new Date().toLocaleString('en-CA', { hour12: false }).replace(',', ''),
+      description: `Refund - ${refund.reason.trim()}`,
+      amount: `-${Math.abs(Number(refund.amount)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      payment_method: selectedTransaction.method,
+      payment_details: selectedTransaction.methodDetail || '',
+      status: 'COMPLETED',
+    };
+    const res = await authFetch(`/api/bookings/${selectedTransaction._bookingObjectId}/transactions`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(txn),
+    });
+    if (!res.ok) throw new Error(await readError(res, 'Refund was not saved. Please try again.'));
     setShowRefundModal(false);
     setSelectedTransaction(null);
-  };
+    await fetchTransactions();
+  });
 
-  const handleVoid = async (transaction) => {
-    if (!window.confirm(`Void transaction ${transaction.id}? This cannot be undone.`)) return;
-    if (!transaction._bookingObjectId) {
-      alert('Cannot find the booking for this transaction.');
-      return;
-    }
-    try {
-      const res = await authFetch(
-        `/api/bookings/${transaction._bookingObjectId}/transactions/${transaction.id}/void`,
-        { method: 'PATCH' }
-      );
-      if (!res.ok) throw new Error(await readError(res, 'Failed to void transaction.'));
-
-      // Update UI immediately without a full refetch
-      setTransactions(prev =>
-        prev.map(t => t.id === transaction.id ? { ...t, status: 'voided' } : t)
-      );
-    } catch (err) {
-      console.error('Failed to void transaction:', err);
-      alert(err.message || 'Failed to void transaction. Please try again.');
-    }
-  };
+  const handleVoid = () => runAction(async () => {
+    const transaction = voidingTxn;
+    if (!transaction?._bookingObjectId) throw new Error('Cannot find the booking for this transaction.');
+    const res = await authFetch(`/api/bookings/${transaction._bookingObjectId}/transactions/${transaction.id}/void`, { method: 'PATCH' });
+    if (!res.ok) throw new Error(await readError(res, 'Failed to void transaction.'));
+    setTransactions(prev => prev.map(t => t.id === transaction.id ? { ...t, status: 'voided' } : t));
+    setVoidingTxn(null);
+    await fetchTransactions();
+  });
 
   const formatDate = (dateStr) => {
     const d = new Date(dateStr);
@@ -211,13 +199,6 @@ function Transactions() {
   const formatTime = (dateStr) => {
     const d = new Date(dateStr);
     return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-  };
-
-  const formatAmount = (amount) => {
-    const abs = Math.abs(amount);
-    const formatted = abs.toLocaleString();
-    if (amount < 0) return `(${formatted})`;
-    return formatted;
   };
 
   const getStatusTag = (status) => {
@@ -230,11 +211,12 @@ function Transactions() {
     }
   };
 
+  if (loadError && !kpis) return <section className="admin-tab-content active"><LoadingError onRetry={fetchTransactions} /></section>;
   if (isLoading || !kpis) {
     return (
       <section className="admin-tab-content active">
         <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-muted)' }}>
-          <div style={{ fontSize: '16px', fontWeight: '500' }}>Loading transactions...</div>
+          <PageSkeleton rows={6} />
         </div>
       </section>
     );
@@ -247,34 +229,35 @@ function Transactions() {
       <div className="page-header">
         <div className="left">
           <h2 style={{ fontSize: '28px', fontWeight: '700' }}>Transactions</h2>
-          <p>Daily operational ledger</p>
+          <p>Payments, refunds, and guest balances in one clear view.</p>
         </div>
       </div>
 
       {/* KPI CARDS */}
-      <div className="kpi-grid txn-kpi-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', marginBottom: '22px', opacity: isRefreshing ? 0.5 : 1, transition: 'opacity 0.2s ease' }}>
+      <div className="kpi-grid txn-kpi-grid" aria-label="Financial summary">
         <div className="kpi-card txn-kpi income">
           <span className="lbl">TOTAL INCOME</span>
-          <span className="val">{kpis.totalIncome.toLocaleString()}</span>
-          <span className="sub">This {filterPeriod}</span>
+          <span className="val">{money(kpis.totalIncome)}</span>
+          <span className="sub">{filterPeriod === 'today' ? 'Today' : `This ${filterPeriod}`}</span>
         </div>
         <div className="kpi-card txn-kpi expenses">
           <span className="lbl">TOTAL EXPENSES</span>
-          <span className="val">{kpis.totalExpenses.toLocaleString()}</span>
+          <span className="val">{money(kpis.totalExpenses)}</span>
           <span className="sub">Refunds & adjustments</span>
         </div>
         <div className="kpi-card txn-kpi net">
           <span className="lbl">NET REVENUE</span>
-          <span className="val" style={{ color: 'var(--status-vac)' }}>{kpis.netRevenue.toLocaleString()}</span>
+          <span className="val" style={{ color: 'var(--status-vac)' }}>{money(kpis.netRevenue)}</span>
           <span className="sub">After deductions</span>
         </div>
         <div className="kpi-card txn-kpi outstanding">
           <span className="lbl">OUTSTANDING</span>
-          <span className="val" style={{ color: '#b45309' }}>{kpis.outstanding.toLocaleString()}</span>
+          <span className="val" style={{ color: '#b45309' }}>{money(kpis.outstanding)}</span>
           <span className="sub">Pending collection</span>
         </div>
       </div>
 
+      {loadError && <div className="workspace-notice" role="alert">The ledger could not refresh. Showing the last loaded records. <button className="btn btn-sm" onClick={fetchTransactions}>Retry</button></div>}
       {/* TRANSACTIONS TABLE */}
       <div className="panel txn-panel">
         
@@ -282,8 +265,9 @@ function Transactions() {
         <div className="panel-header" style={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: '10px', padding: '16px 24px', margin: 0, borderBottom: '1px solid var(--border-light)' }}>
           
           {/* ROW 1: Title */}
-          <div style={{ textAlign: 'left', width: '100%' }}>
-            <h3 style={{ margin: 0, fontSize: '16px' }}>Transaction History ({filteredTransactions.length})</h3>
+          <div className="ledger-heading">
+            <h3>Transaction History <span className="record-count">{filteredTransactions.length}</span></h3>
+            <span className="ledger-sync" role="status">{isRefreshing ? 'Updating…' : 'Select a reference to view details'}</span>
           </div>
 
           {/* ROW 2: Tools (Search, Filters, Actions) */}
@@ -292,9 +276,10 @@ function Transactions() {
             {/* LEFT CLUSTER: Search Bar */}
             <div className="panel-search txn-search" style={{ flex: '1 1 260px', maxWidth: '340px', position: 'relative', display: 'flex', alignItems: 'center' }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ position: 'absolute', left: '12px', pointerEvents: 'none' }}><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-              <input
-                type="text"
-                placeholder="Search guest, room, or TXN ID"
+              <Input
+                type="search"
+                aria-label="Search transactions"
+                placeholder="Search guest, room, or reference…"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 style={{ width: '100%', paddingLeft: '36px' }}
@@ -304,34 +289,36 @@ function Transactions() {
             {/* RIGHT CLUSTER: Filters + Actions */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginLeft: 'auto' }}>
               
-              <select className="floor-dropdown" value={filterPeriod} onChange={(e) => setFilterPeriod(e.target.value)}>
+              <Select aria-label="Date period" className="floor-dropdown" value={filterPeriod} onChange={(e) => setFilterPeriod(e.target.value)}>
                 <option value="today">Today</option>
                 <option value="week">This Week</option>
                 <option value="month">This Month</option>
                 <option value="year">This Year</option>
-              </select>
+              </Select>
 
-              <select className="floor-dropdown" value={filterMethod} onChange={(e) => setFilterMethod(e.target.value)}>
+              <Select aria-label="Payment method filter" className="floor-dropdown" value={filterMethod} onChange={(e) => setFilterMethod(e.target.value)}>
                 <option value="all">All Methods</option>
                 <option value="cash">Cash</option>
                 <option value="credit-card">Credit Card</option>
                 <option value="bank-transfer">Bank Transfer</option>
                 <option value="room-charge">Room Charge</option>
-              </select>
+                <option value="gcash">GCash</option>
+                <option value="maya">Maya</option>
+              </Select>
 
-              <select className="floor-dropdown" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+              <Select aria-label="Transaction status" className="floor-dropdown" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
                 <option value="all">All Status</option>
                 <option value="completed">Completed</option>
                 <option value="pending">Pending</option>
                 <option value="voided">Voided</option>
-              </select>
+              </Select>
 
-              <select className="floor-dropdown" value={filterType} onChange={(e) => setFilterType(e.target.value)}>
+              <Select aria-label="Transaction type" className="floor-dropdown" value={filterType} onChange={(e) => setFilterType(e.target.value)}>
                 <option value="all">All Types</option>
                 <option value="charge">Charge</option>
                 <option value="refund">Refund</option>
                 <option value="void">Void</option>
-              </select>
+              </Select>
 
               <div style={{ width: '1px', height: '24px', background: 'var(--border-light)', margin: '0 4px' }}></div>
 
@@ -371,7 +358,7 @@ function Transactions() {
                 )}
               </div>
 
-              <button className="btn btn-sm btn-gold" onClick={() => setShowPaymentModal(true)}>
+              <button className="btn btn-sm btn-gold" onClick={() => { setActionError(''); setShowPaymentModal(true); }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                 Record Payment
               </button>
@@ -379,7 +366,7 @@ function Transactions() {
           </div>
         </div>
         
-        <div className="table-wrap" style={{ opacity: isRefreshing ? 0.5 : 1, transition: 'opacity 0.2s ease' }}>
+        <div className="table-wrap ledger-table-scroll" role="region" aria-label="Transaction history" tabIndex={0}>
           <table className="txn-table">
             <colgroup>
               <col style={{ width: '104px' }} />
@@ -419,7 +406,7 @@ function Transactions() {
                     style={{ cursor: 'pointer' }}
                   >
                     <td>
-                      <span className="guest-name">{txn.id}</span>
+                      <button type="button" className="table-reference" onClick={event => { event.stopPropagation(); setViewingTxn(txn); }}>{txn.id}</button>
                     </td>
                     <td>
                       <span className="std-text">{formatDate(txn.date)}</span>
@@ -440,7 +427,7 @@ function Transactions() {
                     </td>
                     <td style={{ textAlign: 'right' }}>
                       <span className={`txn-amount ${txn.amount < 0 ? 'negative' : 'positive'}`}>
-                        {formatAmount(txn.amount)}
+                        {money(txn.amount)}
                       </span>
                     </td>
                     <td>{getStatusTag(txn.status)}</td>
@@ -452,268 +439,126 @@ function Transactions() {
         </div>
       </div>
 
-      {/* RECORD PAYMENT MODAL */}
-      {showPaymentModal && createPortal(
-        <RecordPaymentModal
-          onClose={() => setShowPaymentModal(false)}
-          onSave={handleRecordPayment}
-        />,
-        document.body
-      )}
-
-      {/* REFUND MODAL */}
-      {showRefundModal && selectedTransaction && createPortal(
-        <RefundModal
-          transaction={selectedTransaction}
-          onClose={() => { setShowRefundModal(false); setSelectedTransaction(null); }}
-          onRefund={handleRefund}
-        />,
-        document.body
-      )}
-
-      {/* TRANSACTION DETAIL MODAL */}
-      {viewingTxn && createPortal(
-        <TransactionDetailModal
-          transaction={viewingTxn}
-          onClose={() => setViewingTxn(null)}
-          onRefund={(txn) => { setViewingTxn(null); setSelectedTransaction(txn); setShowRefundModal(true); }}
-          onVoid={(txn) => { setViewingTxn(null); handleVoid(txn); }}
-          formatDate={formatDate}
-          formatTime={formatTime}
-          formatAmount={formatAmount}
-          getStatusTag={getStatusTag}
-        />,
-        document.body
-      )}
+      {showPaymentModal && <RecordPaymentModal busy={savingAction} error={actionError}
+        onClose={() => { if (!savingAction) setShowPaymentModal(false); }} onSave={handleRecordPayment} />}
+      {showRefundModal && selectedTransaction && <RefundModal transaction={selectedTransaction}
+        busy={savingAction} error={actionError} onRefund={handleRefund}
+        onClose={() => { if (!savingAction) { setShowRefundModal(false); setSelectedTransaction(null); } }} />}
+      {viewingTxn && <TransactionDetailModal transaction={viewingTxn} onClose={() => setViewingTxn(null)}
+        onRefund={txn => { setActionError(''); setViewingTxn(null); setSelectedTransaction(txn); setShowRefundModal(true); }}
+        onVoid={txn => { setActionError(''); setViewingTxn(null); setVoidingTxn(txn); }}
+        formatDate={formatDate} formatTime={formatTime} getStatusTag={getStatusTag} />}
+      {voidingTxn && <ConfirmModal title="Void transaction?" tone="danger" busy={savingAction}
+        confirmLabel="Void Transaction" onConfirm={handleVoid}
+        onCancel={() => { setViewingTxn(voidingTxn); setVoidingTxn(null); }}
+        message={<><p>This will void <strong>{voidingTxn.id}</strong> for <strong>{money(voidingTxn.amount)}</strong>. This action cannot be undone.</p>
+          {actionError && <p className="form-submit-error" role="alert">{actionError}</p>}</>} />}
     </section>
-  );
-}
-
-/* ============================================================
-   RECORD PAYMENT MODAL
-   ============================================================ */
-function RecordPaymentModal({ onClose, onSave }) {
-  const [formData, setFormData] = useState({
-    guest: '',
-    room: '',
-    description: '',
-    amount: '',
-    method: 'Cash',
-    methodDetail: ''
-  });
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!formData.guest || !formData.amount || !formData.description) {
-      alert('Please fill in required fields.');
-      return;
-    }
-    onSave(formData);
-  };
-
-  return (
-    <div className="modal-overlay open">
-      <div className="modal-content" style={{ maxWidth: '500px' }}>
-        <button className="modal-close" onClick={onClose}>&times;</button>
-        <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '6px' }}>Record Payment</h3>
-        <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '24px' }}>Manually log a payment received</p>
-
-        <form onSubmit={handleSubmit}>
-          <div className="form-grid" style={{ marginBottom: '18px' }}>
-            <div className="form-group">
-              <label>Guest Name <span className="required">*</span></label>
-              <input type="text" value={formData.guest} onChange={(e) => setFormData({ ...formData, guest: e.target.value })} placeholder="e.g. Juan Dela Cruz" />
-            </div>
-            <div className="form-group">
-              <label>Room Number</label>
-              <input type="text" value={formData.room} onChange={(e) => setFormData({ ...formData, room: e.target.value })} placeholder="e.g. 304" />
-            </div>
-          </div>
-
-          <div className="form-group" style={{ marginBottom: '18px' }}>
-            <label>Description <span className="required">*</span></label>
-            <input type="text" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} placeholder="e.g. Room Charge, F&B, Spa" />
-          </div>
-
-          <div className="form-grid" style={{ marginBottom: '18px' }}>
-            <div className="form-group">
-              <label>Amount <span className="required">*</span></label>
-              <input type="number" value={formData.amount} onChange={(e) => setFormData({ ...formData, amount: e.target.value })} placeholder="0.00" min="0" step="0.01" />
-            </div>
-            <div className="form-group">
-              <label>Payment Method</label>
-              <select value={formData.method} onChange={(e) => setFormData({ ...formData, method: e.target.value })}>
-                <option>Cash</option>
-                <option>Credit Card</option>
-                <option>Bank Transfer</option>
-                <option>Room Charge</option>
-                <option>GCash</option>
-                <option>Maya</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="form-group" style={{ marginBottom: '24px' }}>
-            <label>Reference / Detail</label>
-            <input type="text" value={formData.methodDetail} onChange={(e) => setFormData({ ...formData, methodDetail: e.target.value })} placeholder="e.g. Visa ····4242, Receipt #123" />
-          </div>
-
-          <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-            <button type="button" className="btn" onClick={onClose}>Cancel</button>
-            <button type="submit" className="btn btn-gold">Record Payment</button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-/* ============================================================
-   REFUND MODAL
-   ============================================================ */
-function RefundModal({ transaction, onClose, onRefund }) {
-  const [formData, setFormData] = useState({
-    amount: Math.abs(transaction.amount),
-    reason: ''
-  });
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!formData.reason) {
-      alert('Please provide a reason for the refund.');
-      return;
-    }
-    if (parseFloat(formData.amount) > Math.abs(transaction.amount)) {
-      alert('Refund amount cannot exceed original transaction amount.');
-      return;
-    }
-    onRefund(formData);
-  };
-
-  return (
-    <div className="modal-overlay open">
-      <div className="modal-content" style={{ maxWidth: '460px' }}>
-        <button className="modal-close" onClick={onClose}>&times;</button>
-        <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '6px' }}>Issue Refund</h3>
-        <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '24px' }}>Refund for {transaction.id} — {transaction.guest}</p>
-
-        <div style={{ background: 'var(--bg-input)', borderRadius: 'var(--radius-sm)', padding: '14px 18px', marginBottom: '20px', border: '1px solid var(--border-light)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-            <span style={{ color: 'var(--text-muted)' }}>Original Amount</span>
-            <span style={{ fontWeight: '700' }}>{Math.abs(transaction.amount).toLocaleString()}</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginTop: '8px' }}>
-            <span style={{ color: 'var(--text-muted)' }}>Method</span>
-            <span>{transaction.method}</span>
-          </div>
-        </div>
-
-        <form onSubmit={handleSubmit}>
-          <div className="form-group" style={{ marginBottom: '18px' }}>
-            <label>Refund Amount <span className="required">*</span></label>
-            <input type="number" value={formData.amount} onChange={(e) => setFormData({ ...formData, amount: e.target.value })} max={Math.abs(transaction.amount)} min="0" step="0.01" />
-          </div>
-
-          <div className="form-group" style={{ marginBottom: '24px' }}>
-            <label>Reason <span className="required">*</span></label>
-            <textarea value={formData.reason} onChange={(e) => setFormData({ ...formData, reason: e.target.value })} placeholder="e.g. Overcharge correction, Guest complaint resolution" style={{ minHeight: '80px' }} />
-          </div>
-
-          <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-            <button type="button" className="btn" onClick={onClose}>Cancel</button>
-            <button type="submit" className="btn" style={{ background: 'var(--status-occ)', color: '#fff', borderColor: 'var(--status-occ)' }}>Issue Refund</button>
-          </div>
-        </form>
-      </div>
-    </div>
   );
 }
 
 export default Transactions;
 
-/* ============================================================
-   TRANSACTION DETAIL MODAL
-   Shows full info + Refund / Void actions when a row is clicked
-   ============================================================ */
-function TransactionDetailModal({ transaction: txn, onClose, onRefund, onVoid, formatDate, formatTime, formatAmount, getStatusTag }) {
-  // Can only refund a completed positive charge
-  const canRefund = txn.status === 'completed' && txn.amount > 0;
-  // Can void anything that isn't already voided
-  const canVoid = txn.status !== 'voided';
+function ModalClose({ onClose, busy }) {
+  return <button type="button" className="modal-close" aria-label="Close dialog" disabled={busy} onClick={onClose}>×</button>;
+}
 
+function RecordPaymentModal({ onClose, onSave, busy, error }) {
+  const [form, setForm] = useState({ guest: '', room: '', description: '', amount: '', method: 'Cash', methodDetail: '' });
+  const change = key => event => setForm(prev => ({ ...prev, [key]: event.target.value }));
   return (
-    <div className="modal-overlay open">
-      <div className="modal-content txn-detail-modal">
-        <button className="modal-close" onClick={onClose}>&times;</button>
-
-        {/* Title */}
-        <div className="txn-modal-header">
-          <h3>Transaction Details</h3>
-          {getStatusTag(txn.status)}
+    <PortalModal title="Record Payment" maxWidth={560} className="finance-modal" onClose={onClose} busy={busy}>
+      <ModalClose onClose={onClose} busy={busy} />
+      <p className="dialog-eyebrow">FRONT DESK · PAYMENTS</p>
+      <h3>Record Payment</h3>
+      <p className="dialog-intro">Manually log a payment received for a checked-in guest.</p>
+      <ValidatedForm onSubmit={event => { event.preventDefault(); if (!busy) onSave(form); }}>
+        <fieldset disabled={busy} className="dialog-fields">
+          <div className="form-grid">
+            <div className="form-group"><label>Guest Name <span className="required">*</span></label>
+              <Input required value={form.guest} onChange={change('guest')} placeholder="e.g. Juan Dela Cruz" autoComplete="off" /></div>
+            <div className="form-group"><label>Room Number <span className="required">*</span></label>
+              <Input required value={form.room} onChange={change('room')} placeholder="e.g. 304" maxLength={20} /></div>
+          </div>
+          <div className="form-group"><label>Description <span className="required">*</span></label>
+            <Input required value={form.description} onChange={change('description')} placeholder="e.g. Room charge, dining, spa" /></div>
+          <div className="form-grid">
+            <div className="form-group"><label>Amount (₱) <span className="required">*</span></label>
+              <Input required type="number" inputMode="decimal" min="0.01" step="0.01" value={form.amount} onChange={change('amount')} placeholder="0.00" /></div>
+            <div className="form-group"><label>Payment Method</label>
+              <Select value={form.method} onChange={change('method')}>
+                {['Cash', 'Credit Card', 'Bank Transfer', 'Room Charge', 'GCash', 'Maya'].map(method => <option key={method}>{method}</option>)}
+              </Select></div>
+          </div>
+          <div className="form-group"><label>Reference / Detail <span className="optional-label">Optional</span></label>
+            <Input value={form.methodDetail} onChange={change('methodDetail')} placeholder="e.g. Receipt #123 or card ending 4242" />
+            <small className="field-hint">Use a receipt reference or last four digits only. Never enter full card details.</small></div>
+        </fieldset>
+        {error && <p className="form-submit-error" role="alert">{error}</p>}
+        <div className="dialog-actions">
+          <button type="button" className="btn" disabled={busy} onClick={onClose}>Cancel</button>
+          <SubmitButton className="btn btn-gold" disabled={busy}>{busy ? 'Recording…' : 'Record Payment'}</SubmitButton>
         </div>
+      </ValidatedForm>
+    </PortalModal>
+  );
+}
 
-        {/* Amount hero */}
-        <div className={`txn-modal-amount ${txn.amount < 0 ? 'negative' : 'positive'}`}>
-          {txn.amount < 0 ? '−' : ''}₱{Math.abs(txn.amount).toLocaleString()}
+function RefundModal({ transaction, onClose, onRefund, busy, error }) {
+  const [form, setForm] = useState({ amount: Math.abs(transaction.amount), reason: '' });
+  return (
+    <PortalModal title="Issue Refund" maxWidth={540} className="finance-modal" onClose={onClose} busy={busy}>
+      <ModalClose onClose={onClose} busy={busy} />
+      <p className="dialog-eyebrow">TRANSACTION ADJUSTMENT</p>
+      <h3>Issue Refund</h3>
+      <p className="dialog-intro">Refund for {transaction.id} · {transaction.guest}</p>
+      <dl className="refund-summary">
+        <div><dt>Original amount</dt><dd>{money(transaction.amount)}</dd></div>
+        <div><dt>Payment method</dt><dd>{transaction.method}</dd></div>
+      </dl>
+      <ValidatedForm onSubmit={event => { event.preventDefault(); if (!busy) onRefund(form); }}>
+        <fieldset disabled={busy} className="dialog-fields">
+          <div className="form-group"><label>Refund Amount (₱) <span className="required">*</span></label>
+            <Input type="number" required inputMode="decimal" min="0.01" step="0.01" max={Math.abs(transaction.amount)}
+              value={form.amount} onChange={event => setForm({ ...form, amount: event.target.value })} />
+            <small className="field-hint">Up to {money(transaction.amount)} for this transaction.</small></div>
+          <div className="form-group"><label>Reason <span className="required">*</span></label>
+            <Textarea required maxLength={500} rows={3} value={form.reason} onChange={event => setForm({ ...form, reason: event.target.value })}
+              placeholder="e.g. Overcharge correction or guest complaint resolution" /></div>
+        </fieldset>
+        {error && <p className="form-submit-error" role="alert">{error}</p>}
+        <div className="dialog-actions">
+          <button type="button" className="btn" disabled={busy} onClick={onClose}>Cancel</button>
+          <SubmitButton className="btn finance-danger" disabled={busy}>{busy ? 'Issuing refund…' : 'Issue Refund'}</SubmitButton>
         </div>
+      </ValidatedForm>
+    </PortalModal>
+  );
+}
 
-        {/* Fact grid */}
-        <div className="txn-modal-grid">
-          <div className="txn-modal-field">
-            <span className="txn-modal-label">Reference</span>
-            <span className="txn-modal-value">{txn.id}</span>
-          </div>
-          <div className="txn-modal-field">
-            <span className="txn-modal-label">Date & Time</span>
-            <span className="txn-modal-value">{formatDate(txn.date)} · {formatTime(txn.date)}</span>
-          </div>
-          <div className="txn-modal-field">
-            <span className="txn-modal-label">Guest</span>
-            <span className="txn-modal-value">{txn.guest}</span>
-          </div>
-          <div className="txn-modal-field">
-            <span className="txn-modal-label">Room</span>
-            <span className="txn-modal-value">{txn.room}</span>
-          </div>
-          <div className="txn-modal-field full-width">
-            <span className="txn-modal-label">Description</span>
-            <span className="txn-modal-value">{txn.description}</span>
-          </div>
-          <div className="txn-modal-field">
-            <span className="txn-modal-label">Payment Method</span>
-            <span className="txn-modal-value">{txn.method}</span>
-          </div>
-          <div className="txn-modal-field">
-            <span className="txn-modal-label">Detail</span>
-            <span className="txn-modal-value">{txn.methodDetail || '—'}</span>
-          </div>
-          <div className="txn-modal-field">
-            <span className="txn-modal-label">Type</span>
-            <span className="txn-modal-value" style={{ textTransform: 'capitalize' }}>{txn.type}</span>
-          </div>
-          <div className="txn-modal-field">
-            <span className="txn-modal-label">Status</span>
-            <span className="txn-modal-value" style={{ textTransform: 'capitalize' }}>{txn.status}</span>
-          </div>
-        </div>
-
-        {/* Actions */}
-        <div className="txn-modal-actions">
-          {canRefund && (
-            <button className="ledger-btn" onClick={() => onRefund(txn)}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
-              Issue Refund
-            </button>
-          )}
-          {canVoid && (
-            <button className="ledger-btn btn-danger" onClick={() => onVoid(txn)}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg>
-              Void Transaction
-            </button>
-          )}
-          <button className="ledger-btn" style={{ marginLeft: 'auto' }} onClick={onClose}>Close</button>
-        </div>
+function TransactionDetailModal({ transaction: txn, onClose, onRefund, onVoid, formatDate, formatTime, getStatusTag }) {
+  const facts = [
+    ['Reference', txn.id], ['Date & Time', `${formatDate(txn.date)} · ${formatTime(txn.date)}`],
+    ['Guest', txn.guest], ['Room', txn.room], ['Description', txn.description],
+    ['Payment Method', txn.method], ['Detail', txn.methodDetail || '—'],
+    ['Type', txn.type], ['Status', txn.status],
+  ];
+  return (
+    <PortalModal title="Transaction Details" maxWidth={620} className="finance-modal txn-detail-modal" onClose={onClose}>
+      <ModalClose onClose={onClose} />
+      <p className="dialog-eyebrow">PAYMENT RECORD</p>
+      <div className="txn-modal-header"><h3>Transaction Details</h3>{getStatusTag(txn.status)}</div>
+      <div className={`txn-modal-amount ${txn.amount < 0 ? 'negative' : 'positive'}`}>{money(txn.amount)}</div>
+      <dl className="txn-modal-grid">
+        {facts.map(([label, value]) => <div key={label} className={`txn-modal-field ${label === 'Description' ? 'full-width' : ''}`}>
+          <dt className="txn-modal-label">{label}</dt><dd className="txn-modal-value">{value || '—'}</dd>
+        </div>)}
+      </dl>
+      <div className="txn-modal-actions">
+        {txn.status === 'completed' && txn.amount > 0 && <button className="ledger-btn" onClick={() => onRefund(txn)}>↶ Issue Refund</button>}
+        {txn.status !== 'voided' && <button className="ledger-btn btn-danger" onClick={() => onVoid(txn)}>⊘ Void Transaction</button>}
+        <button className="ledger-btn dialog-close-action" onClick={onClose}>Close</button>
       </div>
-    </div>
+    </PortalModal>
   );
 }

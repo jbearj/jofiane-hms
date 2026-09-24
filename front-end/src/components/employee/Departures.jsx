@@ -3,6 +3,8 @@ import { usePolling } from '../../hooks/usePolling';
 import { authFetch } from '../../utils/api';
 import { todayISO, shiftISODate } from '../../utils/dateUtils';
 import GuestDetailModal from './GuestDetailModal';
+import { Input, Select } from '../common/FormControls';
+import { TableSkeletonRows, SkeletonBlock } from '../common/SkeletonLoader';
 
 function Departures() {
   // 1. UI FILTERS STATE
@@ -131,7 +133,7 @@ function Departures() {
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
             </button>
-            <input
+            <Input
               type="date"
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
@@ -156,22 +158,22 @@ function Departures() {
       <div className="kpi-grid operational-kpi-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px', marginBottom: '24px' }}>
         <div className="kpi-card" style={{ borderRadius: '12px', padding: '20px', border: '1px solid #eaeaea', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
           <span className="lbl" style={{ fontSize: '11px', color: '#6b7280', letterSpacing: '0.5px' }}>TOTAL EXPECTED</span>
-          <span className="val" style={{ fontSize: '28px', color: '#111827', margin: '8px 0' }}>{isLoading ? '-' : departures.length}</span>
+          <span className="val" style={{ fontSize: '28px', color: '#111827', margin: '8px 0' }}>{isLoading ? <SkeletonBlock style={{ width: 50, height: 32 }} /> : departures.length}</span>
           <span className="sub" style={{ color: '#6b7280' }}>Departures for selected date</span>
         </div>
         <div className="kpi-card" style={{ borderRadius: '12px', padding: '20px', border: '1px solid #eaeaea', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
           <span className="lbl" style={{ fontSize: '11px', color: '#6b7280', letterSpacing: '0.5px' }}>PENDING / OVERDUE</span>
-          <span className="val" style={{ fontSize: '28px', color: '#111827', margin: '8px 0' }}>{isLoading ? '-' : departures.filter(d => d.status === 'Pending' || d.status === 'Overdue').length}</span>
+          <span className="val" style={{ fontSize: '28px', color: '#111827', margin: '8px 0' }}>{isLoading ? <SkeletonBlock style={{ width: 50, height: 32 }} /> : departures.filter(d => d.status === 'Pending' || d.status === 'Overdue').length}</span>
           <span className="sub" style={{ color: '#dc3545', fontWeight: '500' }}>Requires Check-Out</span>
         </div>
         <div className="kpi-card" style={{ borderRadius: '12px', padding: '20px', border: '1px solid #eaeaea', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
           <span className="lbl" style={{ fontSize: '11px', color: '#6b7280', letterSpacing: '0.5px' }}>CHECKED-OUT</span>
-          <span className="val" style={{ fontSize: '28px', color: '#111827', margin: '8px 0' }}>{isLoading ? '-' : departures.filter(d => d.status === 'Checked-Out').length}</span>
+          <span className="val" style={{ fontSize: '28px', color: '#111827', margin: '8px 0' }}>{isLoading ? <SkeletonBlock style={{ width: 50, height: 32 }} /> : departures.filter(d => d.status === 'Checked-Out').length}</span>
           <span className="sub" style={{ color: '#6b7280' }}>Successfully departed</span>
         </div>
         <div className="kpi-card" style={{ borderRadius: '12px', padding: '20px', border: '1px solid #eaeaea', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
           <span className="lbl" style={{ fontSize: '11px', color: '#6b7280', letterSpacing: '0.5px' }}>BALANCE DUE</span>
-          <span className="val" style={{ fontSize: '28px', color: '#111827', margin: '8px 0' }}>{isLoading ? '-' : departures.filter(d => d.balance > 0).length}</span>
+          <span className="val" style={{ fontSize: '28px', color: '#111827', margin: '8px 0' }}>{isLoading ? <SkeletonBlock style={{ width: 50, height: 32 }} /> : departures.filter(d => d.balance > 0).length}</span>
           <span className="sub" style={{ color: '#6b7280' }}>Unsettled folios</span>
         </div>
       </div>
@@ -184,7 +186,7 @@ function Departures() {
           <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '600', color: '#111827' }}>Departure Manifest</h3>
           
           <div className="manifest-filters" style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-            <select 
+            <Select
               value={statusFilter} 
               onChange={(e) => setStatusFilter(e.target.value)}
               style={{ padding: '8px 12px', fontSize: '13px', borderRadius: '6px', border: '1px solid #d1d5db', outline: 'none', color: '#4b5563', cursor: 'pointer' }}
@@ -193,9 +195,9 @@ function Departures() {
               <option value="Pending">Pending</option>
               <option value="Overdue">Overdue</option>
               <option value="Checked-Out">Checked-Out</option>
-            </select>
+            </Select>
 
-            <select 
+            <Select
               value={roomTypeFilter} 
               onChange={(e) => setRoomTypeFilter(e.target.value)}
               style={{ padding: '8px 12px', fontSize: '13px', borderRadius: '6px', border: '1px solid #d1d5db', outline: 'none', color: '#4b5563', cursor: 'pointer' }}
@@ -204,14 +206,14 @@ function Departures() {
               <option value="Deluxe King">Deluxe King</option>
               <option value="Suite">Suite</option>
               <option value="Standard">Standard</option>
-            </select>
+            </Select>
 
             <div style={{ position: 'relative' }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }}>
                 <circle cx="11" cy="11" r="8"></circle>
                 <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
               </svg>
-              <input
+              <Input
                 type="text"
                 placeholder="Search guest or room..."
                 value={searchQuery}
@@ -227,7 +229,7 @@ function Departures() {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid #eaeaea' }}>
-                <th style={{ padding: '16px 20px', fontSize: '11px', color: '#6b7280', fontWeight: '600', textTransform: 'uppercase', width: '40px' }}><input type="checkbox" /></th>
+                <th style={{ padding: '16px 20px', fontSize: '11px', color: '#6b7280', fontWeight: '600', textTransform: 'uppercase', width: '40px' }}><Input type="checkbox" /></th>
                 <th style={{ padding: '16px 20px', fontSize: '11px', color: '#6b7280', fontWeight: '600', textTransform: 'uppercase' }}>Room</th>
                 <th style={{ padding: '16px 20px', fontSize: '11px', color: '#6b7280', fontWeight: '600', textTransform: 'uppercase' }}>Guest Information</th>
                 <th style={{ padding: '16px 20px', fontSize: '11px', color: '#6b7280', fontWeight: '600', textTransform: 'uppercase' }}>Time / Balance</th>
@@ -240,11 +242,7 @@ function Departures() {
               
               {/* IF LOADING, SHOW SPINNER. IF EMPTY, SHOW "NOT FOUND". ELSE, SHOW DATA. */}
               {isLoading ? (
-                <tr>
-                  <td colSpan="7" style={{ textAlign: 'center', padding: '40px', color: '#6b7280' }}>
-                    <i className="fas fa-spinner fa-spin" style={{ marginRight: '8px' }}></i> Fetching departures from server...
-                  </td>
-                </tr>
+                <TableSkeletonRows columns={7} label="Loading departures" />
               ) : filteredDepartures.length === 0 ? (
                 <tr>
                   <td colSpan="7" style={{ textAlign: 'center', padding: '40px', color: '#6b7280' }}>
@@ -266,7 +264,7 @@ function Departures() {
                       
                       {/* CHECKBOX */}
                       <td style={{ padding: '16px 20px' }}>
-                        <input type="checkbox" disabled={isCheckedOut}/>
+                        <Input type="checkbox" disabled={isCheckedOut}/>
                       </td>
 
                       {/* ROOM[cite: 11] */}

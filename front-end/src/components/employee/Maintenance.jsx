@@ -1,8 +1,9 @@
 import React, { useState, useRef } from 'react';
 import { usePolling } from '../../hooks/usePolling';
 import PortalModal from '../common/PortalModal';
+import { PageSkeleton } from '../common/SkeletonLoader';
 import { authFetch } from '../../utils/api';
-
+import { Input, Select, Textarea, ValidatedForm, SubmitButton } from '../common/FormControls';
 const API = '/api/maintenance-requests';
 
 const Maintenance = () => {
@@ -122,7 +123,7 @@ const Maintenance = () => {
         </div>
         <div className="table-wrap">
           {isLoading ? (
-            <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading requests...</div>
+            <PageSkeleton rows={4} label="Loading records" />
           ) : error ? (
             <div style={{ padding: '20px', color: '#dc2626' }}>{error}</div>
           ) : requests.length === 0 ? (
@@ -172,25 +173,25 @@ const Maintenance = () => {
             <button className="modal-close" onClick={() => setShowForm(false)}>×</button>
             <h3 style={{ marginBottom: '6px', color: 'var(--text-primary)' }}>Report Maintenance</h3>
             <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '20px' }}>Record a room maintenance issue.</p>
-            <form onSubmit={handleSubmit}>
+            <ValidatedForm onSubmit={handleSubmit}>
               <div className="form-grid" style={{ marginBottom: '14px' }}>
                 <div className="form-group">
                   <label>Room Number</label>
-                  <input type="number" value={formData.room_number} onChange={e => setFormData({...formData, room_number: e.target.value})} placeholder="e.g. 205" required />
+                  <Input type="number" value={formData.room_number} onChange={e => setFormData({...formData, room_number: e.target.value})} placeholder="e.g. 205" required />
                 </div>
                 <div className="form-group">
                   <label>Priority</label>
-                  <select value={formData.priority} onChange={e => setFormData({...formData, priority: e.target.value})}>
+                  <Select value={formData.priority} onChange={e => setFormData({...formData, priority: e.target.value})}>
                     <option value="LOW">Low</option>
                     <option value="NORMAL">Normal</option>
                     <option value="HIGH">High</option>
                     <option value="URGENT">Urgent</option>
-                  </select>
+                  </Select>
                 </div>
               </div>
               <div className="form-group" style={{ marginBottom: '14px' }}>
                 <label>Issue Type</label>
-                <select value={formData.issue_type} onChange={e => setFormData({...formData, issue_type: e.target.value})} required>
+                <Select value={formData.issue_type} onChange={e => setFormData({...formData, issue_type: e.target.value})} required>
                   <option value="">Select issue type...</option>
                   <option>Plumbing</option>
                   <option>Electrical</option>
@@ -200,17 +201,17 @@ const Maintenance = () => {
                   <option>TV / Electronics</option>
                   <option>Housekeeping Supply</option>
                   <option>Other</option>
-                </select>
+                </Select>
               </div>
               <div className="form-group" style={{ marginBottom: '20px' }}>
                 <label>Description</label>
-                <textarea value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} placeholder="Describe the problem in detail..." style={{ minHeight: '80px' }} />
+                <Textarea value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} placeholder="Describe the problem in detail..." style={{ minHeight: '80px' }} />
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
                 <button type="button" className="btn" onClick={() => setShowForm(false)}>Cancel</button>
-                <button type="submit" className="btn btn-gold">Submit Request</button>
+                <SubmitButton type="submit" className="btn btn-gold">Submit Request</SubmitButton>
               </div>
-            </form>
+            </ValidatedForm>
         </PortalModal>
       )}
 

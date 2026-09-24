@@ -28,13 +28,13 @@ export default function ConfirmModal({
   const confirmBg = tone === 'danger' ? '#dc2626' : 'var(--gold, #c5a059)';
 
   return (
-    <PortalModal maxWidth={400}>
+    <PortalModal maxWidth={400} onClose={onCancel} busy={busy}>
       <h3 style={{ margin: '0 0 8px', fontSize: '17px', fontWeight: 700, color: 'var(--text-primary, #111827)' }}>
         {title}
       </h3>
-      <p style={{ margin: '0 0 22px', fontSize: '14px', lineHeight: 1.5, color: 'var(--text-muted, #4b5563)' }}>
+      <div style={{ margin: '0 0 22px', fontSize: '14px', lineHeight: 1.5, color: 'var(--text-muted, #4b5563)' }}>
         {message}
-      </p>
+      </div>
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
         <button
           type="button"

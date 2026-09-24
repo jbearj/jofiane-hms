@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
 import { usePolling } from '../../../hooks/usePolling';
 import { authFetch } from '../../../utils/api';
+import { Input, Select, Textarea, ValidatedForm, SubmitButton } from '../../common/FormControls';
+import { PageSkeleton } from '../../common/SkeletonLoader';
+import { createThemedPortal as createPortal } from '../../common/ThemePortal';
 
 function Maintenance() {
   const [isLoading, setIsLoading] = useState(true);
@@ -218,7 +220,7 @@ function Maintenance() {
     return (
       <section className="admin-tab-content active">
         <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-muted)' }}>
-          <div style={{ fontSize: '16px', fontWeight: '500' }}>Loading maintenance board...</div>
+          <PageSkeleton rows={6} />
         </div>
       </section>
     );
@@ -273,32 +275,32 @@ function Maintenance() {
           <div className="panel-toolbar">
             <div className="panel-search">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-              <input
+              <Input
                 type="text"
                 placeholder="Search by ID, room, or issue..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <select className="floor-dropdown" value={filterPriority} onChange={(e) => setFilterPriority(e.target.value)}>
+            <Select className="floor-dropdown" value={filterPriority} onChange={(e) => setFilterPriority(e.target.value)}>
               <option value="all">All Priorities</option>
               <option value="critical">Critical</option>
               <option value="high">High</option>
               <option value="medium">Medium</option>
               <option value="low">Low</option>
-            </select>
-            <select className="floor-dropdown" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+            </Select>
+            <Select className="floor-dropdown" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
               <option value="all">All Status</option>
               <option value="open">Open</option>
               <option value="in-progress">In Progress</option>
               <option value="completed">Completed</option>
               <option value="deferred">Deferred</option>
-            </select>
-            <select className="floor-dropdown" value={filterTech} onChange={(e) => setFilterTech(e.target.value)}>
+            </Select>
+            <Select className="floor-dropdown" value={filterTech} onChange={(e) => setFilterTech(e.target.value)}>
               <option value="all">All Technicians</option>
               {technicians.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
               <option value="">Unassigned</option>
-            </select>
+            </Select>
             <button className="btn btn-sm btn-gold" onClick={handleCreateOrder}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
               New Work Order
@@ -435,7 +437,7 @@ function OrderDetailModal({ order, technicians, getPriorityColor, getStatusLabel
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
           <div>
             <div style={{ fontSize: '10px', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>Assigned To</div>
-            <select
+            <Select
               className="floor-dropdown"
               style={{ width: '100%', fontSize: '12px' }}
               value={order.assignedTo}
@@ -443,7 +445,7 @@ function OrderDetailModal({ order, technicians, getPriorityColor, getStatusLabel
             >
               <option value="">Unassigned</option>
               {technicians.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
-            </select>
+            </Select>
           </div>
           <div>
             <div style={{ fontSize: '10px', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>Reported</div>
@@ -534,59 +536,59 @@ function WorkOrderModal({ order, technicians, onClose, onSave }) {
           {order ? 'Update work order details' : 'Report a maintenance issue'}
         </p>
 
-        <form onSubmit={handleSubmit}>
+        <ValidatedForm onSubmit={handleSubmit}>
           <div className="form-grid" style={{ marginBottom: '18px' }}>
             <div className="form-group">
               <label>Room Number <span className="required">*</span></label>
-              <input type="text" value={formData.room} onChange={(e) => setFormData({ ...formData, room: e.target.value })} placeholder="e.g. 204" />
+              <Input type="text" value={formData.room} onChange={(e) => setFormData({ ...formData, room: e.target.value })} placeholder="e.g. 204" />
             </div>
             <div className="form-group">
               <label>Priority</label>
-              <select value={formData.priority} onChange={(e) => setFormData({ ...formData, priority: e.target.value })}>
+              <Select value={formData.priority} onChange={(e) => setFormData({ ...formData, priority: e.target.value })}>
                 <option value="low">Low</option>
                 <option value="medium">Medium</option>
                 <option value="high">High</option>
                 <option value="critical">Critical</option>
-              </select>
+              </Select>
             </div>
           </div>
 
           <div className="form-group" style={{ marginBottom: '18px' }}>
             <label>Issue Description <span className="required">*</span></label>
-            <textarea value={formData.issue} onChange={(e) => setFormData({ ...formData, issue: e.target.value })} placeholder="Describe the problem..." style={{ minHeight: '80px' }} />
+            <Textarea value={formData.issue} onChange={(e) => setFormData({ ...formData, issue: e.target.value })} placeholder="Describe the problem..." style={{ minHeight: '80px' }} />
           </div>
 
           <div className="form-grid" style={{ marginBottom: '18px' }}>
             <div className="form-group">
               <label>Assign Technician</label>
-              <select value={formData.assignedTo} onChange={(e) => setFormData({ ...formData, assignedTo: e.target.value })}>
+              <Select value={formData.assignedTo} onChange={(e) => setFormData({ ...formData, assignedTo: e.target.value })}>
                 <option value="">Unassigned</option>
                 {technicians.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
-              </select>
+              </Select>
             </div>
             <div className="form-group">
               <label>Status</label>
-              <select value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })}>
+              <Select value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })}>
                 <option value="open">Open</option>
                 <option value="in-progress">In Progress</option>
                 <option value="completed">Completed</option>
                 <option value="deferred">Deferred</option>
-              </select>
+              </Select>
             </div>
           </div>
 
           <div style={{ marginBottom: '24px' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '13px', fontWeight: '500' }}>
-              <input type="checkbox" checked={formData.roomOutOfOrder} onChange={(e) => setFormData({ ...formData, roomOutOfOrder: e.target.checked })} style={{ width: '16px', height: '16px', accentColor: 'var(--gold)' }} />
+              <Input type="checkbox" checked={formData.roomOutOfOrder} onChange={(e) => setFormData({ ...formData, roomOutOfOrder: e.target.checked })} style={{ width: '16px', height: '16px', accentColor: 'var(--gold)' }} />
               Mark room as Out of Order (removes from available inventory)
             </label>
           </div>
 
           <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
             <button type="button" className="btn" onClick={onClose}>Cancel</button>
-            <button type="submit" className="btn btn-gold">{order ? 'Save Changes' : 'Create Work Order'}</button>
+            <SubmitButton type="submit" className="btn btn-gold">{order ? 'Save Changes' : 'Create Work Order'}</SubmitButton>
           </div>
-        </form>
+        </ValidatedForm>
       </div>
     </div>
   );

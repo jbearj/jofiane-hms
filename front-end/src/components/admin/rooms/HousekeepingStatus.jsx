@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, memo } from 'react';
 import { usePolling } from '../../../hooks/usePolling';
 import { authFetch } from '../../../utils/api';
+import { Input, Select, Textarea } from '../../common/FormControls';
+import { PageSkeleton } from '../../common/SkeletonLoader';
 
 function HousekeepingStatus() {
   const [isLoading, setIsLoading] = useState(true);
@@ -200,7 +202,7 @@ function HousekeepingStatus() {
     return (
       <section className="admin-tab-content active">
         <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-muted)' }}>
-          <div style={{ fontSize: '16px', fontWeight: '500' }}>Loading housekeeping status...</div>
+          <PageSkeleton rows={6} />
         </div>
       </section>
     );
@@ -274,23 +276,23 @@ function HousekeepingStatus() {
         <div className="panel-toolbar">
           <div className="panel-search">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-            <input
+            <Input
               type="text"
               placeholder="Search room, type, or staff..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-          <select className="floor-dropdown" value={filterFloor} onChange={(e) => setFilterFloor(e.target.value)}>
+          <Select className="floor-dropdown" value={filterFloor} onChange={(e) => setFilterFloor(e.target.value)}>
             <option value="all">All Floors</option>
             {floors.map(f => <option key={f} value={f}>Floor {f}</option>)}
-          </select>
-          <select className="floor-dropdown" value={filterStaff} onChange={(e) => setFilterStaff(e.target.value)}>
+          </Select>
+          <Select className="floor-dropdown" value={filterStaff} onChange={(e) => setFilterStaff(e.target.value)}>
             <option value="all">All Staff</option>
             {staff.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
-          </select>
+          </Select>
           <label className="panel-toggle">
-            <input
+            <Input
               type="checkbox"
               checked={showPriorityOnly}
               onChange={() => setShowPriorityOnly(!showPriorityOnly)}
@@ -375,7 +377,7 @@ const RoomCard = memo(function RoomCard({ room, staff, getStatusColor, getStatus
       {/* Assigned staff */}
       <div style={{ marginBottom: '12px' }}>
         <label style={{ fontSize: '10px', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>Assigned to</label>
-        <select
+        <Select
           className="floor-dropdown"
           style={{ width: '100%', fontSize: '12px', padding: '6px 10px' }}
           value={room.assignedTo}
@@ -383,7 +385,7 @@ const RoomCard = memo(function RoomCard({ room, staff, getStatusColor, getStatus
         >
           <option value="">Unassigned</option>
           {staff.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
-        </select>
+        </Select>
       </div>
 
       {/* Notes */}
@@ -395,7 +397,7 @@ const RoomCard = memo(function RoomCard({ room, staff, getStatusColor, getStatus
 
       {showNoteInput && (
         <div style={{ marginBottom: '12px' }}>
-          <textarea
+          <Textarea
             value={noteValue}
             onChange={(e) => setNoteValue(e.target.value)}
             placeholder="Add a note..."

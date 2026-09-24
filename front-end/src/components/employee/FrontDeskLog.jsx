@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { authFetch } from '../../utils/api';
 import { todayISO, shiftISODate } from '../../utils/dateUtils';
+import { Input, Select, Textarea, ValidatedForm, SubmitButton } from '../common/FormControls';
+import { CardsSkeleton } from '../common/SkeletonLoader';
 
 function FrontDeskLog({ employee = null }) {
   // Logged-in agent's identity for attributing new entries / comments.
@@ -218,18 +220,18 @@ function FrontDeskLog({ employee = null }) {
             <button type="button" aria-label="Previous day" onClick={() => setSelectedDate(prev => shiftISODate(prev, -1))}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
             </button>
-            <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} />
+            <Input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} />
             <button type="button" aria-label="Next day" onClick={() => setSelectedDate(prev => shiftISODate(prev, 1))}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
             </button>
           </div>
           <button className="btn btn-sm btn-gold" onClick={() => setSelectedDate(todayISO())} style={{ borderRadius: '6px', padding: '8px 14px', fontSize: '13px' }}>Today</button>
-          <select value={selectedShift} onChange={e => setSelectedShift(e.target.value)} style={{ padding: '8px 12px', fontSize: '13px', borderRadius: '6px', border: '1px solid #d1d5db', outline: 'none', color: '#374151', background: '#fff' }}>
+          <Select value={selectedShift} onChange={e => setSelectedShift(e.target.value)} style={{ padding: '8px 12px', fontSize: '13px', borderRadius: '6px', border: '1px solid #d1d5db', outline: 'none', color: '#374151', background: '#fff' }}>
             <option value="all">All Shifts</option>
             <option value="morning">Morning (7am-3pm)</option>
             <option value="afternoon">Afternoon (3pm-11pm)</option>
             <option value="night">Night (11pm-7am)</option>
-          </select>
+          </Select>
           <button onClick={() => setNewEntryModal(true)} className="btn btn-gold" style={{ borderRadius: '6px', padding: '8px 18px', border: 'none', fontWeight: '600', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <i className="fas fa-plus"></i> New Entry
           </button>
@@ -262,10 +264,10 @@ function FrontDeskLog({ employee = null }) {
         <div className="logbook-filter-bar" style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center', marginBottom: '24px', paddingBottom: '20px', borderBottom: '1px solid #f3f4f6' }}>
           <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
             <i className="fas fa-search" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af', fontSize: '13px' }}></i>
-            <input type="text" placeholder="Search entries..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} style={{ width: '100%', padding: '9px 12px 9px 34px', fontSize: '13px', borderRadius: '6px', border: '1px solid #e5e7eb', outline: 'none', color: '#374151', background: '#f9fafb' }} />
+            <Input type="text" placeholder="Search entries..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} style={{ width: '100%', padding: '9px 12px 9px 34px', fontSize: '13px', borderRadius: '6px', border: '1px solid #e5e7eb', outline: 'none', color: '#374151', background: '#f9fafb' }} />
           </div>
 
-          <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)} style={{ padding: '9px 12px', fontSize: '13px', borderRadius: '6px', border: '1px solid #e5e7eb', outline: 'none', color: '#374151', background: '#fff' }}>
+          <Select value={filterCategory} onChange={e => setFilterCategory(e.target.value)} style={{ padding: '9px 12px', fontSize: '13px', borderRadius: '6px', border: '1px solid #e5e7eb', outline: 'none', color: '#374151', background: '#fff' }}>
             <option value="All">All Categories</option>
             <option value="General Note">General Note</option>
             <option value="Guest Request">Guest Request</option>
@@ -273,26 +275,26 @@ function FrontDeskLog({ employee = null }) {
             <option value="Maintenance">Maintenance</option>
             <option value="VIP Note">VIP Note</option>
             <option value="Shift Summary">Shift Summary</option>
-          </select>
+          </Select>
 
-          <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)} style={{ padding: '9px 12px', fontSize: '13px', borderRadius: '6px', border: '1px solid #e5e7eb', outline: 'none', color: '#374151', background: '#fff' }}>
+          <Select value={filterPriority} onChange={e => setFilterPriority(e.target.value)} style={{ padding: '9px 12px', fontSize: '13px', borderRadius: '6px', border: '1px solid #e5e7eb', outline: 'none', color: '#374151', background: '#fff' }}>
             <option value="All">All Priorities</option>
             <option value="high">High</option>
             <option value="medium">Medium</option>
             <option value="low">Low</option>
-          </select>
+          </Select>
 
-          <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={{ padding: '9px 12px', fontSize: '13px', borderRadius: '6px', border: '1px solid #e5e7eb', outline: 'none', color: '#374151', background: '#fff' }}>
+          <Select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={{ padding: '9px 12px', fontSize: '13px', borderRadius: '6px', border: '1px solid #e5e7eb', outline: 'none', color: '#374151', background: '#fff' }}>
             <option value="Open">Open</option>
             <option value="Resolved">Resolved</option>
             <option value="All">All Status</option>
-          </select>
+          </Select>
 
           <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#4b5563', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-            <input type="checkbox" checked={showAutoGenerated} onChange={e => setShowAutoGenerated(e.target.checked)} style={{ accentColor: '#b8860b' }} /> System
+            <Input type="checkbox" checked={showAutoGenerated} onChange={e => setShowAutoGenerated(e.target.checked)} style={{ accentColor: '#b8860b' }} /> System
           </label>
           <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#4b5563', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-            <input type="checkbox" checked={showResolved} onChange={e => setShowResolved(e.target.checked)} style={{ accentColor: '#b8860b' }} /> Resolved
+            <Input type="checkbox" checked={showResolved} onChange={e => setShowResolved(e.target.checked)} style={{ accentColor: '#b8860b' }} /> Resolved
           </label>
         </div>
 
@@ -301,9 +303,7 @@ function FrontDeskLog({ employee = null }) {
         {/* Log Feed */}
         <div className="logbook-feed" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           {isLoading ? (
-            <div style={{ textAlign: 'center', padding: '48px 20px', color: '#6b7280' }}>
-              <i className="fas fa-spinner fa-spin" style={{ marginRight: '8px' }}></i> Loading logbook...
-            </div>
+            <CardsSkeleton cards={3} label="Loading front desk log" />
           ) : (
             <>
               {pinnedEntries.length > 0 && (
@@ -352,60 +352,61 @@ function FrontDeskLog({ employee = null }) {
               </button>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <ValidatedForm className="log-entry-form" onSubmit={(event) => { event.preventDefault(); handleCreateEntry(); }}><div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div style={{ display: 'flex', gap: '12px' }}>
                 <div style={{ flex: 1 }}>
                   <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#374151', marginBottom: '5px' }}>Category</label>
-                  <select value={newEntry.category} onChange={e => setNewEntry({ ...newEntry, category: e.target.value })} style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #e5e7eb', outline: 'none', fontSize: '13px', color: '#374151' }}>
+                  <Select value={newEntry.category} onChange={e => setNewEntry({ ...newEntry, category: e.target.value })} style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #e5e7eb', outline: 'none', fontSize: '13px', color: '#374151' }}>
                     <option>General Note</option>
                     <option>Guest Request</option>
                     <option>Incident</option>
                     <option>Maintenance</option>
                     <option>VIP Note</option>
                     <option>Shift Summary</option>
-                  </select>
+                  </Select>
                 </div>
                 <div style={{ flex: 1 }}>
                   <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#374151', marginBottom: '5px' }}>Priority</label>
-                  <select value={newEntry.priority} onChange={e => setNewEntry({ ...newEntry, priority: e.target.value })} style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #e5e7eb', outline: 'none', fontSize: '13px', color: '#374151' }}>
+                  <Select value={newEntry.priority} onChange={e => setNewEntry({ ...newEntry, priority: e.target.value })} style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #e5e7eb', outline: 'none', fontSize: '13px', color: '#374151' }}>
                     <option value="low">Low</option>
                     <option value="medium">Medium</option>
                     <option value="high">High</option>
-                  </select>
+                  </Select>
                 </div>
               </div>
 
               <div>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#374151', marginBottom: '5px' }}>Title</label>
-                <input type="text" value={newEntry.title} onChange={e => setNewEntry({ ...newEntry, title: e.target.value })} style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #e5e7eb', outline: 'none', fontSize: '13px', color: '#374151' }} placeholder="Brief summary..." />
+                <Input type="text" value={newEntry.title} required onChange={e => setNewEntry({ ...newEntry, title: e.target.value })} style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #e5e7eb', outline: 'none', fontSize: '13px', color: '#374151' }} placeholder="Brief summary..." />
               </div>
 
               <div>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#374151', marginBottom: '5px' }}>Description</label>
-                <textarea value={newEntry.description} onChange={e => setNewEntry({ ...newEntry, description: e.target.value })} rows={3} style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #e5e7eb', outline: 'none', fontSize: '13px', color: '#374151', resize: 'vertical' }} placeholder="Full details..." />
+                <Textarea value={newEntry.description} required onChange={e => setNewEntry({ ...newEntry, description: e.target.value })} rows={3} style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #e5e7eb', outline: 'none', fontSize: '13px', color: '#374151', resize: 'vertical' }} placeholder="Full details..." />
               </div>
 
               <div style={{ display: 'flex', gap: '12px' }}>
                 <div style={{ flex: 1 }}>
                   <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#374151', marginBottom: '5px' }}>Guest (optional)</label>
-                  <input type="text" value={newEntry.linkedGuest} onChange={e => setNewEntry({ ...newEntry, linkedGuest: e.target.value })} style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #e5e7eb', outline: 'none', fontSize: '13px', color: '#374151' }} placeholder="Guest name" />
+                  <Input type="text" value={newEntry.linkedGuest} onChange={e => setNewEntry({ ...newEntry, linkedGuest: e.target.value })} style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #e5e7eb', outline: 'none', fontSize: '13px', color: '#374151' }} placeholder="Guest name" />
                 </div>
                 <div style={{ width: '100px' }}>
                   <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#374151', marginBottom: '5px' }}>Room</label>
-                  <input type="number" value={newEntry.linkedRoom} onChange={e => setNewEntry({ ...newEntry, linkedRoom: e.target.value })} style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #e5e7eb', outline: 'none', fontSize: '13px', color: '#374151' }} placeholder="#" />
+                  <Input type="number" value={newEntry.linkedRoom} onChange={e => setNewEntry({ ...newEntry, linkedRoom: e.target.value })} style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #e5e7eb', outline: 'none', fontSize: '13px', color: '#374151' }} placeholder="#" />
                 </div>
               </div>
 
               <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#374151', cursor: 'pointer' }}>
-                <input type="checkbox" checked={newEntry.pin} onChange={e => setNewEntry({ ...newEntry, pin: e.target.checked })} style={{ accentColor: '#b8860b' }} />
+                <Input type="checkbox" checked={newEntry.pin} onChange={e => setNewEntry({ ...newEntry, pin: e.target.checked })} style={{ accentColor: '#b8860b' }} />
                 Pin this entry to the top
               </label>
             </div>
 
             <div style={{ marginTop: '22px', display: 'flex', justifyContent: 'flex-end', gap: '10px', paddingTop: '16px', borderTop: '1px solid #f3f4f6' }}>
               <button onClick={() => setNewEntryModal(false)} style={{ padding: '9px 18px', background: '#f3f4f6', border: 'none', borderRadius: '6px', color: '#4b5563', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}>Cancel</button>
-              <button onClick={handleCreateEntry} className="btn btn-gold" style={{ padding: '9px 18px', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>Create Entry</button>
+              <SubmitButton className="btn btn-gold" style={{ padding: '9px 18px', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>Create Entry</SubmitButton>
             </div>
+            </ValidatedForm>
           </div>
         </div>
       )}
@@ -525,7 +526,7 @@ function LogEntryCard({ entry, onTogglePin, onDelete, onAddComment }) {
             </div>
           ))}
           <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
-            <input
+            <Input
               type="text"
               value={commentText}
               onChange={(e) => setCommentText(e.target.value)}

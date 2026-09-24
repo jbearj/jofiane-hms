@@ -1,7 +1,9 @@
 import React, { useState, useRef } from 'react';
 import { usePolling } from '../../hooks/usePolling';
 import PortalModal from '../common/PortalModal';
+import { PageSkeleton } from '../common/SkeletonLoader';
 import { authFetch } from '../../utils/api';
+import { Input, Select, Textarea, ValidatedForm, SubmitButton } from '../common/FormControls';
 
 const API = '/api/guest-requests';
 
@@ -153,7 +155,7 @@ function GuestRequests({ isLead = false, employee = null }) {
           </div>
           <div className="table-wrap">
             {isLoading ? (
-              <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading requests...</div>
+              <PageSkeleton rows={4} label="Loading records" />
             ) : error ? (
               <div style={{ padding: '20px', color: '#dc2626' }}>{error}</div>
             ) : visibleRequests.length === 0 ? (
@@ -221,46 +223,46 @@ function GuestRequests({ isLead = false, employee = null }) {
               <button className="modal-close" onClick={() => setShowForm(false)}>×</button>
               <h3 style={{ color: 'var(--text-primary)' }}>New Guest Request</h3>
               <p style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Record a new housekeeping request.</p>
-              <form onSubmit={addRequest}>
+              <ValidatedForm onSubmit={addRequest}>
                 <div className="form-grid" style={{ marginBottom: '14px' }}>
                   <div className="form-group">
                     <label>Room Number</label>
-                    <input type="number" value={formData.room_number} onChange={e => setFormData({...formData, room_number: e.target.value})} placeholder="e.g. 203" required />
+                    <Input type="number" value={formData.room_number} onChange={e => setFormData({...formData, room_number: e.target.value})} placeholder="e.g. 203" required />
                   </div>
                   <div className="form-group">
                     <label>Priority</label>
-                    <select value={formData.priority} onChange={e => setFormData({...formData, priority: e.target.value})}>
+                    <Select value={formData.priority} onChange={e => setFormData({...formData, priority: e.target.value})}>
                       <option value="LOW">Low</option>
                       <option value="NORMAL">Normal</option>
                       <option value="HIGH">High</option>
                       <option value="URGENT">Urgent</option>
-                    </select>
+                    </Select>
                   </div>
                 </div>
                 <div className="form-group" style={{ marginBottom: '14px' }}>
                   <label>Request Type</label>
-                  <input type="text" value={formData.request_type} onChange={e => setFormData({...formData, request_type: e.target.value})} placeholder="e.g. Extra Towels" required />
+                  <Input type="text" value={formData.request_type} onChange={e => setFormData({...formData, request_type: e.target.value})} placeholder="e.g. Extra Towels" required />
                 </div>
                 <div className="form-group" style={{ marginBottom: '14px' }}>
                   <label>Assign To</label>
-                  <select value={formData.assigned_to} onChange={e => setFormData({...formData, assigned_to: e.target.value})}>
+                  <Select value={formData.assigned_to} onChange={e => setFormData({...formData, assigned_to: e.target.value})}>
                     <option value="">Unassigned</option>
                     <option>Maria Santos</option>
                     <option>Rosa Villanueva</option>
                     <option>Elena Cruz</option>
                     <option>Carmen Diaz</option>
                     <option>Liza Fernandez</option>
-                  </select>
+                  </Select>
                 </div>
                 <div className="form-group" style={{ marginBottom: '20px' }}>
                   <label>Notes (optional)</label>
-                  <textarea value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} placeholder="Additional details..." style={{ minHeight: '70px' }} />
+                  <Textarea value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} placeholder="Additional details..." style={{ minHeight: '70px' }} />
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
                   <button type="button" className="btn" onClick={() => setShowForm(false)}>Cancel</button>
-                  <button type="submit" className="btn btn-gold">Create Request</button>
+                  <SubmitButton type="submit" className="btn btn-gold">Create Request</SubmitButton>
                 </div>
-              </form>
+              </ValidatedForm>
           </PortalModal>
         )}
 

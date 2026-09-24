@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { usePolling } from '../../hooks/usePolling';
 import { authFetch } from '../../utils/api';
 import GuestDetailModal from './GuestDetailModal';
+import { TableSkeletonRows } from '../common/SkeletonLoader';
 
 
 function InHouseGuests() {
@@ -157,11 +158,7 @@ function InHouseGuests() {
             </thead>
             <tbody>
               {isLoading ? (
-                <tr>
-                  <td colSpan="6" style={{ textAlign: 'center', padding: '40px', color: '#6b7280' }}>
-                    <i className="fas fa-spinner fa-spin" style={{ marginRight: '8px' }}></i> Fetching in-house guests from server...
-                  </td>
-                </tr>
+                <TableSkeletonRows columns={6} label="Loading in-house guests" />
               ) : filteredGuests.length === 0 ? (
                 <tr>
                   <td colSpan="6" style={{ textAlign: 'center', padding: '40px', color: '#6b7280' }}>

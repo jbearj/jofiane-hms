@@ -1,4 +1,6 @@
+import { Input } from '../../common/FormControls';
 import React, { useState, useEffect } from 'react';
+import { PageSkeleton } from '../../common/SkeletonLoader';
 
 function OtaChannels() {
   const [isLoading, setIsLoading] = useState(true);
@@ -67,7 +69,7 @@ function OtaChannels() {
   const parityIssues = channels.filter(ch => !ch.parity && ch.enabled).length;
 
   if (isLoading) {
-    return (<section className="admin-tab-content active"><div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading OTA channels...</div></section>);
+    return (<section className="admin-tab-content active"><PageSkeleton rows={6} /></section>);
   }
 
   return (
@@ -110,7 +112,7 @@ function OtaChannels() {
               </div>
               <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '11px', color: 'var(--text-muted)' }}>
                 <span>{ch.enabled ? 'On' : 'Off'}</span>
-                <input
+                <Input
                   type="checkbox"
                   checked={ch.enabled}
                   onChange={() => toggleChannel(ch.id)}

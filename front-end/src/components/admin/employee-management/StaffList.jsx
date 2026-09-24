@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
+import { PageSkeleton } from '../../common/SkeletonLoader';
+import { Input, Select, ValidatedForm, SubmitButton } from '../../common/FormControls';
+import { createThemedPortal as createPortal } from '../../common/ThemePortal';
 import employee1 from '../../../assets/employee1.jpeg';
 import { usePolling } from '../../../hooks/usePolling';
 import { authFetch, readError, validatePassword, PASSWORD_RULE_TEXT } from '../../../utils/api';
@@ -244,7 +246,7 @@ function StaffList() {
     return (
       <section className="admin-tab-content active">
         <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-muted)' }}>
-          <div style={{ fontSize: '16px', fontWeight: '500' }}>Loading staff list...</div>
+          <PageSkeleton rows={6} />
         </div>
       </section>
     );
@@ -316,19 +318,19 @@ function StaffList() {
           <div className="panel-toolbar">
             <div className="panel-search">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-              <input
+              <Input
                 type="text"
                 placeholder="Search by name, role, or email..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <select className="floor-dropdown" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+            <Select className="floor-dropdown" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
               <option value="all">All Status</option>
               <option value="Active">Active</option>
               <option value="On Leave">On Leave</option>
               <option value="Terminated">Terminated</option>
-            </select>
+            </Select>
             
             {/* Added button right here */}
             <button className="btn btn-sm btn-gold" onClick={handleAdd}>
@@ -623,14 +625,14 @@ function EmployeeFormModal({ employee, departments, existingEmployees = [], onCl
           {isEdit ? 'Update employee information and portal credentials' : 'Add a new employee to the directory'}
         </p>
 
-        <form onSubmit={handleSubmit}>
+        <ValidatedForm onSubmit={handleSubmit}>
 
           {/* ── PERSONAL INFO ── */}
           <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--gold-dark)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>Personal Information</div>
           <div className="form-grid" style={{ marginBottom: '18px' }}>
             <div className="form-group">
               <label>Full Name <span className="required">*</span></label>
-              <input type="text" value={formData.name} onChange={set('name')} placeholder="e.g. Juan Dela Cruz" />
+              <Input type="text" required value={formData.name} onChange={set('name')} placeholder="e.g. Juan Dela Cruz" />
             </div>
             <div className="form-group">
               <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -639,7 +641,7 @@ function EmployeeFormModal({ employee, departments, existingEmployees = [], onCl
                   Auto-generated
                 </span>
               </label>
-              <input
+              <Input
                 type="text"
                 value={loginUsername}
                 readOnly
@@ -656,11 +658,11 @@ function EmployeeFormModal({ employee, departments, existingEmployees = [], onCl
           <div className="form-grid" style={{ marginBottom: '22px' }}>
             <div className="form-group">
               <label>Phone</label>
-              <input type="text" value={formData.phone} onChange={set('phone')} placeholder="+63 9xx xxx xxxx" />
+              <Input type="text" value={formData.phone} onChange={set('phone')} placeholder="+63 9xx xxx xxxx" />
             </div>
             <div className="form-group">
               <label>Hire Date</label>
-              <input type="date" value={formData.hireDate} onChange={set('hireDate')} />
+              <Input type="date" value={formData.hireDate} onChange={set('hireDate')} />
             </div>
           </div>
 
@@ -669,7 +671,7 @@ function EmployeeFormModal({ employee, departments, existingEmployees = [], onCl
           <div className="form-grid" style={{ marginBottom: '18px' }}>
             <div className="form-group">
               <label>Department</label>
-              <select
+              <Select
                 value={formData.department}
                 onChange={(e) => {
                   const dept = e.target.value;
@@ -679,11 +681,11 @@ function EmployeeFormModal({ employee, departments, existingEmployees = [], onCl
                 }}
               >
                 {departments.map(d => <option key={d} value={d}>{d}</option>)}
-              </select>
+              </Select>
             </div>
             <div className="form-group">
               <label>Role / Position <span className="required">*</span></label>
-              <select value={formData.role} onChange={set('role')}>
+              <Select value={formData.role} onChange={set('role')}>
                 <option value="" disabled>Select a role…</option>
                 {/* Preserve a legacy/custom role that isn't in the preset list (on edit) */}
                 {formData.role && !(ROLES_BY_DEPARTMENT[formData.department] || []).includes(formData.role) && (
@@ -692,21 +694,21 @@ function EmployeeFormModal({ employee, departments, existingEmployees = [], onCl
                 {(ROLES_BY_DEPARTMENT[formData.department] || []).map(r => (
                   <option key={r} value={r}>{r}</option>
                 ))}
-              </select>
+              </Select>
             </div>
           </div>
           <div className="form-grid" style={{ marginBottom: '22px' }}>
             <div className="form-group">
               <label>Monthly Salary (₱)</label>
-              <input type="number" value={formData.salary} onChange={set('salary')} placeholder="0" min="0" />
+              <Input type="number" value={formData.salary} onChange={set('salary')} placeholder="0" min="0" />
             </div>
             <div className="form-group">
               <label>Status</label>
-              <select value={formData.status} onChange={set('status')}>
+              <Select value={formData.status} onChange={set('status')}>
                 <option value="Active">Active</option>
                 <option value="On Leave">On Leave</option>
                 <option value="Terminated">Terminated</option>
-              </select>
+              </Select>
             </div>
           </div>
 
@@ -715,7 +717,7 @@ function EmployeeFormModal({ employee, departments, existingEmployees = [], onCl
           <div style={{ background: 'var(--bg-input)', borderRadius: '8px', padding: '16px', border: '1px solid var(--border-light)', marginBottom: '22px' }}>
             <div style={{ marginBottom: '16px' }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '13px', fontWeight: '500' }}>
-                <input
+                <Input
                   type="checkbox"
                   checked={formData.portalAccess}
                   onChange={(e) => setVal('portalAccess', e.target.checked)}
@@ -733,7 +735,7 @@ function EmployeeFormModal({ employee, departments, existingEmployees = [], onCl
                   Auto-generated
                 </span>
               </label>
-              <input
+              <Input
                 type="text"
                 value={loginUsername}
                 readOnly
@@ -758,8 +760,10 @@ function EmployeeFormModal({ employee, departments, existingEmployees = [], onCl
                 {!isEdit && <span className="required"> *</span>}
               </label>
               <div style={{ position: 'relative' }}>
-                <input
+                <Input
                   type={showPassword ? 'text' : 'password'}
+                  required={!isEdit && formData.portalAccess}
+                  validation={value => value ? validatePassword(value) : ''}
                   value={formData.password}
                   onChange={(e) => {
                     const val = e.target.value;
@@ -802,9 +806,9 @@ function EmployeeFormModal({ employee, departments, existingEmployees = [], onCl
 
           <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
             <button type="button" className="btn" onClick={onClose}>Cancel</button>
-            <button type="submit" className="btn btn-gold">{isEdit ? 'Save Changes' : 'Add Employee'}</button>
+            <SubmitButton className="btn btn-gold">{isEdit ? 'Save Changes' : 'Add Employee'}</SubmitButton>
           </div>
-        </form>
+        </ValidatedForm>
       </div>
     </div>
   );

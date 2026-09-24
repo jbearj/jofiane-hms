@@ -2,6 +2,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { API_BASE, authFetch } from '../../utils/api';
 import GuestDetailModal from './GuestDetailModal';
 import PortalModal from '../common/PortalModal';
+import { Input, Select } from '../common/FormControls';
 
 // Normalise housekeeping string from DB → RoomRack pill class
 const toHKStatus = (s) => {
@@ -244,21 +245,21 @@ function RoomRack() {
           <div className="roomrack-filters">
             <label className="module-search">
               <i className="fas fa-search" />
-              <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Room or type" />
+              <Input value={query} onChange={e => setQuery(e.target.value)} placeholder="Room or type" />
             </label>
-            <select value={floor} onChange={e => setFloor(e.target.value)}>
+            <Select value={floor} onChange={e => setFloor(e.target.value)}>
               <option value="all">All floors</option>
               {[...new Set(rooms.map(r => r.floor))].sort().map(f => (
                 <option key={f} value={f}>Floor {f}</option>
               ))}
-            </select>
-            <select value={status} onChange={e => setStatus(e.target.value)}>
+            </Select>
+            <Select value={status} onChange={e => setStatus(e.target.value)}>
               <option value="all">All room status</option>
               <option value="clean">Clean</option>
               <option value="dirty">Dirty</option>
               <option value="inspection">Inspection</option>
               <option value="maintenance">Maintenance</option>
-            </select>
+            </Select>
           </div>
         </div>
 

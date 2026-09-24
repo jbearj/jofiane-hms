@@ -1,7 +1,9 @@
 import React, { useState, useRef } from 'react';
 import { usePolling } from '../../hooks/usePolling';
 import PortalModal from '../common/PortalModal';
+import { PageSkeleton } from '../common/SkeletonLoader';
 import { authFetch, API_BASE } from '../../utils/api';
+import { Input, Select, Textarea, ValidatedForm, SubmitButton } from '../common/FormControls';
 
 const API = '/api/cleaning-tasks';
 
@@ -151,7 +153,7 @@ const CleaningTasks = ({ isLead = false, employee = null }) => {
         </div>
         <div className="table-wrap">
           {isLoading ? (
-            <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading tasks...</div>
+            <PageSkeleton rows={4} label="Loading records" />
           ) : error ? (
             <div style={{ padding: '20px', color: '#dc2626' }}>{error}</div>
           ) : visibleTasks.length === 0 ? (
@@ -198,30 +200,30 @@ const CleaningTasks = ({ isLead = false, employee = null }) => {
             <button className="modal-close" onClick={() => setShowForm(false)}>×</button>
             <h3 style={{ marginBottom: '6px', color: 'var(--text-primary)' }}>Add Cleaning Task</h3>
             <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '20px' }}>Create a new housekeeping cleaning assignment.</p>
-            <form onSubmit={handleSubmit}>
+            <ValidatedForm onSubmit={handleSubmit}>
               <div className="form-grid" style={{ marginBottom: '14px' }}>
                 <div className="form-group">
                   <label>Room Number</label>
-                  <input type="number" value={formData.room_number} onChange={e => setFormData({...formData, room_number: e.target.value})} placeholder="e.g. 205" required />
+                  <Input type="number" value={formData.room_number} onChange={e => setFormData({...formData, room_number: e.target.value})} placeholder="e.g. 205" required />
                 </div>
                 <div className="form-group">
                   <label>Priority</label>
-                  <select value={formData.priority} onChange={e => setFormData({...formData, priority: e.target.value})}>
+                  <Select value={formData.priority} onChange={e => setFormData({...formData, priority: e.target.value})}>
                     <option value="LOW">Low</option>
                     <option value="NORMAL">Normal</option>
                     <option value="HIGH">High</option>
                     <option value="URGENT">Urgent</option>
-                  </select>
+                  </Select>
                 </div>
               </div>
               <div className="form-group" style={{ marginBottom: '14px' }}>
                 <label>Cleaning Task</label>
-                <input type="text" value={formData.task_type} onChange={e => setFormData({...formData, task_type: e.target.value})} placeholder="e.g. Checkout Cleaning" required />
+                <Input type="text" value={formData.task_type} onChange={e => setFormData({...formData, task_type: e.target.value})} placeholder="e.g. Checkout Cleaning" required />
               </div>
               <div className="form-grid" style={{ marginBottom: '14px' }}>
                 <div className="form-group">
                   <label>Assigned To</label>
-                  <select
+                  <Select
                     value={formData.assigned_name}
                     onChange={e => {
                       const name = e.target.value;
@@ -237,22 +239,22 @@ const CleaningTasks = ({ isLead = false, employee = null }) => {
                     {staff.map(s => (
                       <option key={s.id} value={s.name}>{s.name}</option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
                 <div className="form-group">
                   <label>Scheduled Date</label>
-                  <input type="date" value={formData.scheduled_date} onChange={e => setFormData({...formData, scheduled_date: e.target.value})} />
+                  <Input type="date" value={formData.scheduled_date} onChange={e => setFormData({...formData, scheduled_date: e.target.value})} />
                 </div>
               </div>
               <div className="form-group" style={{ marginBottom: '20px' }}>
                 <label>Notes (optional)</label>
-                <textarea value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} style={{ minHeight: '70px' }} placeholder="Additional notes..." />
+                <Textarea value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} style={{ minHeight: '70px' }} placeholder="Additional notes..." />
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
                 <button type="button" className="btn" onClick={() => setShowForm(false)}>Cancel</button>
-                <button type="submit" className="btn btn-gold">Add Task</button>
+                <SubmitButton type="submit" className="btn btn-gold">Add Task</SubmitButton>
               </div>
-            </form>
+            </ValidatedForm>
         </PortalModal>
       )}
 

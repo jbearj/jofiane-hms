@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { API_BASE } from '../../../utils/api';
+import { Input, Select, ValidatedForm, SubmitButton } from '../../common/FormControls';
+import { PageSkeleton } from '../../common/SkeletonLoader';
 
 function RoomInventory() {
   const [isLoading, setIsLoading] = useState(true);
@@ -139,7 +141,7 @@ function RoomInventory() {
     return (
       <section className="admin-tab-content active">
         <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-muted)' }}>
-          <div style={{ fontSize: '16px', fontWeight: '500' }}>Loading room inventory...</div>
+          <PageSkeleton rows={6} />
         </div>
       </section>
     );
@@ -233,7 +235,7 @@ function RoomInventory() {
             {/* Search */}
             <div className="panel-search">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-              <input
+              <Input
                 type="text"
                 placeholder="Search room number or type..."
                 value={searchQuery}
@@ -242,24 +244,24 @@ function RoomInventory() {
             </div>
 
             {/* Floor */}
-            <select className="floor-dropdown" value={filterFloor} onChange={(e) => setFilterFloor(e.target.value)}>
+            <Select className="floor-dropdown" value={filterFloor} onChange={(e) => setFilterFloor(e.target.value)}>
               <option value="all">All Floors</option>
               {floors.map(f => <option key={f} value={f}>Floor {f}</option>)}
-            </select>
+            </Select>
 
             {/* Type */}
-            <select className="floor-dropdown" value={filterType} onChange={(e) => setFilterType(e.target.value)}>
+            <Select className="floor-dropdown" value={filterType} onChange={(e) => setFilterType(e.target.value)}>
               <option value="all">All Types</option>
               {roomTypes.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
-            </select>
+            </Select>
 
             {/* Status */}
-            <select className="floor-dropdown" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+            <Select className="floor-dropdown" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
               <option value="all">All Status</option>
               <option value="occupied">Occupied</option>
               <option value="vacant">Vacant</option>
               <option value="out-of-order">Out of Order</option>
-            </select>
+            </Select>
             <button className="btn btn-sm btn-gold" onClick={handleAddRoom}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
               Add Room
@@ -409,45 +411,45 @@ function RoomModal({ room, roomTypes, onClose, onSave }) {
           {room ? 'Update room configuration' : 'Add a room to the property inventory'}
         </p>
 
-        <form onSubmit={handleSubmit}>
+        <ValidatedForm onSubmit={handleSubmit}>
           <div className="form-grid" style={{ marginBottom: '18px' }}>
             <div className="form-group">
               <label>Room Number <span className="required">*</span></label>
-              <input type="text" value={formData.number} onChange={(e) => setFormData({ ...formData, number: e.target.value })} placeholder="e.g. 305" />
+              <Input type="text" value={formData.number} onChange={(e) => setFormData({ ...formData, number: e.target.value })} placeholder="e.g. 305" />
             </div>
             <div className="form-group">
               <label>Floor</label>
-              <select value={formData.floor} onChange={(e) => setFormData({ ...formData, floor: e.target.value })}>
+              <Select value={formData.floor} onChange={(e) => setFormData({ ...formData, floor: e.target.value })}>
                 {[1, 2, 3, 4, 5].map(f => <option key={f} value={f}>Floor {f}</option>)}
-              </select>
+              </Select>
             </div>
           </div>
 
           <div className="form-grid" style={{ marginBottom: '18px' }}>
             <div className="form-group">
               <label>Room Type</label>
-              <select value={formData.type} onChange={(e) => handleTypeChange(e.target.value)}>
+              <Select value={formData.type} onChange={(e) => handleTypeChange(e.target.value)}>
                 {roomTypes.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
-              </select>
+              </Select>
             </div>
             <div className="form-group">
               <label>Status</label>
-              <select value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })}>
+              <Select value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })}>
                 <option value="vacant">Vacant</option>
                 <option value="occupied">Occupied</option>
                 <option value="out-of-order">Out of Order</option>
-              </select>
+              </Select>
             </div>
           </div>
 
           <div className="form-grid" style={{ marginBottom: '18px' }}>
             <div className="form-group">
               <label>Rate / Night <span className="required">*</span></label>
-              <input type="number" value={formData.rate} onChange={(e) => setFormData({ ...formData, rate: e.target.value })} min="0" step="100" />
+              <Input type="number" value={formData.rate} onChange={(e) => setFormData({ ...formData, rate: e.target.value })} min="0" step="100" />
             </div>
             <div className="form-group">
               <label>Capacity (pax)</label>
-              <input type="number" value={formData.capacity} onChange={(e) => setFormData({ ...formData, capacity: e.target.value })} min="1" max="10" />
+              <Input type="number" value={formData.capacity} onChange={(e) => setFormData({ ...formData, capacity: e.target.value })} min="1" max="10" />
             </div>
           </div>
 
@@ -461,7 +463,7 @@ function RoomModal({ room, roomTypes, onClose, onSave }) {
                   <span className="remove" onClick={() => removeAmenity(a)}>&times;</span>
                 </span>
               ))}
-              <input
+              <Input
                 type="text"
                 className="amenity-input"
                 placeholder="Type and press Enter..."
@@ -474,9 +476,9 @@ function RoomModal({ room, roomTypes, onClose, onSave }) {
 
           <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
             <button type="button" className="btn" onClick={onClose}>Cancel</button>
-            <button type="submit" className="btn btn-gold">{room ? 'Save Changes' : 'Add Room'}</button>
+            <SubmitButton type="submit" className="btn btn-gold">{room ? 'Save Changes' : 'Add Room'}</SubmitButton>
           </div>
-        </form>
+        </ValidatedForm>
       </div>
     </div>
   );

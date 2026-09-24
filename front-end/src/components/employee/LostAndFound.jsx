@@ -1,8 +1,9 @@
 import React, { useState, useRef } from 'react';
 import { usePolling } from '../../hooks/usePolling';
 import PortalModal from '../common/PortalModal';
+import { PageSkeleton } from '../common/SkeletonLoader';
 import { authFetch } from '../../utils/api';
-
+import { Input, Textarea, ValidatedForm, SubmitButton } from '../common/FormControls';
 const API = '/api/lost-and-found';
 
 function LostAndFound() {
@@ -141,7 +142,7 @@ function LostAndFound() {
           </div>
           <div className="table-wrap">
             {isLoading ? (
-              <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading records...</div>
+              <PageSkeleton rows={4} label="Loading records" />
             ) : error ? (
               <div style={{ padding: '20px', color: '#dc2626' }}>{error}</div>
             ) : items.length === 0 ? (
@@ -200,34 +201,34 @@ function LostAndFound() {
               <button className="modal-close" onClick={() => setShowForm(false)}>×</button>
               <h3 style={{ color: 'var(--text-primary)' }}>Report Found Item</h3>
               <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '16px' }}>Record an item found during room cleaning.</p>
-              <form onSubmit={addItem}>
+              <ValidatedForm onSubmit={addItem}>
                 <div className="form-grid" style={{ marginBottom: '14px' }}>
                   <div className="form-group">
                     <label>Room Number</label>
-                    <input type="number" value={formData.room_number} onChange={e => setFormData({...formData, room_number: e.target.value})} placeholder="e.g. 304" />
+                    <Input type="number" value={formData.room_number} onChange={e => setFormData({...formData, room_number: e.target.value})} placeholder="e.g. 304" />
                   </div>
                   <div className="form-group">
                     <label>Item Name <span className="required">*</span></label>
-                    <input type="text" value={formData.item_name} onChange={e => setFormData({...formData, item_name: e.target.value})} placeholder="e.g. Black Wallet" required />
+                    <Input type="text" value={formData.item_name} onChange={e => setFormData({...formData, item_name: e.target.value})} placeholder="e.g. Black Wallet" required />
                   </div>
                 </div>
                 <div className="form-group" style={{ marginBottom: '14px' }}>
                   <label>Location Found <span className="required">*</span></label>
-                  <input type="text" value={formData.location_found} onChange={e => setFormData({...formData, location_found: e.target.value})} placeholder="e.g. Under the bed" required />
+                  <Input type="text" value={formData.location_found} onChange={e => setFormData({...formData, location_found: e.target.value})} placeholder="e.g. Under the bed" required />
                 </div>
                 <div className="form-group" style={{ marginBottom: '14px' }}>
                   <label>Found By <span className="required">*</span></label>
-                  <input type="text" value={formData.found_by} onChange={e => setFormData({...formData, found_by: e.target.value})} placeholder="Employee name" required />
+                  <Input type="text" value={formData.found_by} onChange={e => setFormData({...formData, found_by: e.target.value})} placeholder="Employee name" required />
                 </div>
                 <div className="form-group" style={{ marginBottom: '20px' }}>
                   <label>Notes</label>
-                  <textarea value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} placeholder="Optional notes..." style={{ minHeight: '70px' }} />
+                  <Textarea value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} placeholder="Optional notes..." style={{ minHeight: '70px' }} />
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
                   <button type="button" className="btn" onClick={() => setShowForm(false)}>Cancel</button>
-                  <button type="submit" className="btn btn-gold">Save Item</button>
+                  <SubmitButton type="submit" className="btn btn-gold">Save Item</SubmitButton>
                 </div>
-              </form>
+              </ValidatedForm>
           </PortalModal>
         )}
 

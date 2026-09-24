@@ -1,5 +1,7 @@
+import { Select } from '../../common/FormControls';
 import React, { useState, useEffect } from 'react';
 import { API_BASE } from '../../../utils/api';
+import { PageSkeleton } from '../../common/SkeletonLoader';
 
 function OccupancyReports() {
   const [isLoading, setIsLoading] = useState(true);
@@ -22,7 +24,7 @@ function OccupancyReports() {
   };
 
   if (isLoading || !data) {
-    return (<section className="admin-tab-content active"><div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading occupancy reports...</div></section>);
+    return (<section className="admin-tab-content active"><PageSkeleton rows={6} /></section>);
   }
 
   const { kpis, trend, byRoomType, byFloor, forecast } = data;
@@ -52,11 +54,11 @@ function OccupancyReports() {
           <div><div style={{ fontSize: '18px', fontWeight: '700', color: 'var(--status-vac)' }}>{kpis.peakDay}</div><div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Peak Day</div></div>
           <div><div style={{ fontSize: '18px', fontWeight: '700', color: 'var(--status-occ)' }}>{kpis.lowDay}</div><div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Low Day</div></div>
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <select className="floor-dropdown" value={period} onChange={(e) => setPeriod(e.target.value)}>
+            <Select className="floor-dropdown" value={period} onChange={(e) => setPeriod(e.target.value)}>
               <option value="weekly">Weekly</option>
               <option value="monthly">Monthly</option>
               <option value="quarterly">Quarterly</option>
-            </select>
+            </Select>
             <button className="btn btn-sm btn-outline-gold" onClick={() => alert('Exporting occupancy report...')}>Export</button>
           </div>
         </div>

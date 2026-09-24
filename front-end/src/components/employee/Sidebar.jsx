@@ -628,7 +628,12 @@ function Sidebar({ employeeRole, employee, isHousekeepingLead = false, isCollaps
           )}
 
           <div 
-            className="user-badge" 
+            className="user-badge"
+            role="button"
+            tabIndex={0}
+            aria-label="Account menu"
+            aria-expanded={showProfileMenu}
+            onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setShowProfileMenu((prev) => !prev); } }}
             onClick={() => setShowProfileMenu((prev) => !prev)}
             style={{ cursor: 'pointer' }}
           >

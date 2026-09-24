@@ -1,5 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import './App.css';
+import './WorkspacePolish.css';
+import HotelHome from './components/home/HotelHome';
+import useIdleSession from './hooks/useIdleSession';
+import usePageNavigation from './hooks/usePageNavigation';
+import { PortalThemeProvider } from './components/common/ThemePortal';
 import Login from './components/login/login';
 import Sidebar from './components/admin/Sidebar';
 import Overview from './components/admin/Overview';
@@ -21,15 +26,18 @@ import Rooms from './components/admin/rooms/Rooms';
 import EmployeePortal from './components/employee/EmployeePortal';
 
 function App() {
-  const [activeTab, setActiveTab] = useState('overview');
-  const [viewMode, setViewMode] = useState('admin'); // 'admin' or 'employee'
+  const [activeTab, setActiveTab] = usePageNavigation('overview');
+  const [screen, setScreen] = useState(() => window.location.hash === '#login' ? 'login' : 'hotel');
+  const [sessionExpired, setSessionExpired] = useState(false);
+  const [viewMode, setViewMode] = usePageNavigation('admin');
   const [isCollapsed, setIsCollapsed] = useState(() => {
     if (typeof window === 'undefined') return false;
     const saved = window.localStorage.getItem('jofiane-sidebar-collapsed');
-    if (saved !== null) return JSON.parse(saved);
+    if (saved !== null) return saved === 'true';
     return typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 900px)').matches;
   });
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [canViewAdmin, setCanViewAdmin] = useState(false);
   const [employeeRole, setEmployeeRole] = useState(null); // Store the role of the logged-in employee
   const [loggedInEmployee, setLoggedInEmployee] = useState(null); // Store the logged-in employee object
 
@@ -72,9 +80,59 @@ function App() {
     }
   }, []);
 
+  const goToScreen = (next) => {
+    window.history.replaceState(null, '', '#' + next);
+    setScreen(next);
+    window.scrollTo?.(0, 0);
+  };
+
+  const handleLogout = (expired = false) => {
+    setIsLoggedIn(false);
+    setLoggedInEmployee(null);
+    setEmployeeRole(null);
+    setCanViewAdmin(false);
+    setActiveTab('overview', { immediate: true });
+    setSessionExpired(expired);
+    ['jofiane-token', 'token', 'user'].forEach((key) => {
+      window.localStorage.removeItem(key);
+      window.sessionStorage.removeItem(key);
+    });
+    goToScreen('hotel');
+  };
+
+  const resumeSession = useIdleSession({
+    enabled: isLoggedIn,
+    onIdle: () => goToScreen('hotel'),
+    onExpire: () => handleLogout(true),
+  });
+
+  useEffect(() => {
+    const onHashChange = () => {
+      const hash = window.location.hash;
+      if (hash === '#portal' && isLoggedIn) {
+        if (resumeSession()) setScreen('portal');
+        return;
+      }
+      setScreen(hash === '#login' ? 'login' : 'hotel');
+    };
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, [isLoggedIn, resumeSession]);
+
+  useEffect(() => {
+    document.title = screen === 'hotel' ? 'Jo Fiane Hotel · A quieter kind of luxury' : screen === 'login' ? 'Employee sign in · Jo Fiane Hotel' : 'Employee workspace · Jo Fiane Hotel';
+  }, [screen]);
+
+  const returnToPortal = () => {
+    if (isLoggedIn) {
+      if (resumeSession()) goToScreen('portal');
+    } else goToScreen('login');
+  };
+
   const handleLoginSuccess = (role, employee, module) => {
+    setCanViewAdmin(role === 'admin' || module === 'admin');
     if (role === 'admin' || module === 'admin') {
-      setViewMode('admin');
+      setViewMode('admin', { immediate: true });
       setEmployeeRole(null);
       // If a DB admin employee logged in, store their info for display purposes
       setLoggedInEmployee(employee || null);
@@ -93,9 +151,11 @@ function App() {
     } else {
       setEmployeeRole(module || 'frontdesk');
       setLoggedInEmployee(employee);
-      setViewMode('employee');
+      setViewMode('employee', { immediate: true });
     }
     setIsLoggedIn(true);
+    setSessionExpired(false);
+    goToScreen('portal');
   };
   
   const renderContent = () => {
@@ -138,22 +198,18 @@ function App() {
     }
   };
 
-  // Render Login page 
-  if (!isLoggedIn) {
-    return <Login onLoginSuccess={handleLoginSuccess} />;
-  }
-
-  // Render Employee Portal 
+  const renderWorkspace = () => {
+  // Keep mounted when AFK so drafts and the selected module survive a break.
   if (viewMode === 'employee') {
     return (
       <div className="employee-view">
-        <button 
+        {canViewAdmin && <button 
           onClick={() => setViewMode('admin')} 
           className="portal-mode-switch"
         >
           ← Switch to Admin View
-        </button>
-        <EmployeePortal employeeRole={employeeRole} employee={loggedInEmployee} />
+        </button>}
+        <EmployeePortal employeeRole={employeeRole} employee={loggedInEmployee} onLogout={() => handleLogout(false)} suspended={screen !== 'portal'} />
       </div>
     );
   }
@@ -169,6 +225,7 @@ function App() {
       </button>
 
       <Sidebar
+        onLogout={() => handleLogout(false)}
         isCollapsed={isCollapsed}
         setIsCollapsed={setIsCollapsed}
         activeTab={activeTab}
@@ -181,10 +238,19 @@ function App() {
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
       </button>
       {!isCollapsed && <button type="button" className="mobile-nav-backdrop" onClick={() => setIsCollapsed(true)} aria-label="Close admin navigation" />}
-      <main className="main-content">
+      <main key={activeTab} className="main-content">
         {renderContent()}
       </main>
     </div>
+  );
+  };
+
+  return (
+    <PortalThemeProvider theme={isAdminDarkMode ? 'dark' : 'light'} suspended={screen !== 'portal'}>
+      {isLoggedIn && <div className="app-workspace" hidden={screen !== 'portal'}>{renderWorkspace()}</div>}
+      {screen === 'hotel' && <HotelHome isLoggedIn={isLoggedIn} expired={sessionExpired} onReturn={returnToPortal} />}
+      {screen === 'login' && <Login onLoginSuccess={handleLoginSuccess} />}
+    </PortalThemeProvider>
   );
 }
 

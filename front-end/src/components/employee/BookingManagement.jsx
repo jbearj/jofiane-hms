@@ -1,5 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
+import { Input, Select, ValidatedForm, SubmitButton } from '../common/FormControls';
+import { CardsSkeleton, TableSkeletonRows, LoadingError } from '../common/SkeletonLoader';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import PortalModal from '../common/PortalModal';
+import { money, parseMoney } from '../../utils/formatters';
 import { usePolling } from '../../hooks/usePolling';
 import { authFetch } from '../../utils/api';
 import { todayISO } from '../../utils/dateUtils';
@@ -12,7 +15,7 @@ const getAccent = (dark) => dark
   ? { accent: '#f59e0b', accentLight: 'rgba(245,158,11,0.12)', accentDark: '#d97706' }
   : { accent: '#b8860b', accentLight: 'rgba(184,134,11,0.12)', accentDark: '#d97706' };
 
-const parseAmount = (str) => parseFloat((str || '0').replace(/,/g, '')) || 0;
+const parseAmount = parseMoney;
 
 function BookingManagement({ employee }) {
   // Dark mode for the front-desk portal is signalled by the 'app-dark' class
@@ -35,9 +38,12 @@ function BookingManagement({ employee }) {
   const FD = getAccent(isDark);
   const [isLoading, setIsLoading]         = useState(true);
   const [bookings, setBookings]           = useState([]);
-  const [filtered, setFiltered]           = useState([]);
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [showWalkIn, setShowWalkIn]       = useState(false);
+  const [walkInSaving, setWalkInSaving] = useState(false);
+  const [walkInError, setWalkInError] = useState('');
+  const walkInLock = useRef(false);
+  const initialLoad = useRef(true);
   const [processingId, setProcessingId]   = useState(null);
   const [error, setError]                 = useState(null);
   const [confirmAction, setConfirmAction] = useState(null); // { type: 'checkin'|'checkout', booking }
@@ -65,7 +71,7 @@ function BookingManagement({ employee }) {
         guest:           b.guest?.full_name || '',
         email:           b.guest?.email    || '',
         phone:           b.guest?.phone    || '',
-        room:            b.room_number     || '',
+        room:            String(b.room_number || ''),
         checkIn:         b.dates?.check_in  || '',
         checkOut:        b.dates?.check_out || '',
         nights:          parseInt(b.dates?.nights) || 0,
@@ -79,32 +85,31 @@ function BookingManagement({ employee }) {
         _id:             b._id,
       }));
       setBookings(normalized);
-      if (!selectedBooking && normalized.length > 0) setSelectedBooking(normalized[0]);
+      setSelectedBooking(current => current ? normalized.find(b => b._id === current._id) || null : null);
     } catch (err) {
       console.error(err);
       setError('Failed to connect to server.');
     } finally {
-      if (!background) setIsLoading(false);
+      setIsLoading(false);
+      initialLoad.current = false;
     }
   };
 
-  const applyFilters = () => {
+  const invalidDates = Boolean(dateFrom && dateTo && dateTo < dateFrom);
+  const filtered = useMemo(() => {
     let r = [...bookings];
     if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
+      const q = searchQuery.trim().toLowerCase();
       r = r.filter(b => b.guest.toLowerCase().includes(q) || b.id.toLowerCase().includes(q) || b.room.includes(q));
     }
     if (filterStatus !== 'all') r = r.filter(b => b.status === filterStatus);
     if (dateFrom) r = r.filter(b => b.checkIn >= dateFrom);
     if (dateTo)   r = r.filter(b => b.checkIn <= dateTo);
-    setFiltered(r);
-  };
+    return invalidDates ? [] : r;
+  }, [bookings, searchQuery, filterStatus, dateFrom, dateTo, invalidDates]);
 
-  // Initial foreground load (shows the "Loading…" placeholder once)
-  useEffect(() => { fetchBookings(); }, []);
-  // Background polling refreshes (silent — no loading flash)
-  usePolling(() => fetchBookings({ background: true }), 10000);
-  useEffect(() => { applyFilters(); }, [bookings, searchQuery, filterStatus, dateFrom, dateTo]);
+  // One initial request, then silent background refreshes.
+  usePolling(() => fetchBookings({ background: !initialLoad.current }), 10000);
 
   // ── CHECK-IN ─────────────────────────────────────
   // Clicking Check In / Check Out opens a styled confirmation modal; the
@@ -131,6 +136,10 @@ function BookingManagement({ employee }) {
 
   // ── WALK-IN SAVE ─────────────────────────────────
   const handleWalkIn = async (formData) => {
+    if (walkInLock.current) return;
+    walkInLock.current = true;
+    setWalkInSaving(true);
+    setWalkInError('');
     try {
       const fmtAmt = (n) => parseFloat(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2 });
       const hasPayment = parseFloat(formData.amount) > 0;
@@ -164,7 +173,8 @@ function BookingManagement({ employee }) {
       if (!res.ok) throw new Error();
       await fetchBookings();
       setShowWalkIn(false);
-    } catch { alert('Failed to save walk-in booking. Please try again.'); }
+    } catch { setWalkInError('Failed to save walk-in booking. Your entries have been kept. Please try again.'); }
+    finally { walkInLock.current = false; setWalkInSaving(false); }
   };
 
   // ── HELPERS ──────────────────────────────────────
@@ -210,7 +220,7 @@ function BookingManagement({ employee }) {
           <button
             className="btn btn-sm"
             style={{ background: FD.accent, color: '#fff', border: 'none', borderRadius: '8px', padding: '9px 18px', fontWeight: '700', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}
-            onClick={() => setShowWalkIn(true)}
+            onClick={() => { setWalkInError(''); setShowWalkIn(true); }}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             New Walk-In
@@ -218,100 +228,46 @@ function BookingManagement({ employee }) {
         </div>
       </div>
 
-      {/* ── SUMMARY BAR ── */}
-      <div className="panel" style={{ padding: '18px 24px', marginBottom: '20px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '28px', flexWrap: 'wrap' }}>
-          <div>
-            <div style={{ fontSize: '22px', fontWeight: '700' }}>{bookings.length}</div>
-            <div style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '600', textTransform: 'uppercase' }}>Total</div>
-          </div>
-          <div style={{ width: '1px', height: '32px', background: 'var(--border-light)' }} />
-          <div>
-            <div style={{ fontSize: '18px', fontWeight: '700', color: '#1d4ed8' }}>{confirmedCount}</div>
-            <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Confirmed</div>
-          </div>
-          <div>
-            <div style={{ fontSize: '18px', fontWeight: '700', color: '#065f46' }}>{checkedInCount}</div>
-            <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Checked In</div>
-          </div>
-          <div>
-            <div style={{ fontSize: '18px', fontWeight: '700', color: 'var(--text-primary)' }}>
-              ₱{totalRevenue.toLocaleString()}
-            </div>
-            <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Total Revenue</div>
-          </div>
-        </div>
-      </div>
+      {isLoading ? <CardsSkeleton cards={4} label="Loading reservation summary" /> :
+        <dl className="reservation-metrics panel" aria-label="Reservation summary across all dates">
+          <div><dt>Total reservations</dt><dd>{bookings.length}</dd><small>Across all dates</small></div>
+          <div className="metric-confirmed"><dt>Confirmed</dt><dd>{confirmedCount}</dd><small>Awaiting arrival</small></div>
+          <div className="metric-inhouse"><dt>Checked in</dt><dd>{checkedInCount}</dd><small>Currently in house</small></div>
+          <div><dt>Total revenue</dt><dd>{money(totalRevenue)}</dd><small>Non-cancelled booking value</small></div>
+        </dl>}
 
-      {/* ── FILTERS ── */}
-      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '16px' }}>
-        <div className="panel-search" style={{ flex: '1 1 220px', maxWidth: '300px', position: 'relative', display: 'flex', alignItems: 'center' }}>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ position: 'absolute', left: '10px', pointerEvents: 'none' }}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input type="text" placeholder="Search guest, booking ID, or room…" value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            style={{ width: '100%', paddingLeft: '32px' }} />
+      <div className="reservation-toolbar" role="search" aria-label="Reservation filters">
+        <label className="reservation-search"><span>Find a reservation</span>
+          <div className="search-input-wrap"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><circle cx="10.5" cy="10.5" r="7.5"/><path d="m16 16 5 5"/></svg>
+            <Input type="search" aria-label="Search reservations" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Guest name, booking ID, or room…" /></div>
+        </label>
+        <label><span>Status</span><Select aria-label="Reservation status" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+          <option value="all">All statuses</option>
+          {['Confirmed', 'Checked In', 'Checked Out', 'Cancelled', 'No Show'].map(status => <option key={status}>{status}</option>)}
+        </Select></label>
+        <div className="reservation-scope"><span>Date scope</span>
+          <div className="segmented-control">
+            <button type="button" aria-pressed={dateFrom === todayISO() && dateTo === todayISO()} onClick={() => { setDateFrom(todayISO()); setDateTo(todayISO()); }}>Today</button>
+            <button type="button" aria-pressed={!dateFrom && !dateTo} onClick={() => { setDateFrom(''); setDateTo(''); }}>All dates</button>
+          </div>
         </div>
-        <select className="floor-dropdown" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
-          <option value="all">All Status</option>
-          <option value="Confirmed">Confirmed</option>
-          <option value="Checked In">Checked In</option>
-          <option value="Checked Out">Checked Out</option>
-          <option value="Cancelled">Cancelled</option>
-          <option value="No Show">No Show</option>
-        </select>
-        {/* Quick date scope: Today (default) or All dates. */}
-        {(() => {
-          const isToday = dateFrom === todayISO() && dateTo === todayISO();
-          const isAll = !dateFrom && !dateTo;
-          return (
-            <div style={{ display: 'inline-flex', border: '1px solid var(--border-light, #d1d5db)', borderRadius: '8px', overflow: 'hidden' }}>
-              <button
-                type="button"
-                onClick={() => { setDateFrom(todayISO()); setDateTo(todayISO()); }}
-                style={{ padding: '8px 14px', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: 600,
-                  background: isToday ? 'var(--gold, #c5a059)' : 'transparent', color: isToday ? '#fff' : 'var(--text-secondary, #4b5563)' }}
-              >
-                Today
-              </button>
-              <button
-                type="button"
-                onClick={() => { setDateFrom(''); setDateTo(''); }}
-                style={{ padding: '8px 14px', border: 'none', borderLeft: '1px solid var(--border-light, #d1d5db)', cursor: 'pointer', fontSize: '13px', fontWeight: 600,
-                  background: isAll ? 'var(--gold, #c5a059)' : 'transparent', color: isAll ? '#fff' : 'var(--text-secondary, #4b5563)' }}
-              >
-                All Dates
-              </button>
-            </div>
-          );
-        })()}
-        <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
-          className="floor-dropdown" title="Check-in from" />
-        <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
-          className="floor-dropdown" title="Check-in to" />
-        {(searchQuery || filterStatus !== 'all') && (
-          <button className="btn btn-xs" onClick={() => { setSearchQuery(''); setFilterStatus('all'); }}>
-            Clear
-          </button>
-        )}
+        <label><span>Check-in from</span><Input type="date" aria-label="Check-in from" value={dateFrom} onChange={e => setDateFrom(e.target.value)} /></label>
+        <label><span>Check-in to</span><Input type="date" aria-label="Check-in to" value={dateTo} min={dateFrom || undefined} onChange={e => setDateTo(e.target.value)} /></label>
+        {(searchQuery || filterStatus !== 'all' || dateFrom || dateTo) &&
+          <button className="btn reservation-reset" onClick={() => { setSearchQuery(''); setFilterStatus('all'); setDateFrom(''); setDateTo(''); }}>Clear filters</button>}
       </div>
+      {error && !isLoading && <LoadingError message={bookings.length ? 'Refresh failed. The last loaded reservations are shown below.' : error} onRetry={() => fetchBookings()} />}
 
       {/* ── MAIN TABLE ── */}
-      <div className="panel" style={{ padding: 0, overflow: 'hidden' }}>
+      <div className="panel reservation-panel">
         <div className="panel-header" style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-light)' }}>
-          <h3 style={{ margin: 0 }}>Reservations ({filtered.length})</h3>
+          <h3 style={{ margin: 0 }}>Reservations <span className="record-count">{isLoading ? '—' : filtered.length}</span></h3>
           {/* Teal top-border accent strip */}
           <div style={{ height: '3px', background: FD.accent, borderRadius: '2px', width: '48px' }} />
         </div>
 
-        <div className="table-wrap">
-          {isLoading ? (
-            <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading reservations…</div>
-          ) : error ? (
-            <div style={{ padding: '20px', color: '#dc2626' }}>{error}</div>
-          ) : filtered.length === 0 ? (
-            <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>No reservations match the current filters.</div>
-          ) : (
-            <table>
+        <div className="table-wrap ledger-table-scroll" role="region" aria-label="Reservations table" tabIndex={0}>
+            <table className="reservation-table">
               <thead>
                 <tr>
                   <th>Booking ID</th>
@@ -328,7 +284,9 @@ function BookingManagement({ employee }) {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(b => (
+                {isLoading ? <TableSkeletonRows columns={11} label="Loading reservations" /> : filtered.length === 0 ?
+                  <tr><td colSpan={11}><div className="ledger-empty"><strong>{invalidDates ? 'Check your date range' : error ? 'Reservations are unavailable' : 'No matching reservations'}</strong><span>{invalidDates ? 'The end date must be on or after the start date.' : 'Try another guest, status, or date range.'}</span></div></td></tr> :
+                  filtered.map(b => (
                   <tr
                     key={b._id}
                     className={`table-row-hover${selectedBooking?._id === b._id ? ' selected-booking-row' : ''}`}
@@ -338,7 +296,7 @@ function BookingManagement({ employee }) {
                       background: selectedBooking?._id === b._id ? FD.accentLight : 'transparent',
                     }}
                   >
-                    <td><span className="guest-name">{b.id}</span></td>
+                    <td><button type="button" className="table-reference" aria-expanded={selectedBooking?._id === b._id} aria-controls="booking-details" onClick={e => { e.stopPropagation(); setSelectedBooking(current => current?._id === b._id ? null : b); }}>{b.id}</button></td>
                     <td>
                       <span className="guest-name">{b.guest}</span>
                       {b.phone && <span className="guest-sub">{b.phone}</span>}
@@ -348,11 +306,11 @@ function BookingManagement({ employee }) {
                     <td><span className="std-text">{fmtDate(b.checkOut)}</span></td>
                     <td><span className="std-text">{b.nights}</span></td>
                     <td><span className="std-text">{b.source}</span></td>
-                    <td style={{ textAlign: 'right', fontWeight: '700' }}>₱{b.amount.toLocaleString()}</td>
+                    <td style={{ textAlign: 'right', fontWeight: '700' }}>{money(b.amount)}</td>
                     <td>
                       {b.balanceDue > 0
-                        ? <span style={{ fontSize: '12px', fontWeight: '700', color: '#dc2626' }}>₱{b.balanceDue.toLocaleString()}</span>
-                        : <span style={{ fontSize: '12px', fontWeight: '700', color: '#059669' }}>Paid</span>
+                        ? <span className="balance-due">{money(b.balanceDue)}</span>
+                        : <span className="balance-paid">Paid</span>
                       }
                     </td>
                     <td>{getStatusBadge(b.status)}</td>
@@ -383,13 +341,12 @@ function BookingManagement({ employee }) {
                 ))}
               </tbody>
             </table>
-          )}
         </div>
       </div>
 
       {/* ── BOOKING DETAIL DRAWER ── */}
       {selectedBooking && (
-        <div className="panel" style={{ marginTop: '16px', padding: '20px 24px' }}>
+        <div id="booking-details" className="panel booking-details-panel" style={{ marginTop: '16px', padding: '20px 24px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <h3 style={{ margin: 0, fontSize: '16px' }}>{selectedBooking.id}</h3>
@@ -419,7 +376,7 @@ function BookingManagement({ employee }) {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '20px' }}>
+          <div className="booking-fact-grid">
             {[
               ['Guest',        selectedBooking.guest],
               ['Email',        selectedBooking.email || '—'],
@@ -487,10 +444,8 @@ function BookingManagement({ employee }) {
       )}
 
       {/* ── WALK-IN MODAL ── */}
-      {showWalkIn && createPortal(
-        <WalkInModal onClose={() => setShowWalkIn(false)} onSave={handleWalkIn} accentColor={FD.accent} />,
-        document.body
-      )}
+      {showWalkIn && <WalkInModal onClose={() => { if (!walkInSaving) setShowWalkIn(false); }}
+        onSave={handleWalkIn} accentColor={FD.accent} busy={walkInSaving} error={walkInError} />}
 
       {/* ── CHECK-IN / CHECK-OUT CONFIRMATION ── */}
       {confirmAction && (
@@ -515,14 +470,14 @@ function BookingManagement({ employee }) {
 /* ================================================================
    WALK-IN MODAL — streamlined for speed at the front desk
    ================================================================ */
-function WalkInModal({ onClose, onSave, accentColor }) {
+function WalkInModal({ onClose, onSave, accentColor, busy, error }) {
   const calcNights = (ci, co) => {
     if (!ci || !co) return 0;
     const diff = (new Date(co) - new Date(ci)) / 86400000;
     return diff > 0 ? diff : 0;
   };
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = todayISO();
   const [form, setForm] = useState({
     guest: '', phone: '', email: '',
     room: '', checkIn: today, checkOut: '', nights: 0,
@@ -542,13 +497,12 @@ function WalkInModal({ onClose, onSave, accentColor }) {
     if (!form.checkIn)        { alert('Check-in date is required.'); return; }
     if (!form.checkOut)       { alert('Check-out date is required.'); return; }
     if (form.nights <= 0)     { alert('Check-out must be after check-in.'); return; }
-    onSave({ ...form, nights: String(form.nights) });
+    if (!busy) onSave({ ...form, nights: String(form.nights) });
   };
 
   return (
-    <div className="modal-overlay open">
-      <div className="modal-content" style={{ maxWidth: '500px' }}>
-        <button className="modal-close" onClick={onClose}>&times;</button>
+    <PortalModal maxWidth={560} className="finance-modal" title="New Walk-In" onClose={onClose} busy={busy}>
+        <button type="button" className="modal-close" aria-label="Close dialog" disabled={busy} onClick={onClose}>&times;</button>
 
         {/* Teal header strip */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
@@ -559,18 +513,19 @@ function WalkInModal({ onClose, onSave, accentColor }) {
           </div>
         </div>
 
-        <form onSubmit={handleSubmit}>
+        <ValidatedForm onSubmit={handleSubmit}>
+          <fieldset className="dialog-fields" disabled={busy}>
 
           {/* Guest Info */}
           <div style={{ fontSize: '10px', fontWeight: '700', color: accentColor, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>Guest</div>
           <div className="form-grid" style={{ marginBottom: '16px' }}>
             <div className="form-group">
               <label>Full Name <span className="required">*</span></label>
-              <input type="text" value={form.guest} onChange={set('guest')} placeholder="e.g. Juan Dela Cruz" />
+              <Input type="text" required value={form.guest} onChange={set('guest')} placeholder="e.g. Juan Dela Cruz" />
             </div>
             <div className="form-group">
               <label>Phone</label>
-              <input type="text" value={form.phone} onChange={set('phone')} placeholder="+63 9xx xxx xxxx" />
+              <Input type="tel" value={form.phone} onChange={set('phone')} placeholder="+63 9xx xxx xxxx" />
             </div>
           </div>
 
@@ -579,21 +534,21 @@ function WalkInModal({ onClose, onSave, accentColor }) {
           <div className="form-grid" style={{ marginBottom: '16px' }}>
             <div className="form-group">
               <label>Room # <span className="required">*</span></label>
-              <input type="text" value={form.room} onChange={set('room')} placeholder="e.g. 304" />
+              <Input type="text" required value={form.room} onChange={set('room')} placeholder="e.g. 304" />
             </div>
             <div className="form-group">
               <label>Nights</label>
-              <input type="number" value={form.nights} readOnly style={{ background: 'var(--bg-body)', cursor: 'not-allowed' }} />
+              <Input type="number" value={form.nights} readOnly style={{ background: 'var(--bg-body)', cursor: 'not-allowed' }} />
             </div>
           </div>
           <div className="form-grid" style={{ marginBottom: '20px' }}>
             <div className="form-group">
               <label>Check-In <span className="required">*</span></label>
-              <input type="date" value={form.checkIn} onChange={set('checkIn')} />
+              <Input type="date" required value={form.checkIn} onChange={set('checkIn')} />
             </div>
             <div className="form-group">
               <label>Check-Out <span className="required">*</span></label>
-              <input type="date" value={form.checkOut} onChange={set('checkOut')} />
+              <Input type="date" required min={form.checkIn || undefined} validation={value => value && value <= form.checkIn ? 'Check-out must be after check-in.' : ''} value={form.checkOut} onChange={set('checkOut')} />
             </div>
           </div>
 
@@ -602,30 +557,28 @@ function WalkInModal({ onClose, onSave, accentColor }) {
           <div className="form-grid" style={{ marginBottom: '20px' }}>
             <div className="form-group">
               <label>Total Amount (₱)</label>
-              <input type="number" value={form.amount} onChange={set('amount')} placeholder="0" min="0" />
+              <Input type="number" value={form.amount} onChange={set('amount')} placeholder="0.00" min="0" step="0.01" />
             </div>
             <div className="form-group">
               <label>Method</label>
-              <select value={form.paymentMethod} onChange={set('paymentMethod')}>
+              <Select value={form.paymentMethod} onChange={set('paymentMethod')}>
                 <option>Cash</option>
                 <option>Credit Card</option>
                 <option>GCash</option>
                 <option>Maya</option>
                 <option>Bank Transfer</option>
-              </select>
+              </Select>
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-            <button type="button" className="btn" onClick={onClose}>Cancel</button>
-            <button type="submit" className="btn"
-              style={{ background: accentColor, color: '#fff', border: 'none', fontWeight: '700' }}>
-              Register Walk-In
-            </button>
+          </fieldset>
+          {error && <p role="alert" className="form-submit-error">{error}</p>}
+          <div className="dialog-actions">
+            <button type="button" className="btn" disabled={busy} onClick={onClose}>Cancel</button>
+            <SubmitButton disabled={busy} className="btn btn-gold">{busy ? 'Registering…' : 'Register Walk-In'}</SubmitButton>
           </div>
-        </form>
-      </div>
-    </div>
+        </ValidatedForm>
+    </PortalModal>
   );
 }
 

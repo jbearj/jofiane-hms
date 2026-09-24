@@ -1,5 +1,7 @@
+import { Select } from '../../common/FormControls';
 import React, { useState, useEffect } from 'react';
 import { API_BASE } from '../../../utils/api';
+import { PageSkeleton } from '../../common/SkeletonLoader';
 
 function FinancialReports() {
   const [isLoading, setIsLoading] = useState(true);
@@ -22,7 +24,7 @@ function FinancialReports() {
   };
 
   if (isLoading || !data) {
-    return (<section className="admin-tab-content active"><div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading financial reports...</div></section>);
+    return (<section className="admin-tab-content active"><PageSkeleton rows={6} /></section>);
   }
 
   const { kpis, revenueTrend, revenueBySource, expenses, adrTrend, paymentMethods, outstanding } = data;
@@ -51,11 +53,11 @@ function FinancialReports() {
           <div><div style={{ fontSize: '18px', fontWeight: '700', color: 'var(--gold)' }}>{kpis.profitMargin}%</div><div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Margin</div></div>
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Outstanding: <span style={{ fontWeight: '700', color: '#b45309' }}>{outstanding.total.toLocaleString()}</span> ({outstanding.count} folios)</div>
-            <select className="floor-dropdown" value={period} onChange={(e) => setPeriod(e.target.value)}>
+            <Select className="floor-dropdown" value={period} onChange={(e) => setPeriod(e.target.value)}>
               <option value="weekly">Weekly</option>
               <option value="monthly">Monthly</option>
               <option value="quarterly">Quarterly</option>
-            </select>
+            </Select>
             <button className="btn btn-sm" onClick={() => alert('Exporting financial report...')}>Export CSV</button>
             <button className="btn btn-sm btn-outline-gold" onClick={() => window.print()}>Print</button>
           </div>

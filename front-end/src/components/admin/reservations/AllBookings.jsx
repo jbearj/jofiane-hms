@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
 import { usePolling } from '../../../hooks/usePolling';
 import { authFetch } from '../../../utils/api';
+import { Input, Select, Textarea, ValidatedForm, SubmitButton } from '../../common/FormControls';
+import { PageSkeleton, CardsSkeleton } from '../../common/SkeletonLoader';
+import { createThemedPortal as createPortal } from '../../common/ThemePortal';
 
 function AllBookings() {
   const [isLoading, setIsLoading] = useState(true);
@@ -175,7 +177,7 @@ function AllBookings() {
   const totalRevenue = bookings.filter(b => b.status !== 'Cancelled').reduce((sum, b) => sum + b.amount, 0);
 
   if (isLoading) {
-    return (<section className="admin-tab-content active"><div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading bookings...</div></section>);
+    return (<section className="admin-tab-content active"><PageSkeleton rows={6} /></section>);
   }
 
   return (
@@ -214,32 +216,32 @@ function AllBookings() {
           <div className="panel-toolbar">
             <div className="panel-search">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-              <input type="text" placeholder="Search by guest or booking ID..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+              <Input type="text" placeholder="Search by guest or booking ID..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
             </div>
-            <select className="floor-dropdown" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+            <Select className="floor-dropdown" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
               <option value="all">All Status</option>
               <option value="Confirmed">Confirmed</option>
               <option value="Checked In">Checked In</option>
               <option value="Checked Out">Checked Out</option>
               <option value="No Show">No-Show</option>
               <option value="Cancelled">Cancelled</option>
-            </select>
-            <select className="floor-dropdown" value={filterSource} onChange={(e) => setFilterSource(e.target.value)}>
+            </Select>
+            <Select className="floor-dropdown" value={filterSource} onChange={(e) => setFilterSource(e.target.value)}>
               <option value="all">All Sources</option>
               <option value="Direct">Direct</option>
               <option value="Walk-in">Walk-in</option>
               <option value="Booking.com">Booking.com</option>
               <option value="Expedia">Expedia</option>
               <option value="Agoda">Agoda</option>
-            </select>
-            <select className="floor-dropdown" value={filterRoomType} onChange={(e) => setFilterRoomType(e.target.value)}>
+            </Select>
+            <Select className="floor-dropdown" value={filterRoomType} onChange={(e) => setFilterRoomType(e.target.value)}>
               <option value="all">All Room Types</option>
               <option value="Standard">Standard</option>
               <option value="Deluxe">Deluxe</option>
               <option value="Premium">Premium</option>
               <option value="Suite">Suite</option>
               <option value="Presidential">Presidential</option>
-            </select>
+            </Select>
             <button className="btn btn-sm" onClick={() => alert('Exporting bookings...')}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
               Export
@@ -424,7 +426,7 @@ function BookingDetailModal({ booking, getStatusTag, formatDate, onClose, onDele
             Transaction Ledger
           </div>
           {loadingTxns ? (
-            <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>Loading...</div>
+            <CardsSkeleton cards={2} label="Loading transaction ledger" />
           ) : transactions.length === 0 ? (
             <div style={{ padding: '14px 16px', background: 'var(--bg-input)', borderRadius: '8px', border: '1px solid var(--border-light)', fontSize: '13px', color: 'var(--text-muted)' }}>
               No transactions recorded for this booking.
@@ -487,11 +489,11 @@ function BookingDetailModal({ booking, getStatusTag, formatDate, onClose, onDele
                 <div style={{ fontSize: '12px', fontWeight: '700', color: '#92400e', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '14px' }}>
                   Cancel Booking
                 </div>
-                <form onSubmit={handleCancel}>
+                <ValidatedForm onSubmit={handleCancel}>
                   <div className="form-grid" style={{ marginBottom: '12px' }}>
                     <div className="form-group">
                       <label style={{ fontSize: '11px' }}>Reason <span className="required">*</span></label>
-                      <select
+                      <Select
                         value={cancelForm.reason}
                         onChange={(e) => setCancelForm({ ...cancelForm, reason: e.target.value })}
                       >
@@ -501,11 +503,11 @@ function BookingDetailModal({ booking, getStatusTag, formatDate, onClose, onDele
                         <option>Flight cancelled</option>
                         <option>Overbooking</option>
                         <option>Other</option>
-                      </select>
+                      </Select>
                     </div>
                     <div className="form-group">
                       <label style={{ fontSize: '11px' }}>Cancelled By</label>
-                      <input
+                      <Input
                         type="text"
                         value={cancelForm.cancelled_by}
                         onChange={(e) => setCancelForm({ ...cancelForm, cancelled_by: e.target.value })}
@@ -515,7 +517,7 @@ function BookingDetailModal({ booking, getStatusTag, formatDate, onClose, onDele
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', cursor: 'pointer' }}>
-                      <input
+                      <Input
                         type="checkbox"
                         checked={cancelForm.penalty_applied}
                         onChange={(e) => setCancelForm({ ...cancelForm, penalty_applied: e.target.checked, penalty_amount: '' })}
@@ -527,7 +529,7 @@ function BookingDetailModal({ booking, getStatusTag, formatDate, onClose, onDele
                   {cancelForm.penalty_applied && (
                     <div className="form-group" style={{ marginBottom: '14px' }}>
                       <label style={{ fontSize: '11px' }}>Penalty Amount (₱)</label>
-                      <input
+                      <Input
                         type="number"
                         min="0"
                         value={cancelForm.penalty_amount}
@@ -537,14 +539,14 @@ function BookingDetailModal({ booking, getStatusTag, formatDate, onClose, onDele
                     </div>
                   )}
                   <div style={{ display: 'flex', gap: '8px' }}>
-                    <button type="submit" className="btn btn-sm" style={{ background: '#b45309', color: '#fff', borderColor: '#b45309' }} disabled={isCancelling}>
+                    <SubmitButton type="submit" className="btn btn-sm" style={{ background: '#b45309', color: '#fff', borderColor: '#b45309' }} disabled={isCancelling}>
                       {isCancelling ? 'Cancelling...' : 'Confirm Cancellation'}
-                    </button>
+                    </SubmitButton>
                     <button type="button" className="btn btn-sm" onClick={() => setShowCancelForm(false)}>
                       Back
                     </button>
                   </div>
-                </form>
+                </ValidatedForm>
               </div>
             )}
           </div>
@@ -613,70 +615,70 @@ function CreateBookingModal({ onClose, onSave }) {
         <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '4px' }}>New Booking</h3>
         <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '24px' }}>Fill in reservation details</p>
 
-        <form onSubmit={handleSubmit}>
+        <ValidatedForm onSubmit={handleSubmit}>
 
           {/* GUEST INFO */}
           <h4 style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--gold-dark)', marginBottom: '12px' }}>Guest Information</h4>
           <div className="form-grid" style={{ marginBottom: '16px' }}>
-            <div className="form-group"><label>Full Name <span className="required">*</span></label><input type="text" value={form.guest} onChange={(e) => setForm({ ...form, guest: e.target.value })} placeholder="e.g. Juan Dela Cruz" /></div>
-            <div className="form-group"><label>Email</label><input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="guest@email.com" /></div>
+            <div className="form-group"><label>Full Name <span className="required">*</span></label><Input type="text" value={form.guest} onChange={(e) => setForm({ ...form, guest: e.target.value })} placeholder="e.g. Juan Dela Cruz" /></div>
+            <div className="form-group"><label>Email</label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="guest@email.com" /></div>
           </div>
           <div className="form-grid" style={{ marginBottom: '16px' }}>
-            <div className="form-group"><label>Phone</label><input type="text" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+63 9xx xxx xxxx" /></div>
-            <div className="form-group"><label>Nationality</label><input type="text" value={form.nationality} onChange={(e) => setForm({ ...form, nationality: e.target.value })} placeholder="e.g. Filipino" /></div>
+            <div className="form-group"><label>Phone</label><Input type="text" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+63 9xx xxx xxxx" /></div>
+            <div className="form-group"><label>Nationality</label><Input type="text" value={form.nationality} onChange={(e) => setForm({ ...form, nationality: e.target.value })} placeholder="e.g. Filipino" /></div>
           </div>
           <div className="form-grid" style={{ marginBottom: '22px' }}>
             <div className="form-group"><label>ID Type</label>
-              <select value={form.idType} onChange={(e) => setForm({ ...form, idType: e.target.value })}>
+              <Select value={form.idType} onChange={(e) => setForm({ ...form, idType: e.target.value })}>
                 <option>Passport</option><option>Driver's License</option><option>National ID</option><option>Company ID</option><option>Other</option>
-              </select>
+              </Select>
             </div>
-            <div className="form-group"><label>ID Number</label><input type="text" value={form.idNumber} onChange={(e) => setForm({ ...form, idNumber: e.target.value })} placeholder="e.g. P12345678" /></div>
+            <div className="form-group"><label>ID Number</label><Input type="text" value={form.idNumber} onChange={(e) => setForm({ ...form, idNumber: e.target.value })} placeholder="e.g. P12345678" /></div>
           </div>
 
           {/* STAY DETAILS */}
           <h4 style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--gold-dark)', marginBottom: '12px' }}>Stay Details</h4>
           <div className="form-grid" style={{ marginBottom: '16px' }}>
-            <div className="form-group"><label>Check-in <span className="required">*</span></label><input type="date" value={form.checkIn} onChange={(e) => handleDateChange('checkIn', e.target.value)} /></div>
-            <div className="form-group"><label>Check-out <span className="required">*</span></label><input type="date" value={form.checkOut} onChange={(e) => handleDateChange('checkOut', e.target.value)} /></div>
+            <div className="form-group"><label>Check-in <span className="required">*</span></label><Input type="date" value={form.checkIn} onChange={(e) => handleDateChange('checkIn', e.target.value)} /></div>
+            <div className="form-group"><label>Check-out <span className="required">*</span></label><Input type="date" value={form.checkOut} onChange={(e) => handleDateChange('checkOut', e.target.value)} /></div>
           </div>
           <div className="form-grid" style={{ marginBottom: '16px' }}>
-            <div className="form-group"><label>Nights</label><input type="number" value={form.nights} readOnly style={{ background: 'var(--bg-body)', cursor: 'not-allowed' }} /></div>
-            <div className="form-group"><label>Expected Arrival</label><input type="time" value={form.arrivalTime} onChange={(e) => setForm({ ...form, arrivalTime: e.target.value })} /></div>
+            <div className="form-group"><label>Nights</label><Input type="number" value={form.nights} readOnly style={{ background: 'var(--bg-body)', cursor: 'not-allowed' }} /></div>
+            <div className="form-group"><label>Expected Arrival</label><Input type="time" value={form.arrivalTime} onChange={(e) => setForm({ ...form, arrivalTime: e.target.value })} /></div>
           </div>
           <div className="form-grid" style={{ marginBottom: '16px' }}>
-            <div className="form-group"><label>Adults</label><input type="number" value={form.adults} onChange={(e) => setForm({ ...form, adults: e.target.value })} min="1" max="10" /></div>
-            <div className="form-group"><label>Children</label><input type="number" value={form.children} onChange={(e) => setForm({ ...form, children: e.target.value })} min="0" max="10" /></div>
+            <div className="form-group"><label>Adults</label><Input type="number" value={form.adults} onChange={(e) => setForm({ ...form, adults: e.target.value })} min="1" max="10" /></div>
+            <div className="form-group"><label>Children</label><Input type="number" value={form.children} onChange={(e) => setForm({ ...form, children: e.target.value })} min="0" max="10" /></div>
           </div>
           <div className="form-grid" style={{ marginBottom: '22px' }}>
             <div className="form-group"><label>Room Type</label>
-              <select value={form.roomType} onChange={(e) => setForm({ ...form, roomType: e.target.value })}>
+              <Select value={form.roomType} onChange={(e) => setForm({ ...form, roomType: e.target.value })}>
                 <option>Standard</option><option>Deluxe</option><option>Premium</option><option>Suite</option><option>Presidential</option>
-              </select>
+              </Select>
             </div>
-            <div className="form-group"><label>Room # (assign later if empty)</label><input type="text" value={form.room} onChange={(e) => setForm({ ...form, room: e.target.value })} placeholder="e.g. 304" /></div>
+            <div className="form-group"><label>Room # (assign later if empty)</label><Input type="text" value={form.room} onChange={(e) => setForm({ ...form, room: e.target.value })} placeholder="e.g. 304" /></div>
           </div>
           <div className="form-grid" style={{ marginBottom: '22px' }}>
             <div className="form-group"><label>Source</label>
-              <select value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })}>
+              <Select value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })}>
                 <option>Direct</option><option>Walk-in</option><option>Booking.com</option><option>Expedia</option><option>Agoda</option><option>Airbnb</option><option>Phone</option>
-              </select>
+              </Select>
             </div>
             <div className="form-group"><label>Purpose of Stay</label>
-              <select value={form.purpose} onChange={(e) => setForm({ ...form, purpose: e.target.value })}>
+              <Select value={form.purpose} onChange={(e) => setForm({ ...form, purpose: e.target.value })}>
                 <option>Leisure</option><option>Business</option><option>Event</option><option>Transit</option><option>Other</option>
-              </select>
+              </Select>
             </div>
           </div>
 
           {/* PAYMENT */}
           <h4 style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--gold-dark)', marginBottom: '12px' }}>Payment</h4>
           <div className="form-grid" style={{ marginBottom: '16px' }}>
-            <div className="form-group"><label>Total Amount</label><input type="number" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} min="0" placeholder="0" /></div>
+            <div className="form-group"><label>Total Amount</label><Input type="number" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} min="0" placeholder="0" /></div>
             <div className="form-group"><label>Payment Status</label>
-              <select value={form.paymentStatus} onChange={(e) => setForm({ ...form, paymentStatus: e.target.value })}>
+              <Select value={form.paymentStatus} onChange={(e) => setForm({ ...form, paymentStatus: e.target.value })}>
                 <option>Pending</option><option>Paid</option><option>Partial</option><option>OTA Collect</option>
-              </select>
+              </Select>
             </div>
           </div>
 
@@ -718,8 +720,8 @@ function CreateBookingModal({ onClose, onSave }) {
             <div style={{ background: 'var(--bg-input)', borderRadius: '8px', padding: '16px', border: '1px solid var(--border-light)', marginBottom: '22px' }}>
               <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '12px' }}>Cash Payment Details</div>
               <div className="form-grid">
-                <div className="form-group"><label>Cash Received</label><input type="number" value={form.cashReceived || ''} onChange={(e) => setForm({ ...form, cashReceived: e.target.value })} placeholder="0" min="0" /></div>
-                <div className="form-group"><label>Change</label><input type="number" value={form.cashReceived && form.amount ? (parseFloat(form.cashReceived) - parseFloat(form.amount)).toFixed(2) : ''} readOnly style={{ background: 'var(--bg-body)', cursor: 'not-allowed' }} /></div>
+                <div className="form-group"><label>Cash Received</label><Input type="number" value={form.cashReceived || ''} onChange={(e) => setForm({ ...form, cashReceived: e.target.value })} placeholder="0" min="0" /></div>
+                <div className="form-group"><label>Change</label><Input type="number" value={form.cashReceived && form.amount ? (parseFloat(form.cashReceived) - parseFloat(form.amount)).toFixed(2) : ''} readOnly style={{ background: 'var(--bg-body)', cursor: 'not-allowed' }} /></div>
               </div>
             </div>
           )}
@@ -730,7 +732,7 @@ function CreateBookingModal({ onClose, onSave }) {
               <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '12px' }}>Card / Online Payment Details</div>
               <div className="form-group" style={{ marginBottom: '12px' }}>
                 <label>Platform</label>
-                <select value={form.onlinePlatform || ''} onChange={(e) => setForm({ ...form, onlinePlatform: e.target.value })}>
+                <Select value={form.onlinePlatform || ''} onChange={(e) => setForm({ ...form, onlinePlatform: e.target.value })}>
                   <option value="">Select...</option>
                   <option>Credit Card (Visa)</option>
                   <option>Credit Card (Mastercard)</option>
@@ -740,11 +742,11 @@ function CreateBookingModal({ onClose, onSave }) {
                   <option>Bank Transfer</option>
                   <option>PayPal</option>
                   <option>OTA Collect</option>
-                </select>
+                </Select>
               </div>
               <div className="form-grid" style={{ marginBottom: '12px' }}>
-                <div className="form-group"><label>Card / Account Holder</label><input type="text" value={form.cardHolder || ''} onChange={(e) => setForm({ ...form, cardHolder: e.target.value })} placeholder="Name on card" /></div>
-                <div className="form-group"><label>Last 4 Digits / Ref #</label><input type="text" value={form.onlineRef || ''} onChange={(e) => setForm({ ...form, onlineRef: e.target.value })} placeholder="e.g. 4242 or TXN-REF" /></div>
+                <div className="form-group"><label>Card / Account Holder</label><Input type="text" value={form.cardHolder || ''} onChange={(e) => setForm({ ...form, cardHolder: e.target.value })} placeholder="Name on card" /></div>
+                <div className="form-group"><label>Last 4 Digits / Ref #</label><Input type="text" value={form.onlineRef || ''} onChange={(e) => setForm({ ...form, onlineRef: e.target.value })} placeholder="e.g. 4242 or TXN-REF" /></div>
               </div>
             </div>
           )}
@@ -753,14 +755,14 @@ function CreateBookingModal({ onClose, onSave }) {
           <h4 style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--gold-dark)', marginBottom: '12px' }}>Additional</h4>
           <div className="form-group" style={{ marginBottom: '24px' }}>
             <label>Special Requests / Notes</label>
-            <textarea value={form.specialRequests} onChange={(e) => setForm({ ...form, specialRequests: e.target.value })} placeholder="e.g. Extra pillows, late check-in, anniversary setup..." style={{ minHeight: '70px' }} />
+            <Textarea value={form.specialRequests} onChange={(e) => setForm({ ...form, specialRequests: e.target.value })} placeholder="e.g. Extra pillows, late check-in, anniversary setup..." style={{ minHeight: '70px' }} />
           </div>
 
           <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
             <button type="button" className="btn" onClick={onClose}>Cancel</button>
-            <button type="submit" className="btn btn-gold">Create Booking</button>
+            <SubmitButton type="submit" className="btn btn-gold">Create Booking</SubmitButton>
           </div>
-        </form>
+        </ValidatedForm>
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { usePolling } from '../../hooks/usePolling';
 import { authFetch } from '../../utils/api';
+import { PageSkeleton, LoadingError } from '../common/SkeletonLoader';
 
 const API = '/api/dashboard/admin-operations';
 
@@ -32,11 +33,12 @@ function Overview({ setActiveTab, adminProfile }) {
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
   const nowTime = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
+  if (error && !data) return <LoadingError onRetry={fetchData} />;
   if (isLoading || !data) {
     return (
       <section className="admin-tab-content active">
         <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-muted)' }}>
-          <div style={{ fontSize: '16px', fontWeight: '500' }}>Loading operations monitor…</div>
+          <PageSkeleton rows={6} />
         </div>
       </section>
     );

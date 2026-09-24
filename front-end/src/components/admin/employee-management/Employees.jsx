@@ -1,3 +1,4 @@
+import { Input, Select } from '../../common/FormControls';
 import React, { useState, useEffect } from 'react';
 
 function Employees({ employees, openModal }) {
@@ -220,7 +221,7 @@ function Employees({ employees, openModal }) {
             <div className="panel-toolbar">
               <div className="panel-search">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                <input
+                <Input
                   type="text"
                   placeholder="Search by name, email, or position..."
                   value={searchQuery}
@@ -228,17 +229,17 @@ function Employees({ employees, openModal }) {
                 />
               </div>
 
-              <select className="floor-dropdown" value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)}>
+              <Select className="floor-dropdown" value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)}>
                 {uniqueRoles.map(role => (
                   <option key={role} value={role}>{role === 'All' ? 'All Positions' : role}</option>
                 ))}
-              </select>
+              </Select>
 
-              <select className="floor-dropdown" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+              <Select className="floor-dropdown" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
                 {uniqueStatuses.map(status => (
                   <option key={status} value={status}>{status === 'All' ? 'All Status' : status}</option>
                 ))}
-              </select>
+              </Select>
 
               {(searchQuery || roleFilter !== 'All' || statusFilter !== 'All') && (
                 <button

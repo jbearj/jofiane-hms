@@ -4,6 +4,8 @@ import { authFetch } from '../../utils/api';
 import { todayISO, shiftISODate } from '../../utils/dateUtils';
 import GuestDetailModal from './GuestDetailModal';
 import ConfirmModal from '../common/ConfirmModal';
+import { Input, Select } from '../common/FormControls';
+import { TableSkeletonRows, SkeletonBlock } from '../common/SkeletonLoader';
 
 function Arrivals() {
   // 1. UI FILTERS STATE
@@ -129,7 +131,7 @@ function Arrivals() {
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
             </button>
-            <input
+            <Input
               type="date"
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
@@ -152,22 +154,22 @@ function Arrivals() {
       <div className="kpi-grid operational-kpi-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px', marginBottom: '24px' }}>
         <div className="kpi-card" style={{ borderRadius: '12px', padding: '20px', border: '1px solid #eaeaea', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
           <span className="lbl" style={{ fontSize: '11px', color: '#6b7280', letterSpacing: '0.5px' }}>TOTAL EXPECTED</span>
-          <span className="val" style={{ fontSize: '28px', color: '#111827', margin: '8px 0' }}>{isLoading ? '-' : arrivals.length}</span>
+          <span className="val" style={{ fontSize: '28px', color: '#111827', margin: '8px 0' }}>{isLoading ? <SkeletonBlock style={{ width: 50, height: 32 }} /> : arrivals.length}</span>
           <span className="sub" style={{ color: '#6b7280' }}>Arrivals for selected date</span>
         </div>
         <div className="kpi-card" style={{ borderRadius: '12px', padding: '20px', border: '1px solid #eaeaea', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
           <span className="lbl" style={{ fontSize: '11px', color: '#6b7280', letterSpacing: '0.5px' }}>PENDING CHECK-IN</span>
-          <span className="val" style={{ fontSize: '28px', color: '#111827', margin: '8px 0' }}>{isLoading ? '-' : arrivals.filter(a => a.status === 'Pending').length}</span>
+          <span className="val" style={{ fontSize: '28px', color: '#111827', margin: '8px 0' }}>{isLoading ? <SkeletonBlock style={{ width: 50, height: 32 }} /> : arrivals.filter(a => a.status === 'Pending').length}</span>
           <span className="sub" style={{ color: '#6b7280' }}>Requires Action</span>
         </div>
         <div className="kpi-card" style={{ borderRadius: '12px', padding: '20px', border: '1px solid #eaeaea', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
           <span className="lbl" style={{ fontSize: '11px', color: '#6b7280', letterSpacing: '0.5px' }}>CHECKED-IN</span>
-          <span className="val" style={{ fontSize: '28px', color: '#111827', margin: '8px 0' }}>{isLoading ? '-' : arrivals.filter(a => a.status === 'Checked-In').length}</span>
+          <span className="val" style={{ fontSize: '28px', color: '#111827', margin: '8px 0' }}>{isLoading ? <SkeletonBlock style={{ width: 50, height: 32 }} /> : arrivals.filter(a => a.status === 'Checked-In').length}</span>
           <span className="sub" style={{ color: '#6b7280' }}>Successfully arrived</span>
         </div>
         <div className="kpi-card" style={{ borderRadius: '12px', padding: '20px', border: '1px solid #eaeaea', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
           <span className="lbl" style={{ fontSize: '11px', color: '#6b7280', letterSpacing: '0.5px' }}>VIP ARRIVALS</span>
-          <span className="val" style={{ fontSize: '28px', color: '#111827', margin: '8px 0' }}>{isLoading ? '-' : arrivals.filter(a => a.isVIP).length}</span>
+          <span className="val" style={{ fontSize: '28px', color: '#111827', margin: '8px 0' }}>{isLoading ? <SkeletonBlock style={{ width: 50, height: 32 }} /> : arrivals.filter(a => a.isVIP).length}</span>
           <span className="sub" style={{ color: '#6b7280' }}>Special handling required</span>
         </div>
       </div>
@@ -178,20 +180,20 @@ function Arrivals() {
         <div className="panel-header manifest-toolbar" style={{ padding: '20px', borderBottom: '1px solid #eaeaea', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '600', color: '#111827' }}>Arrival Manifest</h3>
           <div className="manifest-filters" style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ padding: '8px 12px', fontSize: '13px', borderRadius: '6px', border: '1px solid #d1d5db', outline: 'none', color: '#4b5563', cursor: 'pointer' }}>
+            <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ padding: '8px 12px', fontSize: '13px', borderRadius: '6px', border: '1px solid #d1d5db', outline: 'none', color: '#4b5563', cursor: 'pointer' }}>
               <option value="All">All Statuses</option>
               <option value="Pending">Pending</option>
               <option value="Checked-In">Checked-In</option>
-            </select>
-            <select value={roomTypeFilter} onChange={(e) => setRoomTypeFilter(e.target.value)} style={{ padding: '8px 12px', fontSize: '13px', borderRadius: '6px', border: '1px solid #d1d5db', outline: 'none', color: '#4b5563', cursor: 'pointer' }}>
+            </Select>
+            <Select value={roomTypeFilter} onChange={(e) => setRoomTypeFilter(e.target.value)} style={{ padding: '8px 12px', fontSize: '13px', borderRadius: '6px', border: '1px solid #d1d5db', outline: 'none', color: '#4b5563', cursor: 'pointer' }}>
               <option value="All">All Room Types</option>
               <option value="Veranda Suite">Veranda Suite</option>
               <option value="Presidential Suite">Presidential Suite</option>
               <option value="Garden Room">Garden Room</option>
-            </select>
+            </Select>
             <div style={{ position: 'relative' }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }}><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-              <input type="text" placeholder="Search guest..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={{ padding: '8px 12px 8px 32px', fontSize: '13px', borderRadius: '6px', border: '1px solid #d1d5db', outline: 'none', width: '220px' }} />
+              <Input type="text" placeholder="Search guest..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={{ padding: '8px 12px 8px 32px', fontSize: '13px', borderRadius: '6px', border: '1px solid #d1d5db', outline: 'none', width: '220px' }} />
             </div>
           </div>
         </div>
@@ -213,11 +215,7 @@ function Arrivals() {
               
               {/* IF LOADING, SHOW SPINNER. IF EMPTY, SHOW "NOT FOUND". ELSE, SHOW DATA. */}
               {isLoading ? (
-                <tr>
-                  <td colSpan="7" style={{ textAlign: 'center', padding: '40px', color: '#6b7280' }}>
-                    <i className="fas fa-spinner fa-spin" style={{ marginRight: '8px' }}></i> Fetching arrivals from server...
-                  </td>
-                </tr>
+                <TableSkeletonRows columns={7} label="Loading arrivals" />
               ) : filteredArrivals.length === 0 ? (
                 <tr>
                   <td colSpan="7" style={{ textAlign: 'center', padding: '40px', color: '#6b7280' }}>

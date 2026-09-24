@@ -2,7 +2,8 @@ import React, { useState, useRef } from 'react';
 import { usePolling } from '../../hooks/usePolling';
 import { authFetch, readError } from '../../utils/api';
 import PortalModal from '../common/PortalModal';
-
+import { PageSkeleton } from '../common/SkeletonLoader';
+import { Input, Select, Textarea, ValidatedForm, SubmitButton } from '../common/FormControls';
 const API = '/api/housekeeping-logs';
 
 function HousekeepingLogs() {
@@ -152,7 +153,7 @@ function HousekeepingLogs() {
 
           <div style={{ padding: '0 10px' }}>
             {isLoading ? (
-              <div style={{ padding: '32px 10px', fontSize: '13px', color: 'var(--text-muted)' }}>Loading logs…</div>
+              <PageSkeleton rows={4} label="Loading records" />
             ) : error ? (
               <div style={{ padding: '32px 10px', fontSize: '13px', color: 'var(--status-occ)' }}>{error}</div>
             ) : logs.length === 0 ? (
@@ -188,15 +189,15 @@ function HousekeepingLogs() {
               <button className="modal-close" onClick={() => setShowForm(false)}>×</button>
               <h3 style={{ color: 'var(--text-primary)' }}>New Housekeeping Log</h3>
 
-              <form onSubmit={addLog}>
+              <ValidatedForm onSubmit={addLog}>
                 <div className="form-group">
                   <label>Room Number</label>
-                  <input type="text" name="room" value={formData.room} onChange={handleChange} required />
+                  <Input type="text" name="room" value={formData.room} onChange={handleChange} required />
                 </div>
 
                 <div className="form-group">
                   <label>Category</label>
-                  <select name="category" value={formData.category} onChange={handleChange}>
+                  <Select name="category" value={formData.category} onChange={handleChange}>
                     <option>Room Note</option>
                     <option>Room Status</option>
                     <option>Priority</option>
@@ -204,20 +205,20 @@ function HousekeepingLogs() {
                     <option>Maintenance</option>
                     <option>Lost & Found</option>
                     <option>Shift Handover</option>
-                  </select>
+                  </Select>
                 </div>
 
                 <div className="form-group">
                   <label>Employee</label>
-                  <select name="employee" value={formData.employee} onChange={handleChange} required>
+                  <Select name="employee" value={formData.employee} onChange={handleChange} required>
                     <option value="">Select Employee</option>
                     {staff.map((name) => <option key={name} value={name}>{name}</option>)}
-                  </select>
+                  </Select>
                 </div>
 
                 <div className="form-group">
                   <label>Description</label>
-                  <textarea
+                  <Textarea
                     name="description"
                     value={formData.description}
                     onChange={handleChange}
@@ -229,11 +230,11 @@ function HousekeepingLogs() {
 
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px' }}>
                   <button type="button" className="btn" onClick={() => setShowForm(false)}>Cancel</button>
-                  <button type="submit" className="btn btn-gold" disabled={saving}>
+                  <SubmitButton type="submit" className="btn btn-gold" disabled={saving}>
                     {saving ? 'Saving…' : 'Save Log'}
-                  </button>
+                  </SubmitButton>
                 </div>
-              </form>
+              </ValidatedForm>
           </PortalModal>
         )}
 

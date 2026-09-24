@@ -1,5 +1,7 @@
+import { Select } from '../../common/FormControls';
 import React, { useState, useEffect } from 'react';
 import { authFetch } from '../../../utils/api';
+import { PageSkeleton } from '../../common/SkeletonLoader';
 
 const SHIFT_TYPES = [
   { id: 'morning',   label: 'Morning',   time: '6am–2pm',   color: '#fef3c7', textColor: '#92400e', dot: '#f59e0b' },
@@ -200,7 +202,7 @@ function ShiftSchedules() {
     return (
       <section className="admin-tab-content active">
         <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-muted)' }}>
-          <div style={{ fontSize: '16px', fontWeight: '500' }}>Loading shift schedules...</div>
+          <PageSkeleton rows={6} />
         </div>
       </section>
     );
@@ -275,10 +277,10 @@ function ShiftSchedules() {
 
               {/* Filters & Legend */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                <select className="floor-dropdown" value={filterDept} onChange={(e) => setFilterDept(e.target.value)}>
+                <Select className="floor-dropdown" value={filterDept} onChange={(e) => setFilterDept(e.target.value)}>
                   <option value="all">All Departments</option>
                   {departments.map(d => <option key={d} value={d}>{d}</option>)}
-                </select>
+                </Select>
                 <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
                   {SHIFT_TYPES.map(s => (
                     <span key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: s.textColor, fontWeight: '500' }}>

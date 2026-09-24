@@ -1,5 +1,7 @@
+import { Select } from '../../common/FormControls';
 import React, { useState, useEffect } from 'react';
 import { API_BASE } from '../../../utils/api';
+import { PageSkeleton } from '../../common/SkeletonLoader';
 
 function GuestReports() {
   const [isLoading, setIsLoading] = useState(true);
@@ -22,7 +24,7 @@ function GuestReports() {
   };
 
   if (isLoading || !data) {
-    return (<section className="admin-tab-content active"><div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading guest reports...</div></section>);
+    return (<section className="admin-tab-content active"><PageSkeleton rows={6} /></section>);
   }
 
   const { kpis, bookingSource, topGuests } = data;
@@ -52,11 +54,11 @@ function GuestReports() {
           <div><div style={{ fontSize: '18px', fontWeight: '700' }}>{kpis.avgSpend.toLocaleString()}</div><div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Avg Spend</div></div>
           <div><div style={{ fontSize: '18px', fontWeight: '700', color: 'var(--status-vac)' }}>{kpis.returnRate}%</div><div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Return Rate</div></div>
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <select className="floor-dropdown" value={period} onChange={(e) => setPeriod(e.target.value)}>
+            <Select className="floor-dropdown" value={period} onChange={(e) => setPeriod(e.target.value)}>
               <option value="weekly">Weekly</option>
               <option value="monthly">Monthly</option>
               <option value="quarterly">Quarterly</option>
-            </select>
+            </Select>
             <button className="btn btn-sm btn-outline-gold" onClick={() => alert('Exporting guest report...')}>Export</button>
           </div>
         </div>

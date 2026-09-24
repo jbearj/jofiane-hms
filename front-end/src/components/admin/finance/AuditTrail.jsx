@@ -1,5 +1,7 @@
+import { Input, Select } from '../../common/FormControls';
 import React, { useState, useEffect } from 'react';
 import { API_BASE } from '../../../utils/api';
+import { PageSkeleton } from '../../common/SkeletonLoader';
 
 function AuditTrail() {
   const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -158,7 +160,7 @@ function AuditTrail() {
     return (
       <section className="admin-tab-content active">
         <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-muted)' }}>
-          <div style={{ fontSize: '16px', fontWeight: '500' }}>Loading audit trail...</div>
+          <PageSkeleton rows={6} />
         </div>
       </section>
     );
@@ -211,7 +213,7 @@ function AuditTrail() {
             {/* Search */}
             <div className="panel-search">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-              <input
+              <Input
                 type="text"
                 placeholder="Search by action, description, or user..."
                 value={searchQuery}
@@ -220,14 +222,14 @@ function AuditTrail() {
             </div>
 
             {/* Period */}
-            <select className="floor-dropdown" value={filterPeriod} onChange={(e) => setFilterPeriod(e.target.value)}>
+            <Select className="floor-dropdown" value={filterPeriod} onChange={(e) => setFilterPeriod(e.target.value)}>
               <option value="today">Today</option>
               <option value="week">This Week</option>
               <option value="month">This Month</option>
-            </select>
+            </Select>
 
             {/* Category */}
-            <select className="floor-dropdown" value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
+            <Select className="floor-dropdown" value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
               <option value="all">All Categories</option>
               <option value="day-close">Day Close</option>
               <option value="rate-change">Rate Changes</option>
@@ -235,24 +237,24 @@ function AuditTrail() {
               <option value="void">Voids</option>
               <option value="no-show">No-Shows</option>
               <option value="adjustment">Adjustments</option>
-            </select>
+            </Select>
 
             {/* Status */}
-            <select className="floor-dropdown" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+            <Select className="floor-dropdown" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
               <option value="all">All Status</option>
               <option value="balanced">Balanced</option>
               <option value="variance">Variance</option>
               <option value="approved">Approved</option>
               <option value="completed">Completed</option>
-            </select>
+            </Select>
 
             {/* User */}
-            <select className="floor-dropdown" value={filterUser} onChange={(e) => setFilterUser(e.target.value)}>
+            <Select className="floor-dropdown" value={filterUser} onChange={(e) => setFilterUser(e.target.value)}>
               <option value="all">All Users</option>
               {uniqueUsers.map(user => (
                 <option key={user} value={user}>{user}</option>
               ))}
-            </select>
+            </Select>
 
             <span className="panel-toolbar-meta">{filteredLogs.length} entries</span>
             <button className="btn btn-sm" onClick={() => alert('Exporting audit trail...')}>

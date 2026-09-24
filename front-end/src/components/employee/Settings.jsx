@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { createPortal } from 'react-dom';
 import { authFetch, readError } from '../../utils/api';
 import ChangePasswordModal from '../common/ChangePasswordModal';
+import { Input, ValidatedForm, SubmitButton } from '../common/FormControls';
+import { createThemedPortal as createPortal } from '../common/ThemePortal';
 
 function EmployeeSettings({ isDarkMode, setIsDarkMode, employee, onUpdateProfile }) {
   const [profile, setProfile] = useState({
@@ -241,7 +242,7 @@ function EditProfileModal({ profile, isDarkMode, onClose, onSave, onChangePasswo
         <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '4px' }}>Edit Profile</h3>
         <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '24px' }}>Update your profile information</p>
 
-        <form onSubmit={handleSubmit}>
+        <ValidatedForm onSubmit={handleSubmit}>
           {/* Photo Upload */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
             <div style={{ width: '72px', height: '72px', borderRadius: '50%', background: photoPreview ? 'transparent' : 'linear-gradient(135deg, #f0d98c, #b88b34)', display: 'grid', placeItems: 'center', fontSize: '28px', fontWeight: '800', color: '#3a2b20', flexShrink: 0, overflow: 'hidden', border: '2px solid var(--border-light)' }}>
@@ -258,7 +259,7 @@ function EditProfileModal({ profile, isDarkMode, onClose, onSave, onChangePasswo
               >
                 Upload Photo
               </label>
-              <input
+              <Input
                 id="emp-photo-upload"
                 type="file"
                 accept="image/*"
@@ -272,7 +273,7 @@ function EditProfileModal({ profile, isDarkMode, onClose, onSave, onChangePasswo
           {/* Full Name */}
           <div className="form-group" style={{ marginBottom: '16px' }}>
             <label>Full Name</label>
-            <input
+            <Input
               type="text"
               value={form.fullName}
               onChange={(e) => setForm({ ...form, fullName: e.target.value })}
@@ -283,7 +284,7 @@ function EditProfileModal({ profile, isDarkMode, onClose, onSave, onChangePasswo
           {/* Email */}
           <div className="form-group" style={{ marginBottom: '24px' }}>
             <label>Email</label>
-            <input
+            <Input
               type="email"
               value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
@@ -308,9 +309,9 @@ function EditProfileModal({ profile, isDarkMode, onClose, onSave, onChangePasswo
           {/* Actions */}
           <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
             <button type="button" className="btn" onClick={onClose}>Cancel</button>
-            <button type="submit" className="btn btn-gold">Save Changes</button>
+            <SubmitButton type="submit" className="btn btn-gold">Save Changes</SubmitButton>
           </div>
-        </form>
+        </ValidatedForm>
         </div>
       </div>
     </div>

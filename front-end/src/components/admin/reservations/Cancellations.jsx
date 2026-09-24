@@ -1,5 +1,7 @@
+import { Input, Select } from '../../common/FormControls';
 import React, { useState, useEffect } from 'react';
 import { API_BASE } from '../../../utils/api';
+import { PageSkeleton } from '../../common/SkeletonLoader';
 
 function Cancellations() {
   const [isLoading, setIsLoading] = useState(true);
@@ -84,7 +86,7 @@ function Cancellations() {
   const reasons = [...new Set(cancellations.map(c => c.reason))];
 
   if (isLoading) {
-    return (<section className="admin-tab-content active"><div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading cancellations...</div></section>);
+    return (<section className="admin-tab-content active"><PageSkeleton rows={6} /></section>);
   }
 
   return (
@@ -116,17 +118,17 @@ function Cancellations() {
           <div className="panel-toolbar">
             <div className="panel-search">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-              <input type="text" placeholder="Search by guest or booking ID..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+              <Input type="text" placeholder="Search by guest or booking ID..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
             </div>
-            <select className="floor-dropdown" value={filterReason} onChange={(e) => setFilterReason(e.target.value)}>
+            <Select className="floor-dropdown" value={filterReason} onChange={(e) => setFilterReason(e.target.value)}>
               <option value="all">All Reasons</option>
               {reasons.map(r => <option key={r} value={r}>{r}</option>)}
-            </select>
-            <select className="floor-dropdown" value={filterPenalty} onChange={(e) => setFilterPenalty(e.target.value)}>
+            </Select>
+            <Select className="floor-dropdown" value={filterPenalty} onChange={(e) => setFilterPenalty(e.target.value)}>
               <option value="all">All Penalties</option>
               <option value="applied">Penalty Applied</option>
               <option value="waived">No Penalty</option>
-            </select>
+            </Select>
           </div>
         </div>
         <div className="table-wrap">

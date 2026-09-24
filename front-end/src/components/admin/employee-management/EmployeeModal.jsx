@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Input, Select, ValidatedForm, SubmitButton } from '../../common/FormControls';
 
 function EmployeeModal({ employee, onClose, onSave, onDelete }) {
   const [formData, setFormData] = useState({
@@ -73,10 +74,10 @@ function EmployeeModal({ employee, onClose, onSave, onDelete }) {
           <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>View, edit, and save staff records.</p>
         </div>
 
-        <form onSubmit={handleSubmit}>
+        <ValidatedForm onSubmit={handleSubmit}>
           <div className="form-group" style={{ marginTop: 0 }}>
             <label>Full Name <span className="required">*</span></label>
-            <input
+            <Input
               type="text"
               name="name"
               value={formData.name}
@@ -88,7 +89,7 @@ function EmployeeModal({ employee, onClose, onSave, onDelete }) {
 
           <div className="form-group">
             <label>Account Email <span className="required">*</span></label>
-            <input
+            <Input
               type="email"
               name="email"
               value={formData.email}
@@ -101,7 +102,7 @@ function EmployeeModal({ employee, onClose, onSave, onDelete }) {
           <div className="form-group">
             <label>Password</label>
             <div className="password-wrapper">
-              <input
+              <Input
                 type={showPassword ? 'text' : 'password'}
                 name="password"
                 value={formData.password}
@@ -117,18 +118,18 @@ function EmployeeModal({ employee, onClose, onSave, onDelete }) {
           <div className="form-grid">
             <div className="form-group" style={{ marginTop: 0 }}>
               <label>Position / Role</label>
-              <select name="role" value={formData.role} onChange={handleChange}>
+              <Select name="role" value={formData.role} onChange={handleChange}>
                 <option>Front Desk Concierge</option>
                 <option>Night Auditor</option>
                 <option>Housekeeping Lead</option>
                 <option>Maintenance Tech</option>
                 <option>Bellhop</option>
                 <option>Manager</option>
-              </select>
+              </Select>
             </div>
             <div className="form-group" style={{ marginTop: 0 }}>
               <label>Monthly Salary (₱)</label>
-              <input
+              <Input
                 type="number"
                 name="salary"
                 value={formData.salary}
@@ -141,7 +142,7 @@ function EmployeeModal({ employee, onClose, onSave, onDelete }) {
           <div className="form-grid">
             <div className="form-group" style={{ marginTop: 0 }}>
               <label>Shift Start</label>
-              <input
+              <Input
                 type="time"
                 name="start"
                 value={formData.start}
@@ -150,7 +151,7 @@ function EmployeeModal({ employee, onClose, onSave, onDelete }) {
             </div>
             <div className="form-group" style={{ marginTop: 0 }}>
               <label>Shift End</label>
-              <input
+              <Input
                 type="time"
                 name="end"
                 value={formData.end}
@@ -161,11 +162,11 @@ function EmployeeModal({ employee, onClose, onSave, onDelete }) {
 
           <div className="form-group">
             <label>Account Status</label>
-            <select name="status" value={formData.status} onChange={handleChange}>
+            <Select name="status" value={formData.status} onChange={handleChange}>
               <option value="Active">Active — Full Access</option>
               <option value="On Leave">On Leave — Suspended</option>
               <option value="Terminated">Terminated — Revoked</option>
-            </select>
+            </Select>
           </div>
 
           <hr className="modal-divider" />
@@ -177,11 +178,11 @@ function EmployeeModal({ employee, onClose, onSave, onDelete }) {
               </button>
             )}
             <button type="button" className="btn" style={{ flex: 1 }} onClick={onClose}>Cancel</button>
-            <button type="submit" className="btn btn-gold" style={{ flex: 2 }}>
+            <SubmitButton className="btn btn-gold" style={{ flex: 2 }}>
               <i className="fas fa-save"></i> {formData.id ? 'Update' : 'Create'}
-            </button>
+            </SubmitButton>
           </div>
-        </form>
+        </ValidatedForm>
       </div>
     </div>
   );

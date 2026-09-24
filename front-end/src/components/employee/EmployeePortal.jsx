@@ -1,5 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Sidebar from './Sidebar';
+import usePageNavigation from '../../hooks/usePageNavigation';
+import { PortalThemeProvider } from '../common/ThemePortal';
 import Dashboard from './Dashboard';
 import BookingManagement from './BookingManagement';
 import Arrivals from './Arrivals';
@@ -19,7 +21,7 @@ import GuestRequests from './GuestRequests';
 import HousekeepingLogs from './HousekeepingLogs';
 import LostAndFound from './LostAndFound';
 
-function EmployeePortal({employeeRole, employee}) {
+function EmployeePortal({employeeRole, employee, onLogout, suspended = false}) {
   // Live profile shared across the sidebar, dashboards, and settings.
   // Seeded from the logged-in employee; updated when they edit their profile,
   // so the change reflects everywhere (mirrors the admin adminProfile pattern).
@@ -36,7 +38,6 @@ function EmployeePortal({employeeRole, employee}) {
       photo: updated.photo ?? prev?.photo,
     }));
   };
-
   const frontDeskTabs = [
   'dashboard',
   'bookings',
@@ -89,10 +90,8 @@ function EmployeePortal({employeeRole, employee}) {
       ? housekeepingTabs
       : frontDeskTabs;
 
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [displayedTab, setDisplayedTab] = useState('dashboard');
-  const [transitionPhase, setTransitionPhase] = useState('idle');
-  const pageTransitionTimerRef = useRef(null);
+  const [activeTab, navigateToTab] = usePageNavigation('dashboard');
+  const displayedTab = activeTab;
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(() => {
     if (typeof window === 'undefined') return false;
@@ -114,42 +113,6 @@ function EmployeePortal({employeeRole, employee}) {
     document.body.classList.toggle('app-dark', isDarkMode);
     return () => document.body.classList.remove('app-dark');
   }, [isDarkMode]);
-
-  useEffect(() => () => {
-    if (pageTransitionTimerRef.current) {
-      window.clearTimeout(pageTransitionTimerRef.current);
-    }
-  }, []);
-
-  const navigateToTab = (nextTab) => {
-    if (nextTab === activeTab) return;
-
-    const prefersReducedMotion = typeof window.matchMedia === 'function'
-      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-    setActiveTab(nextTab);
-
-    if (pageTransitionTimerRef.current) {
-      window.clearTimeout(pageTransitionTimerRef.current);
-    }
-
-    if (prefersReducedMotion) {
-      setDisplayedTab(nextTab);
-      setTransitionPhase('idle');
-      return;
-    }
-
-    setTransitionPhase('leaving');
-    pageTransitionTimerRef.current = window.setTimeout(() => {
-      setDisplayedTab(nextTab);
-      setTransitionPhase('entering');
-
-      pageTransitionTimerRef.current = window.setTimeout(() => {
-        setTransitionPhase('idle');
-        pageTransitionTimerRef.current = null;
-      }, 300);
-    }, 140);
-  };
 
   const renderContent = () => {
 
@@ -181,7 +144,7 @@ function EmployeePortal({employeeRole, employee}) {
     case 'bookings':
       return (
         <main className="main-content employee-content">
-          <BookingManagement />
+          <BookingManagement employee={employeeProfile} />
         </main>
       );
 
@@ -295,8 +258,9 @@ function EmployeePortal({employeeRole, employee}) {
 };
 
   return (
-    <div className={`portal-shell employee-portal-shell page-transition-${transitionPhase} ${isCollapsed ? 'nav-collapsed' : ''} ${isDarkMode ? 'theme-dark' : 'theme-light'}`}>
-      <Sidebar 
+    <PortalThemeProvider theme={isDarkMode ? 'dark' : 'light'} suspended={suspended}>
+    <div className={`portal-shell employee-portal-shell ${isCollapsed ? 'nav-collapsed' : ''} ${isDarkMode ? 'theme-dark' : 'theme-light'}`}>
+      <Sidebar onLogout={onLogout}
         employeeRole={employeeRole}
         employee={employeeProfile}
         isHousekeepingLead={isHousekeepingLead}
@@ -327,8 +291,9 @@ function EmployeePortal({employeeRole, employee}) {
           aria-label="Close employee navigation"
         />
       )}
-      {renderContent()}
+      <React.Fragment key={activeTab}>{renderContent()}</React.Fragment>
     </div>
+    </PortalThemeProvider>
   );
 }
 

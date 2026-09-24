@@ -1,15 +1,18 @@
 import React, { useState } from 'react';
 import { usePolling } from '../../hooks/usePolling';
 import { API_BASE } from '../../utils/api';
+import { PageSkeleton, LoadingError } from '../common/SkeletonLoader';
 
 function Dashboard({ employee, setActiveTab }) {
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [stats, setStats] = useState(null);
   const [recentActivity, setRecentActivity] = useState([]);
   const [todayDate] = useState(new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }));
 
   const fetchDashboard = async () => {
-    setIsLoading(true);
+    if (!stats) setIsLoading(true);
+    setLoadError(false);
     try {
       const res = await fetch(`${API_BASE}/api/dashboard/overview`);
       if (!res.ok) throw new Error(`Server error: ${res.status}`);
@@ -30,6 +33,7 @@ function Dashboard({ employee, setActiveTab }) {
       }));
       setRecentActivity(activities);
     } catch (err) {
+      setLoadError(true);
       console.error(err);
     } finally {
       setIsLoading(false);
@@ -42,26 +46,17 @@ if (isLoading) {
   return (
     <main className="main-content employee-dashboard">
       <section className="admin-tab-content active">
-        <div style={{ padding: '60px', textAlign: 'center', color: '#6b7280' }}>
-          <i
-            className="fas fa-spinner fa-spin"
-            style={{ fontSize: '20px', marginBottom: '12px', display: 'block'}}
-          >
-          </i>
-          Loading Overview...
-        </div>
+        <PageSkeleton rows={6} />
       </section>
     </main>
   );
 }
 
-if (!stats) {
+if (loadError && !stats) {
   return (
     <main className="main-content employee-dashboard">
       <section className="admin-tab-content active">
-        <div style={{ padding: '60px', textAlign: 'center', color: '#6b7280' }}>
-          Unable to load dashboard data.
-        </div>
+        <LoadingError onRetry={fetchDashboard} />
       </section>
     </main>
   );
