@@ -150,31 +150,25 @@ function Transactions() {
       return;
     }
     try {
-      const refundTxn = {
-        txn_id: `TXN-${Date.now()}`,
-        datetime: new Date().toLocaleString('en-CA', { hour12: false }).replace(',', ''),
-        description: `Refund - ${refundData.reason}`,
-        // Stored as negative string e.g. "-2,100.00"
-        amount: `-${Math.abs(parseFloat(refundData.amount)).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
-        payment_method: selectedTransaction.method,
-        payment_details: selectedTransaction.methodDetail || '',
-        status: 'COMPLETED',
-      };
-
       const res = await authFetch(
-        `/api/bookings/${selectedTransaction._bookingObjectId}/transactions`,
+        `/api/bookings/${selectedTransaction._bookingObjectId}/refunds`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(refundTxn),
+          body: JSON.stringify({
+            amount: Math.abs(parseFloat(refundData.amount)),
+            reason: refundData.reason,
+            payment_method: selectedTransaction.method,
+            reference: selectedTransaction.methodDetail || '',
+          }),
         }
       );
-      if (!res.ok) throw new Error(`Server error: ${res.status}`);
+      if (!res.ok) throw new Error(await readError(res, 'Failed to issue refund.'));
 
       await fetchTransactions();
     } catch (err) {
       console.error('Failed to issue refund:', err);
-      alert('Failed to issue refund. Please try again.');
+      alert(err.message || 'Failed to issue refund. Please try again.');
     }
     setShowRefundModal(false);
     setSelectedTransaction(null);

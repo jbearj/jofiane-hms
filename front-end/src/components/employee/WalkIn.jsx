@@ -36,7 +36,34 @@ function WalkIn({ onViewBooking }) {
     const bookingId = `BKG-${Date.now()}`;
     const fullName = `${form.firstName} ${form.lastName}`.trim();
     const deposit = parseFloat(form.deposit) || 0;
-    const balanceDue = Math.max(0, total - deposit);
+    const now = new Date().toLocaleString('en-CA', { hour12: false }).replace(',', '');
+    const txns = [];
+    // Room cost is a CHARGE (what the guest owes for the stay).
+    if (total > 0) {
+      txns.push({
+        txn_id: `TXN-${Date.now()}`,
+        type: 'charge',
+        datetime: now,
+        description: `Room Charge (Rm ${selectedRoom.id})`,
+        amount: fmtAmt(total),
+        payment_method: 'Room Charge',
+        payment_details: 'Front Desk',
+        status: 'COMPLETED',
+      });
+    }
+    // Deposit collected at check-in is a PAYMENT against that charge.
+    if (deposit > 0) {
+      txns.push({
+        txn_id: `TXN-${Date.now() + 1}`,
+        type: 'payment',
+        datetime: now,
+        description: `Walk-in Deposit (Rm ${selectedRoom.id})`,
+        amount: fmtAmt(deposit),
+        payment_method: form.payment || 'Cash',
+        payment_details: 'Front Desk',
+        status: 'COMPLETED',
+      });
+    }
     const payload = {
       booking_id: bookingId,
       room_number: selectedRoom.id,
@@ -44,20 +71,8 @@ function WalkIn({ onViewBooking }) {
       status: 'Confirmed',
       dates: { check_in: form.checkIn, check_out: form.checkOut, nights: String(nights) },
       guest: { guest_id: String(Date.now()), full_name: fullName, email: form.email || '', phone: form.mobile || '' },
-      billing: {
-        expected_total: fmtAmt(total),
-        total_paid: fmtAmt(deposit),
-        balance_due: fmtAmt(balanceDue),
-      },
-      transactions: deposit > 0 ? [{
-        txn_id: `TXN-${Date.now()}`,
-        datetime: new Date().toLocaleString('en-CA', { hour12: false }).replace(',', ''),
-        description: `Walk-in Deposit (Rm ${selectedRoom.id})`,
-        amount: fmtAmt(deposit),
-        payment_method: form.payment || 'Cash',
-        payment_details: 'Front Desk',
-        status: 'COMPLETED',
-      }] : [],
+      billing: { expected_total: fmtAmt(total), total_paid: '0.00', balance_due: fmtAmt(total) },
+      transactions: txns,
     };
     try {
       const res = await authFetch('/api/bookings', {
