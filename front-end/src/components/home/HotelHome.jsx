@@ -37,9 +37,13 @@ export default function HotelHome({ isLoggedIn, expired, onReturn }) {
   const menuTrigger = useRef(null);
   const menuDestination = useRef(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  // Always start with animation running; user can pause via the motion control.
-  const [motionPaused, setMotionPaused] = useState(false);
-  const [pageHidden, setPageHidden] = useState(document.hidden);
+  const prefersReduced = () =>
+    typeof window !== 'undefined' &&
+    Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches);
+  const [motionPaused, setMotionPaused] = useState(() => prefersReduced());
+  const [pageHidden, setPageHidden] = useState(() =>
+    typeof document !== 'undefined' ? document.hidden : false
+  );
   const [activeSection, setActiveSection] = useState('hotel-hero');
 
   useEffect(() => {
