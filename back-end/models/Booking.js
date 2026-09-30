@@ -2,9 +2,10 @@ const mongoose = require('mongoose');
 
 const transactionSchema = new mongoose.Schema({
   txn_id: String,            // e.g. "TXN-9021"
+  type: String,              // "charge" | "payment" | "refund" (inferred if absent)
   datetime: String,          // e.g. "2026-08-10 09:14:00"
   description: String,
-  amount: String,            // stored as string e.g. "14,700.00"
+  amount: String,            // stored as string e.g. "14,700.00" ("-2,100.00" for refunds)
   payment_method: String,    // "Credit Card", "Cash", "Room Charge", etc.
   payment_details: String,   // e.g. "Visa ....4242"
   status: String,            // "COMPLETED", "PENDING", "VOIDED"

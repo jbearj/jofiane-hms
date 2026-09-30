@@ -163,19 +163,20 @@ function Transactions() {
 
   const handleRefund = (refund) => runAction(async () => {
     if (!selectedTransaction?._bookingObjectId) throw new Error('Cannot find the booking for this transaction.');
-    const txn = {
-      txn_id: `TXN-${Date.now()}`,
-      datetime: new Date().toLocaleString('en-CA', { hour12: false }).replace(',', ''),
-      description: `Refund - ${refund.reason.trim()}`,
-      amount: `-${Math.abs(Number(refund.amount)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-      payment_method: selectedTransaction.method,
-      payment_details: selectedTransaction.methodDetail || '',
-      status: 'COMPLETED',
-    };
-    const res = await authFetch(`/api/bookings/${selectedTransaction._bookingObjectId}/transactions`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(txn),
-    });
-    if (!res.ok) throw new Error(await readError(res, 'Refund was not saved. Please try again.'));
+    const res = await authFetch(
+      `/api/bookings/${selectedTransaction._bookingObjectId}/refunds`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: Math.abs(parseFloat(refund.amount)),
+          reason: refund.reason.trim(),
+          payment_method: selectedTransaction.method,
+          reference: selectedTransaction.methodDetail || '',
+        }),
+      }
+    );
+    if (!res.ok) throw new Error(await readError(res, 'Failed to issue refund.'));
     setShowRefundModal(false);
     setSelectedTransaction(null);
     await fetchTransactions();

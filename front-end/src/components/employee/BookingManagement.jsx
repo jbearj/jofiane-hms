@@ -4,9 +4,10 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import PortalModal from '../common/PortalModal';
 import { money, parseMoney } from '../../utils/formatters';
 import { usePolling } from '../../hooks/usePolling';
-import { authFetch } from '../../utils/api';
+import { authFetch, readError } from '../../utils/api';
 import { todayISO } from '../../utils/dateUtils';
 import ConfirmModal from '../common/ConfirmModal';
+import RecordPaymentModal from './RecordPaymentModal';
 
 // ─── Accent colour adapts to dark/light mode
 // Dark mode: amber/gold (matches the overall dark theme warmth)
@@ -47,6 +48,7 @@ function BookingManagement({ employee }) {
   const [processingId, setProcessingId]   = useState(null);
   const [error, setError]                 = useState(null);
   const [confirmAction, setConfirmAction] = useState(null); // { type: 'checkin'|'checkout', booking }
+  const [payingBooking, setPayingBooking] = useState(null);
 
   // Filters
   const [searchQuery, setSearchQuery]     = useState('');
@@ -134,6 +136,20 @@ function BookingManagement({ employee }) {
     finally { setProcessingId(null); }
   };
 
+  // ── RECORD PAYMENT ───────────────────────────────
+  const handleRecordPayment = async ({ amount, payment_method, reference }) => {
+    const booking = payingBooking;
+    if (!booking) return;
+    const res = await authFetch(`/api/bookings/${booking._id}/payments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amount, payment_method, reference }),
+    });
+    if (!res.ok) throw new Error(await readError(res, 'Failed to record payment.'));
+    setPayingBooking(null);
+    await fetchBookings();   // refresh so balance/ledger update immediately
+  };
+
   // ── WALK-IN SAVE ─────────────────────────────────
   const handleWalkIn = async (formData) => {
     if (walkInLock.current) return;
@@ -142,7 +158,35 @@ function BookingManagement({ employee }) {
     setWalkInError('');
     try {
       const fmtAmt = (n) => parseFloat(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2 });
-      const hasPayment = parseFloat(formData.amount) > 0;
+      const total = parseFloat(formData.amount) || 0;
+      const now = new Date().toLocaleString('en-CA', { hour12: false }).replace(',', '');
+      const txns = [];
+      // The room cost is a CHARGE (what the guest owes).
+      if (total > 0) {
+        txns.push({
+          txn_id: `TXN-${Date.now()}`,
+          type: 'charge',
+          datetime: now,
+          description: `Room Charge (Rm ${formData.room})`,
+          amount: fmtAmt(total),
+          payment_method: 'Room Charge',
+          payment_details: 'Front Desk',
+          status: 'COMPLETED',
+        });
+      }
+      // Any amount collected at walk-in is a PAYMENT against that charge.
+      if (total > 0) {
+        txns.push({
+          txn_id: `TXN-${Date.now() + 1}`,
+          type: 'payment',
+          datetime: now,
+          description: 'Walk-in Payment',
+          amount: fmtAmt(total),
+          payment_method: formData.paymentMethod || 'Cash',
+          payment_details: 'Front Desk',
+          status: 'COMPLETED',
+        });
+      }
       const payload = {
         booking_id:  `BKG-${Date.now()}`,
         room_number:  formData.room,
@@ -150,20 +194,8 @@ function BookingManagement({ employee }) {
         status:       'Confirmed',
         dates: { check_in: formData.checkIn, check_out: formData.checkOut, nights: String(formData.nights) },
         guest: { guest_id: String(Date.now()), full_name: formData.guest, email: formData.email || '', phone: formData.phone || '' },
-        billing: {
-          expected_total: fmtAmt(formData.amount),
-          total_paid:     hasPayment ? fmtAmt(formData.amount) : '0.00',
-          balance_due:    hasPayment ? '0.00' : fmtAmt(formData.amount),
-        },
-        transactions: hasPayment ? [{
-          txn_id:         `TXN-${Date.now()}`,
-          datetime:       new Date().toLocaleString('en-CA', { hour12: false }).replace(',', ''),
-          description:    `Walk-in Room Charge (Rm ${formData.room})`,
-          amount:         fmtAmt(formData.amount),
-          payment_method: formData.paymentMethod || 'Cash',
-          payment_details:'Front Desk',
-          status:         'COMPLETED',
-        }] : [],
+        billing: { expected_total: fmtAmt(total), total_paid: '0.00', balance_due: fmtAmt(total) },
+        transactions: txns,
       };
       const res = await authFetch('/api/bookings', {
         method: 'POST',
@@ -353,6 +385,15 @@ function BookingManagement({ employee }) {
               {getStatusBadge(selectedBooking.status)}
             </div>
             <div style={{ display: 'flex', gap: '8px' }}>
+              {selectedBooking.balanceDue > 0 && selectedBooking.status !== 'Cancelled' && (
+                <button
+                  className="btn btn-sm"
+                  style={{ background: 'var(--gold, #c5a059)', color: '#fff', border: 'none', fontWeight: '700' }}
+                  onClick={() => setPayingBooking(selectedBooking)}
+                >
+                  Record Payment
+                </button>
+              )}
               {selectedBooking.status === 'Confirmed' && (
                 <button
                   className="btn btn-sm"
@@ -447,6 +488,20 @@ function BookingManagement({ employee }) {
       {showWalkIn && <WalkInModal onClose={() => { if (!walkInSaving) setShowWalkIn(false); }}
         onSave={handleWalkIn} accentColor={FD.accent} busy={walkInSaving} error={walkInError} />}
 
+      {/* ── RECORD PAYMENT ── */}
+      {payingBooking && (
+        <RecordPaymentModal
+          booking={{
+            _id: payingBooking._id,
+            guest: payingBooking.guest,
+            room: payingBooking.room,
+            balance: payingBooking.balanceDue,
+          }}
+          onSubmit={handleRecordPayment}
+          onClose={() => setPayingBooking(null)}
+        />
+      )}
+
       {/* ── CHECK-IN / CHECK-OUT CONFIRMATION ── */}
       {confirmAction && (
         <ConfirmModal
@@ -454,7 +509,20 @@ function BookingManagement({ employee }) {
           message={
             confirmAction.type === 'checkin'
               ? <>Check in <strong>{confirmAction.booking.guest}</strong> to Room <strong>{confirmAction.booking.room}</strong>?</>
-              : <>Check out <strong>{confirmAction.booking.guest}</strong> from Room <strong>{confirmAction.booking.room}</strong>?</>
+              : (() => {
+                  const bal = confirmAction.booking.balanceDue || 0;
+                  return (
+                    <>
+                      Check out <strong>{confirmAction.booking.guest}</strong> from Room <strong>{confirmAction.booking.room}</strong>?
+                      {bal > 0 && (
+                        <div style={{ marginTop: '12px', padding: '10px 14px', background: '#fef9c3', border: '1px solid #fde047', borderRadius: '8px', fontSize: '13px', color: '#854d0e' }}>
+                          ⚠️ <strong>Outstanding balance: ₱{Number(bal).toLocaleString()}</strong><br />
+                          <span style={{ fontWeight: 400 }}>The guest has an unsettled balance. You can still check them out, but consider collecting payment first.</span>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()
           }
           confirmLabel={confirmAction.type === 'checkin' ? 'Check In' : 'Check Out'}
           tone={confirmAction.type === 'checkin' ? 'primary' : 'danger'}

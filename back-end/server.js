@@ -156,6 +156,92 @@ const isAdminEmployee = (emp) =>
 
 
 // ─────────────────────────────────────────────
+// MONEY / BILLING HELPERS
+// The transaction ledger is the single source of truth. Every money route
+// mutates the ledger, then calls recomputeBilling() so expected_total,
+// total_paid and balance_due are always derived consistently.
+//
+// Each (non-voided) transaction is one of three kinds:
+//   charge  — what the guest owes (room charge, F&B, penalty). amount > 0.
+//   payment — money received (deposit, balance payment).       amount > 0.
+//   refund  — money returned to the guest.                      amount < 0.
+// We infer the kind from the transaction's fields so existing records (which
+// have no explicit type) still classify correctly.
+// ─────────────────────────────────────────────
+
+// Parse a money string like "12,500.00" (or "-2,100.00") into a Number.
+const money = (str) => parseFloat(String(str ?? '0').replace(/,/g, '')) || 0;
+
+// Format a Number back into the stored "12,500.00" string form.
+const moneyStr = (n) => Number(n || 0).toLocaleString('en-US', {
+  minimumFractionDigits: 2, maximumFractionDigits: 2,
+});
+
+// Classify a transaction as 'charge' | 'payment' | 'refund'.
+// Prefers an explicit t.type if present; otherwise infers from amount sign,
+// payment_method and description keywords.
+const classifyTxn = (t) => {
+  if (!t) return 'charge';
+  const explicit = String(t.type || '').toLowerCase();
+  if (explicit === 'charge' || explicit === 'payment' || explicit === 'refund') return explicit;
+
+  const amt = money(t.amount);
+  const desc = String(t.description || '').toLowerCase();
+  const method = String(t.payment_method || '').toLowerCase();
+
+  // Negative amounts are money leaving the till → refunds.
+  if (amt < 0 || desc.includes('refund')) return 'refund';
+
+  // Charges: things the guest owes. Penalties/fees and explicit "charge" lines.
+  if (method === 'penalty' || desc.includes('charge') || desc.includes('penalty') ||
+      desc.includes('fee') || desc.includes('minibar') || desc.includes('f&b') ||
+      desc.includes('room service') || desc.includes('laundry') || desc.includes('spa')) {
+    return 'charge';
+  }
+
+  // Everything else positive is treated as a payment (deposit / balance payment).
+  return 'payment';
+};
+
+// Recompute billing totals from the ledger (ignoring VOIDED transactions) and
+// write them back onto the booking object. Returns the same booking.
+//   expected_total = sum of charges
+//   total_paid     = sum of payments  − sum of |refunds|
+//   balance_due    = max(0, expected_total − total_paid)
+const recomputeBilling = (booking) => {
+  const txns = (booking.transactions || []).filter(
+    t => String(t.status || '').toUpperCase() !== 'VOIDED'
+  );
+
+  let charges = 0, payments = 0, refunds = 0;
+  for (const t of txns) {
+    const kind = classifyTxn(t);
+    const amt = Math.abs(money(t.amount));
+    if (kind === 'charge')       charges  += amt;
+    else if (kind === 'payment') payments += amt;
+    else if (kind === 'refund')  refunds  += amt;
+  }
+
+  // If the booking already carried an expected_total that isn't represented as
+  // charge transactions (e.g. legacy bookings whose room total was stored only
+  // in billing), keep the larger of the two so we never understate what's owed.
+  const storedExpected = money(booking.billing?.expected_total);
+  const expectedTotal = Math.max(charges, storedExpected);
+
+  const totalPaid = Math.max(0, payments - refunds);
+  const balanceDue = Math.max(0, expectedTotal - totalPaid);
+
+  booking.billing = {
+    ...(booking.billing || {}),
+    expected_total: moneyStr(expectedTotal),
+    total_paid: moneyStr(totalPaid),
+    balance_due: moneyStr(balanceDue),
+  };
+  return booking;
+};
+
+
+// ─────────────────────────────────────────────
 // AUTH
 // ─────────────────────────────────────────────
 
@@ -561,39 +647,30 @@ app.post('/api/bookings/:id/cancel', requireAuth, async (req, res) => {
     }
 
 
-    const fmtAmount = (n) =>
-      parseFloat(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-
-    const updateData = {
-      status: 'Cancelled',
-      cancellation: {
-        cancelled_by: cancelled_by || 'Staff',
-        cancelled_at: new Date().toLocaleString('en-CA', { hour12: false }).replace(',', ''),
-        reason: reason || 'Guest request',
-        penalty_applied: !!penalty_applied,
-        penalty_amount: penalty_applied ? fmtAmount(penalty_amount) : '0.00',
-      },
+    booking.status = 'Cancelled';
+    booking.cancellation = {
+      cancelled_by: cancelled_by || 'Staff',
+      cancelled_at: new Date().toLocaleString('en-CA', { hour12: false }).replace(',', ''),
+      reason: reason || 'Guest request',
+      penalty_applied: !!penalty_applied,
+      penalty_amount: penalty_applied ? moneyStr(money(penalty_amount)) : '0.00',
     };
 
-
- 
-    if (penalty_applied && parseFloat(penalty_amount) > 0) {
-      updateData.$push = {
-        transactions: {
-          txn_id: `TXN-${Date.now()}`,
-          datetime: new Date().toLocaleString('en-CA', { hour12: false }).replace(',', ''),
-          description: `Cancellation Penalty - ${reason || 'Guest request'}`,
-          amount: fmtAmount(penalty_amount),
-          payment_method: 'Penalty',
-          payment_details: `Cancelled by ${cancelled_by || 'Staff'}`,
-          status: 'COMPLETED',
-        },
-      };
+    // A cancellation penalty is a CHARGE the guest owes.
+    if (penalty_applied && money(penalty_amount) > 0) {
+      booking.transactions.push({
+        txn_id: `TXN-${Date.now()}`,
+        datetime: new Date().toLocaleString('en-CA', { hour12: false }).replace(',', ''),
+        description: `Cancellation Penalty - ${reason || 'Guest request'}`,
+        amount: moneyStr(money(penalty_amount)),
+        payment_method: 'Penalty',
+        payment_details: `Cancelled by ${cancelled_by || 'Staff'}`,
+        status: 'COMPLETED',
+      });
     }
 
-
-    const updated = await Booking.findByIdAndUpdate(req.params.id, updateData, { new: true });
+    recomputeBilling(booking);
+    const updated = await booking.save();
     res.json(updated);
   } catch (error) {
     console.error('Cancel booking error:', error);
@@ -607,9 +684,13 @@ app.post('/api/bookings/:id/cancel', requireAuth, async (req, res) => {
 app.post('/api/bookings', requireAuth, async (req, res) => {
   try {
     const booking = new Booking(req.body);
+    // Keep billing consistent with whatever transactions the booking was
+    // created with (deposit payments, room charges, etc.).
+    recomputeBilling(booking);
     const saved = await booking.save();
     res.status(201).json(saved);
   } catch (error) {
+    console.error('Create booking error:', error);
     res.status(500).json({ error: 'Failed to create booking' });
   }
 });
@@ -706,14 +787,15 @@ app.post('/api/bookings/:id/checkout', requireAuth, async (req, res) => {
 
 app.post('/api/bookings/:id/transactions', requireAuth, requireAdmin, async (req, res) => {
   try {
-    const updated = await Booking.findByIdAndUpdate(
-      req.params.id,
-      { $push: { transactions: req.body } },
-      { new: true }
-    );
-    if (!updated) return res.status(404).json({ error: 'Booking not found' });
-    res.status(201).json(updated);
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) return res.status(404).json({ error: 'Booking not found' });
+
+    booking.transactions.push(req.body);
+    recomputeBilling(booking);           // keep billing in sync with the ledger
+    const saved = await booking.save();
+    res.status(201).json(saved);
   } catch (error) {
+    console.error('Add transaction error:', error);
     res.status(500).json({ error: 'Failed to add transaction' });
   }
 });
@@ -721,15 +803,110 @@ app.post('/api/bookings/:id/transactions', requireAuth, requireAdmin, async (req
 
 app.patch('/api/bookings/:id/transactions/:txnId/void', requireAuth, requireAdmin, async (req, res) => {
   try {
-    const updated = await Booking.findOneAndUpdate(
-      { _id: req.params.id, 'transactions.txn_id': req.params.txnId },
-      { $set: { 'transactions.$.status': 'VOIDED' } },
-      { new: true }
-    );
-    if (!updated) return res.status(404).json({ error: 'Booking or transaction not found' });
-    res.json(updated);
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) return res.status(404).json({ error: 'Booking or transaction not found' });
+
+    const txn = (booking.transactions || []).find(t => t.txn_id === req.params.txnId);
+    if (!txn) return res.status(404).json({ error: 'Booking or transaction not found' });
+
+    txn.status = 'VOIDED';
+    recomputeBilling(booking);           // voiding a payment reopens the balance, etc.
+    const saved = await booking.save();
+    res.json(saved);
   } catch (error) {
+    console.error('Void transaction error:', error);
     res.status(500).json({ error: 'Failed to void transaction' });
+  }
+});
+
+
+// ─────────────────────────────────────────────
+// RECORD A PAYMENT against a booking's balance (staff-level).
+// Adds a PAYMENT transaction and recomputes billing so the balance drops.
+// ─────────────────────────────────────────────
+app.post('/api/bookings/:id/payments', requireAuth, async (req, res) => {
+  try {
+    if (!isValidObjectId(req.params.id)) {
+      return res.status(400).json({ error: 'Invalid booking id' });
+    }
+    const amountNum = money(req.body?.amount);
+    if (!(amountNum > 0)) {
+      return res.status(400).json({ error: 'Payment amount must be greater than zero.' });
+    }
+
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) return res.status(404).json({ error: 'Booking not found' });
+
+    const currentBalance = money(booking.billing?.balance_due);
+    if (amountNum > currentBalance + 0.005) {
+      return res.status(400).json({
+        error: `Payment (₱${moneyStr(amountNum)}) exceeds the outstanding balance (₱${moneyStr(currentBalance)}).`,
+      });
+    }
+
+    booking.transactions.push({
+      txn_id: `TXN-${Date.now()}`,
+      type: 'payment',
+      datetime: new Date().toLocaleString('en-CA', { hour12: false }).replace(',', ''),
+      description: 'Payment received',
+      amount: moneyStr(amountNum),
+      payment_method: String(req.body?.payment_method || 'Cash'),
+      payment_details: req.body?.reference ? String(req.body.reference) : 'Front Desk',
+      status: 'COMPLETED',
+    });
+
+    recomputeBilling(booking);
+    const saved = await booking.save();
+    res.status(201).json(saved);
+  } catch (error) {
+    console.error('Record payment error:', error);
+    res.status(500).json({ error: 'Failed to record payment', detail: error.message });
+  }
+});
+
+
+// ─────────────────────────────────────────────
+// ISSUE A REFUND against a booking (admin-level).
+// Adds a REFUND transaction (money out), capped at what has been paid, and
+// recomputes billing so the balance rises by the refunded amount.
+// ─────────────────────────────────────────────
+app.post('/api/bookings/:id/refunds', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    if (!isValidObjectId(req.params.id)) {
+      return res.status(400).json({ error: 'Invalid booking id' });
+    }
+    const amountNum = money(req.body?.amount);
+    if (!(amountNum > 0)) {
+      return res.status(400).json({ error: 'Refund amount must be greater than zero.' });
+    }
+
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) return res.status(404).json({ error: 'Booking not found' });
+
+    const totalPaid = money(booking.billing?.total_paid);
+    if (amountNum > totalPaid + 0.005) {
+      return res.status(400).json({
+        error: `Refund (₱${moneyStr(amountNum)}) exceeds the amount paid (₱${moneyStr(totalPaid)}).`,
+      });
+    }
+
+    booking.transactions.push({
+      txn_id: `TXN-${Date.now()}`,
+      type: 'refund',
+      datetime: new Date().toLocaleString('en-CA', { hour12: false }).replace(',', ''),
+      description: `Refund - ${req.body?.reason || 'Guest request'}`,
+      amount: `-${moneyStr(amountNum)}`,   // negative = money out
+      payment_method: String(req.body?.payment_method || 'Cash'),
+      payment_details: req.body?.reference ? String(req.body.reference) : 'Front Desk',
+      status: 'COMPLETED',
+    });
+
+    recomputeBilling(booking);
+    const saved = await booking.save();
+    res.status(201).json(saved);
+  } catch (error) {
+    console.error('Issue refund error:', error);
+    res.status(500).json({ error: 'Failed to issue refund', detail: error.message });
   }
 });
 
@@ -760,6 +937,7 @@ app.get('/api/transactions', async (req, res) => {
           _id: 0,
           booking_object_id: '$_id',
           txn_id:          '$transactions.txn_id',
+          type:            '$transactions.type',
           datetime:        '$transactions.datetime',
           description:     '$transactions.description',
           amount:          '$transactions.amount',
@@ -773,24 +951,29 @@ app.get('/api/transactions', async (req, res) => {
       }
     ]);
 
+    // Only COMPLETED transactions count toward money in/out; VOIDED are ignored.
+    const completed = result.filter(t => String(t.status || '').toUpperCase() === 'COMPLETED');
 
-    const parse = (str) => parseFloat((str || '0').replace(/,/g, '')) || 0;
+    // Income = money actually received (payments). Charges are what's owed, not
+    // cash in hand, so they don't count as income here.
+    const totalIncome = completed
+      .filter(t => classifyTxn(t) === 'payment')
+      .reduce((sum, t) => sum + Math.abs(money(t.amount)), 0);
 
+    // Money out = refunds returned to guests.
+    const totalExpenses = completed
+      .filter(t => classifyTxn(t) === 'refund')
+      .reduce((sum, t) => sum + Math.abs(money(t.amount)), 0);
 
-    const totalIncome = result
-      .filter(t => t.status === 'COMPLETED' && parse(t.amount) > 0)
-      .reduce((sum, t) => sum + parse(t.amount), 0);
-
-
-    const totalExpenses = result
-      .filter(t => t.status === 'COMPLETED' && parse(t.amount) < 0)
-      .reduce((sum, t) => sum + Math.abs(parse(t.amount)), 0);
-
-
-    const outstanding = result
-      .filter(t => t.status === 'PENDING')
-      .reduce((sum, t) => sum + parse(t.amount), 0);
-
+    // Outstanding = the sum of every booking's current balance due (live figure),
+    // independent of the selected period.
+    const activeBookings = await Booking.find(
+      { status: { $nin: ['Cancelled'] } },
+      { 'billing.balance_due': 1 }
+    );
+    const outstanding = activeBookings.reduce(
+      (sum, b) => sum + money(b.billing?.balance_due), 0
+    );
 
     res.json({
       transactions: result,
@@ -802,6 +985,7 @@ app.get('/api/transactions', async (req, res) => {
       }
     });
   } catch (error) {
+    console.error('Fetch transactions error:', error);
     res.status(500).json({ error: 'Failed to fetch transactions' });
   }
 });
