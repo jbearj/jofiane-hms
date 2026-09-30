@@ -6,6 +6,7 @@ import employee1 from '../../../assets/employee1.jpeg';
 import { usePolling } from '../../../hooks/usePolling';
 import { authFetch, readError, validatePassword, PASSWORD_RULE_TEXT } from '../../../utils/api';
 import { exportToCSV } from '../../../utils/exportUtils';
+import { todayISO } from '../../../utils/dateUtils';
 
 let cachedStaffList = null;
 
@@ -34,7 +35,7 @@ function StaffList() {
     // Only show the full-page skeleton on the very first load if no cache exists.
     if (!hasLoadedOnce.current && !cachedStaffList) setIsLoading(true);
     try {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = todayISO();
 
       // Fetch employees and today's shift assignments in parallel
       const [empRes, shiftsRes, assignRes] = await Promise.all([

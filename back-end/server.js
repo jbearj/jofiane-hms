@@ -1189,9 +1189,11 @@ app.get('/api/shift-assignments', async (req, res) => {
   try {
     const filter = {};
     if (req.query.startDate && req.query.endDate) {
+      const startStr = String(req.query.startDate).slice(0, 10);
+      const endStr   = String(req.query.endDate).slice(0, 10);
       filter.shift_date = {
-        $gte: new Date(req.query.startDate),
-        $lte: new Date(req.query.endDate),
+        $gte: new Date(`${startStr}T00:00:00.000Z`),
+        $lte: new Date(`${endStr}T23:59:59.999Z`),
       };
     }
     const assignments = await ShiftAssignment.find(filter).sort({ shift_date: 1 });
@@ -1207,14 +1209,15 @@ app.get('/api/shift-assignments', async (req, res) => {
 app.patch('/api/shift-assignments/upsert', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { employee_id, shift_date, shift_id, status } = req.body;
-    const dateObj = new Date(shift_date);
+    const dateStr = typeof shift_date === 'string' ? shift_date.slice(0, 10) : new Date(shift_date).toISOString().slice(0, 10);
+    const dateObj = new Date(`${dateStr}T00:00:00.000Z`);
 
 
     const existing = await ShiftAssignment.findOne({
       employee_id,
       shift_date: {
-        $gte: new Date(dateObj.toISOString().slice(0, 10)),
-        $lt:  new Date(new Date(dateObj.getTime() + 86400000).toISOString().slice(0, 10)),
+        $gte: dateObj,
+        $lt:  new Date(dateObj.getTime() + 86400000),
       },
     });
 

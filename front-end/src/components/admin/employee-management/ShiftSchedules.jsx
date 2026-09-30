@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { authFetch } from '../../../utils/api';
 import { PageSkeleton } from '../../common/SkeletonLoader';
 import { exportToCSV } from '../../../utils/exportUtils';
+import { toLocalISODate } from '../../../utils/dateUtils';
 
 const SHIFT_TYPES = [
   { id: 'morning',   label: 'Morning',   time: '6am–2pm',   color: '#fef3c7', textColor: '#92400e', dot: '#f59e0b' },
@@ -35,6 +36,7 @@ function ShiftSchedules() {
 
   const getWeekDates = () => {
     const today = new Date();
+    today.setHours(0, 0, 0, 0);
     const dayOfWeek = today.getDay();
     const monday = new Date(today);
     monday.setDate(today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1) + weekOffset * 7);
@@ -84,8 +86,8 @@ function ShiftSchedules() {
   const fetchSchedule = async () => {
     (employees.length || cachedShiftSchedule) ? setIsNavigating(true) : setIsLoading(true);
     try {
-      const startDate = weekDates[0].toISOString().slice(0, 10);
-      const endDate   = weekDates[6].toISOString().slice(0, 10);
+      const startDate = toLocalISODate(weekDates[0]);
+      const endDate   = toLocalISODate(weekDates[6]);
 
       const [empRes, shiftsRes, assignRes] = await Promise.all([
         authFetch('/api/employees'),
@@ -112,8 +114,8 @@ function ShiftSchedules() {
       const newAssignIds   = {};
 
       assignData.forEach(a => {
-        const assignDate = new Date(a.shift_date);
-        const dayIdx = weekDates.findIndex(d => d.toDateString() === assignDate.toDateString());
+        const assignDateStr = String(a.shift_date).slice(0, 10);
+        const dayIdx = weekDates.findIndex(d => toLocalISODate(d) === assignDateStr);
         if (dayIdx === -1) return;
         const key = `${a.employee_id}-${dayIdx}`;
         newSchedule[key]  = dbShiftToType(a.shift_id, shiftsData) || 'morning';
@@ -142,7 +144,7 @@ function ShiftSchedules() {
   const assignShift = async (empId, dayIdx, shiftTypeId) => {
     const key         = `${empId}-${dayIdx}`;
     const targetDate  = weekDates[dayIdx];
-    const dateStr     = targetDate.toISOString().slice(0, 10);
+    const dateStr     = toLocalISODate(targetDate);
 
     // Optimistic UI update
     setSchedule(prev => ({ ...prev, [key]: shiftTypeId }));
@@ -225,8 +227,8 @@ function ShiftSchedules() {
       })),
     ];
 
-    const startStr = weekDates[0].toISOString().slice(0, 10);
-    const endStr = weekDates[6].toISOString().slice(0, 10);
+    const startStr = toLocalISODate(weekDates[0]);
+    const endStr = toLocalISODate(weekDates[6]);
     exportToCSV(filteredEmployees, columns, `jofiane-shifts-${startStr}_to_${endStr}`);
   };
 
