@@ -104,6 +104,7 @@ function Sidebar({ employeeRole, employee, isHousekeepingLead = false, isCollaps
     e.preventDefault();
 
     // DITO KA MAGLALAGAY NG CHECKING (e.g. sample hardcoded PIN "1234" or API Call sa backend)
+    // TODO: Replace this hardcoded PIN with a backend API call (e.g. POST /api/auth/verify-pin)
     const CORRECT_ADMIN_PIN = "1234"; 
 
     if (adminPin === CORRECT_ADMIN_PIN) {
@@ -229,25 +230,17 @@ function Sidebar({ employeeRole, employee, isHousekeepingLead = false, isCollaps
   ];
 
   const visibleMenuItems = menuItems.filter((item) => {
-
-    if (employeeRole === 'frontdesk') {
-      return [
-        'dashboard',
-        'frontdesk',
-        'reservations',
-        'rooms',
-        'finance'
-      ].includes(item.id);
-    }
-
     if (employeeRole === 'housekeeping') {
-      return [
-        'dashboard',
-        'housekeeping'
-      ].includes(item.id);
+      return ['dashboard', 'housekeeping'].includes(item.id);
     }
-
-    return false;
+    // frontdesk, null (admin preview), or any other role → show frontdesk items
+    return [
+      'dashboard',
+      'frontdesk',
+      'reservations',
+      'rooms',
+      'finance'
+    ].includes(item.id);
   })
   // Restrict housekeeping sub-items for non-lead (Cleaner) staff
   .map((item) => {

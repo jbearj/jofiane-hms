@@ -17,6 +17,7 @@ test('shows skeletons while loading and one initial request, then an accurate al
   expect(screen.queryByRole('button', { name: 'BKG-200' })).not.toBeInTheDocument();
   expect(screen.getByText('₱7,800.00')).toBeInTheDocument();
   expect(authFetch).toHaveBeenCalledTimes(1);
+  expect(screen.queryByRole('button', { name: 'Clear filters' })).not.toBeInTheDocument();
 });
 
 test('filters reservations by date scope, trimmed search, room and status', async () => {

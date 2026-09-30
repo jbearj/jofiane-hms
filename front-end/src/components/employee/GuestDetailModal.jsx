@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import PortalModal from '../common/PortalModal';
+import { CardsSkeleton } from '../common/SkeletonLoader';
 import { API_BASE } from '../../utils/api';
 
 /**
@@ -68,7 +69,7 @@ export default function GuestDetailModal({ booking, title = 'Guest Details', onC
   ];
 
   return (
-    <PortalModal maxWidth={480}>
+    <PortalModal maxWidth={480} title={title} onClose={onClose}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
         <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: 'var(--text-primary, #111827)' }}>{title}</h3>
@@ -109,7 +110,7 @@ export default function GuestDetailModal({ booking, title = 'Guest Details', onC
         <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted, #9ca3af)', marginBottom: '10px' }}>Folio</div>
 
         {txnState === 'loading' && (
-          <div style={{ fontSize: '13px', color: 'var(--text-muted, #6b7280)', padding: '8px 0' }}>Loading transactions…</div>
+          <CardsSkeleton cards={1} label="Loading guest transactions" />
         )}
 
         {txnState === 'error' && (

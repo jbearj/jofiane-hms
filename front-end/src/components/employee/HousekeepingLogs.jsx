@@ -107,7 +107,7 @@ function HousekeepingLogs() {
   const dndCount         = logs.filter((log) => log.category === 'DND').length;
 
   return (
-    <main className="main-content employee-content">
+    <div className="employee-module housekeeping-logs-module">
       <section className="admin-tab-content active housekeeping-module">
 
         <div className="employee-dashboard-header" style={{ marginBottom: '28px' }}>
@@ -239,7 +239,7 @@ function HousekeepingLogs() {
         )}
 
       </section>
-    </main>
+    </div>
   );
 }
 

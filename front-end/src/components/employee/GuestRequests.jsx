@@ -123,7 +123,7 @@ function GuestRequests({ isLead = false, employee = null }) {
   const completedCount  = visibleRequests.filter(r => r.status === 'COMPLETED').length;
 
   return (
-    <main className="main-content employee-content">
+    <div className="employee-module guest-requests-module">
       <section className="admin-tab-content active housekeeping-module">
 
         <div className="employee-dashboard-header" style={{ marginBottom: '28px' }}>
@@ -267,7 +267,7 @@ function GuestRequests({ isLead = false, employee = null }) {
         )}
 
       </section>
-    </main>
+    </div>
   );
 }
 

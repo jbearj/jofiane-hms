@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { usePolling } from '../../hooks/usePolling';
 import { API_BASE } from '../../utils/api';
+import { PageSkeleton } from '../common/SkeletonLoader';
 
 function HousekeepingDashboard({ employee, setActiveTab, isLead = false }) {
   const [todayDate] = useState(
@@ -65,6 +66,8 @@ function HousekeepingDashboard({ employee, setActiveTab, isLead = false }) {
     if (l.includes('progress')) return 'In Progress';
     return 'Dirty';
   };
+
+  if (isLoading) return <main className="main-content employee-content"><PageSkeleton variant="cards" label="Loading housekeeping overview" /></main>;
 
   const dirtyRooms      = rooms.filter(r => r.status === 'Dirty').length;
   const inProgressRooms = rooms.filter(r => r.status === 'In Progress').length;

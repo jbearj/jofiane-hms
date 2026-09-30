@@ -199,22 +199,22 @@ function App() {
   };
 
   const renderWorkspace = () => {
-  // Keep mounted when AFK so drafts and the selected module survive a break.
-  if (viewMode === 'employee') {
-    return (
-      <div className="employee-view">
-        {canViewAdmin && <button 
-          onClick={() => setViewMode('admin')} 
-          className="portal-mode-switch"
-        >
-          ← Switch to Admin View
-        </button>}
-        <EmployeePortal employeeRole={employeeRole} employee={loggedInEmployee} onLogout={() => handleLogout(false)} suspended={screen !== 'portal'} />
-      </div>
-    );
-  }
+    // Keep mounted when AFK so drafts and the selected module survive a break.
+    if (viewMode === 'employee') {
+      return (
+        <div className="employee-view">
+          {canViewAdmin && <button
+            onClick={() => setViewMode('admin')}
+            className="portal-mode-switch"
+          >
+            ← Switch to Admin View
+          </button>}
+          <EmployeePortal employeeRole={employeeRole || 'frontdesk'} employee={loggedInEmployee} onLogout={() => handleLogout(false)} suspended={screen !== 'portal'} />
+        </div>
+      );
+    }
 
-  // Render Admin Console view by default
+    // Render Admin Console view by default
   return (
     <div className={`portal-shell employee-portal-shell admin-portal-shell admin-view ${isCollapsed ? 'nav-collapsed' : ''} ${isAdminDarkMode ? 'theme-dark' : 'theme-light'}`}>
       <button 

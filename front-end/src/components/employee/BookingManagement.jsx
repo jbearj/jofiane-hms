@@ -253,7 +253,7 @@ function BookingManagement({ employee }) {
         </div>
         <label><span>Check-in from</span><Input type="date" aria-label="Check-in from" value={dateFrom} onChange={e => setDateFrom(e.target.value)} /></label>
         <label><span>Check-in to</span><Input type="date" aria-label="Check-in to" value={dateTo} min={dateFrom || undefined} onChange={e => setDateTo(e.target.value)} /></label>
-        {(searchQuery || filterStatus !== 'all' || dateFrom || dateTo) &&
+        {(searchQuery || filterStatus !== 'all' || ((dateFrom || dateTo) && (dateFrom !== todayISO() || dateTo !== todayISO()))) &&
           <button className="btn reservation-reset" onClick={() => { setSearchQuery(''); setFilterStatus('all'); setDateFrom(''); setDateTo(''); }}>Clear filters</button>}
       </div>
       {error && !isLoading && <LoadingError message={bookings.length ? 'Refresh failed. The last loaded reservations are shown below.' : error} onRetry={() => fetchBookings()} />}

@@ -116,7 +116,7 @@ function LostAndFound() {
   const unclaimedCount = items.filter(i => i.status === 'UNCLAIMED').length;
 
   return (
-    <main className="main-content employee-content">
+    <div className="employee-module lost-found-module">
       <section className="admin-tab-content active housekeeping-module">
 
         <div className="employee-dashboard-header" style={{ marginBottom: '28px' }}>
@@ -233,7 +233,7 @@ function LostAndFound() {
         )}
 
       </section>
-    </main>
+    </div>
   );
 }
 

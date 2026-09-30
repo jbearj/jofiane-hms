@@ -220,12 +220,16 @@ function EmployeePortal({employeeRole, employee, onLogout, suspended = false}) {
     
     case 'guest-requests':
       return (
-        <GuestRequests isLead={isHousekeepingLead} employee={employeeProfile} />
+        <main className="main-content employee-content">
+          <GuestRequests isLead={isHousekeepingLead} employee={employeeProfile} />
+        </main>
       );
 
     case 'lost-found':
       return (
-        <LostAndFound />
+        <main className="main-content employee-content">
+          <LostAndFound />
+        </main>
       );
 
 
@@ -238,7 +242,9 @@ function EmployeePortal({employeeRole, employee, onLogout, suspended = false}) {
 
     case 'housekeeping-logs':
       return (
-        <HousekeepingLogs />
+        <main className="main-content employee-content">
+          <HousekeepingLogs />
+        </main>
       );
 
     case 'settings':

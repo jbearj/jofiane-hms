@@ -2,6 +2,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { API_BASE, authFetch } from '../../utils/api';
 import GuestDetailModal from './GuestDetailModal';
 import PortalModal from '../common/PortalModal';
+import { PageSkeleton } from '../common/SkeletonLoader';
 import { Input, Select } from '../common/FormControls';
 
 // Normalise housekeeping string from DB → RoomRack pill class
@@ -203,9 +204,7 @@ function RoomRack() {
   if (isLoading) {
     return (
       <section className="admin-tab-content active employee-module roomrack-module">
-        <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-muted)' }}>
-          Loading Room Rack...
-        </div>
+        <PageSkeleton variant="cards" label="Loading room rack" />
       </section>
     );
   }

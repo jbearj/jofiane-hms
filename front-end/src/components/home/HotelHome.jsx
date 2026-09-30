@@ -8,6 +8,8 @@ const roomCollection = [
   { name: 'Garden Room', note: 'Room to slow down.', amenities: 'King-size bed · Smart TV', variant: 'garden' },
   { name: 'Veranda Suite', note: 'A little more room to unwind.', amenities: 'Private balcony · Wi-Fi · Mini bar', variant: 'veranda' },
   { name: 'Amber Loft', note: 'Your own quiet corner.', amenities: 'Private balcony · Smart TV', variant: 'amber' },
+  { name: 'Ivory Suite', note: 'Light, space, and calm.', amenities: 'Sofa lounge · Wi-Fi · Smart TV · Mini bar', variant: 'ivory' },
+  { name: 'Cedar Retreat', note: 'Warm tones, restful nights.', amenities: 'King-size bed · Rain shower · Smart TV', variant: 'cedar' },
 ];
 
 function Arrow({ direction = 'right' }) {
@@ -35,13 +37,27 @@ export default function HotelHome({ isLoggedIn, expired, onReturn }) {
   const menuTrigger = useRef(null);
   const menuDestination = useRef(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  // Always start with animation running; user can pause via the motion control.
   const [motionPaused, setMotionPaused] = useState(false);
+  const [pageHidden, setPageHidden] = useState(document.hidden);
   const [activeSection, setActiveSection] = useState('hotel-hero');
+
+  useEffect(() => {
+    const preference = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+    const syncPreference = (event) => setMotionPaused(event.matches);
+    const syncVisibility = () => setPageHidden(document.hidden);
+    preference?.addEventListener?.('change', syncPreference);
+    document.addEventListener('visibilitychange', syncVisibility);
+    return () => {
+      preference?.removeEventListener?.('change', syncPreference);
+      document.removeEventListener('visibilitychange', syncVisibility);
+    };
+  }, []);
 
   const explore = (event, id) => {
     event.preventDefault();
     setMenuOpen(false);
-    const reduced = motionPaused || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    const reduced = motionPaused;
     const section = document.getElementById(id);
     if (menuOpen) menuDestination.current = section?.querySelector('h1,h2');
     section?.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' });
@@ -74,32 +90,35 @@ export default function HotelHome({ isLoggedIn, expired, onReturn }) {
 
   useEffect(() => {
     const surface = page.current;
-    const preference = window.matchMedia?.('(prefers-reduced-motion: reduce)');
     let frame = 0;
     const update = () => {
       frame = 0;
       const scroll = window.scrollY;
       const distance = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
       surface?.style.setProperty('--hotel-progress', String(Math.min(1, scroll / distance)));
-      surface?.style.setProperty('--hotel-parallax', `${motionPaused || preference?.matches ? 0 : Math.min(scroll * .28, 260)}px`);
+      // Leave the camera at its current position while paused, rather than jumping.
+      if (!motionPaused && !pageHidden) surface?.style.setProperty('--hotel-parallax', `${Math.min(scroll * .2, 180)}px`);
     };
     const schedule = () => { if (!frame) frame = requestAnimationFrame(update); };
     update();
     window.addEventListener('scroll', schedule, { passive: true });
     window.addEventListener('resize', schedule);
-    preference?.addEventListener?.('change', schedule);
     return () => {
       cancelAnimationFrame(frame);
       window.removeEventListener('scroll', schedule);
       window.removeEventListener('resize', schedule);
-      preference?.removeEventListener?.('change', schedule);
     };
-  }, [motionPaused]);
+  }, [motionPaused, pageHidden]);
 
   useEffect(() => {
+    document.documentElement.classList.add('hotel-home-active');
+    document.body.classList.add('hotel-home-active');
     document.title = 'Jo Fiane Hotel · A quieter kind of luxury';
     title.current?.focus({ preventScroll: true });
-    if (typeof IntersectionObserver === 'undefined') return undefined;
+    if (typeof IntersectionObserver === 'undefined') return () => {
+      document.documentElement.classList.remove('hotel-home-active');
+      document.body.classList.remove('hotel-home-active');
+    };
     const observer = new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
         if (entry.isIntersecting) {
@@ -114,16 +133,21 @@ export default function HotelHome({ isLoggedIn, expired, onReturn }) {
       entries.forEach((entry) => { if (entry.isIntersecting) setActiveSection(entry.target.id); });
     }, { rootMargin: '-20% 0px -55% 0px', threshold: 0 });
     page.current?.querySelectorAll('section[id]').forEach((section) => sections.observe(section));
-    return () => { observer.disconnect(); sections.disconnect(); };
+    return () => {
+      document.documentElement.classList.remove('hotel-home-active');
+      document.body.classList.remove('hotel-home-active');
+      observer.disconnect();
+      sections.disconnect();
+    };
   }, []);
 
   const moveRooms = (direction) => {
-    const reducedMotion = motionPaused || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    const reducedMotion = motionPaused;
     rail.current?.scrollBy({ left: direction * (rail.current.clientWidth * 0.72), behavior: reducedMotion ? 'auto' : 'smooth' });
   };
 
   return (
-    <div className={`hotel-home${motionPaused ? ' hotel-motion-paused' : ''}`} ref={page}>
+    <div className={`hotel-home${motionPaused ? ' hotel-motion-paused' : ''}`} data-motion={motionPaused || pageHidden ? 'paused' : 'running'} ref={page}>
       <div className="hotel-reading-progress" aria-hidden="true" />
       <a className="hotel-skip-link" href="#hotel-introduction" onClick={(event) => explore(event, 'hotel-introduction')}>Skip to hotel information</a>
       <header className="hotel-header">
@@ -141,7 +165,7 @@ export default function HotelHome({ isLoggedIn, expired, onReturn }) {
         <span className="hotel-menu-watermark" aria-hidden="true">Jo Fiane.</span>
       </div>}
 
-      <button type="button" className="hotel-motion-control" aria-pressed={motionPaused} onClick={() => setMotionPaused((paused) => !paused)}>{motionPaused ? 'Play motion' : 'Pause motion'} <span aria-hidden="true">{motionPaused ? '▷' : 'Ⅱ'}</span></button>
+      <button type="button" className="hotel-motion-control" aria-pressed={motionPaused} onClick={() => setMotionPaused((paused) => !paused)}><span className="hotel-motion-indicator" aria-hidden="true"><i /><i /><i /></span>{motionPaused ? 'Play motion' : 'Pause motion'} <span aria-hidden="true">{motionPaused ? '▷' : 'Ⅱ'}</span></button>
 
       {expired && (
         <div className="hotel-session-notice" role="alert">
@@ -153,11 +177,9 @@ export default function HotelHome({ isLoggedIn, expired, onReturn }) {
 
       <main>
         <section className="hotel-hero" id="hotel-hero" aria-labelledby="hotel-heading">
-          <div className="hotel-hero-image" style={{ backgroundImage: `url(${retreatImage})` }} />
+          <div className="hotel-hero-camera" aria-hidden="true"><div className="hotel-hero-image" style={{ backgroundImage: `url(${retreatImage})` }} /></div>
           <div className="hotel-hero-shade" />
           <div className="hotel-light-orbit" aria-hidden="true" />
-          <div className="hotel-architecture" aria-hidden="true"><i /><i /><i /><span>THE ART OF A THOUGHTFUL STAY</span></div>
-          <div className="hotel-orbit-seal" aria-hidden="true"><svg viewBox="0 0 120 120"><defs><path id="hotel-seal-path" d="M60,60m-44,0a44,44 0 1,1 88,0a44,44 0 1,1 -88,0" /></defs><text><textPath href="#hotel-seal-path">JO FIANE HOTEL · ARRIVE. EXHALE. STAY. · </textPath></text></svg><span>J.</span></div>
           <div className="hotel-hero-copy">
             <p className="hotel-eyebrow"><span /> WELCOME TO JO FIANE HOTEL</p>
             <h1 id="hotel-heading" tabIndex="-1" ref={title}><span className="hotel-title-line"><span>A quieter kind</span></span><span className="hotel-title-line"><span>of <em>luxury.</em></span></span></h1>
@@ -166,7 +188,31 @@ export default function HotelHome({ isLoggedIn, expired, onReturn }) {
           </div>
           <div className="hotel-hero-bottom">
             <span className="hotel-scroll-cue"><span /> SCROLL TO DISCOVER</span>
-            <div className="hotel-welcome-note"><span className="hotel-welcome-mark">J.</span><p>A warm welcome.<br /><strong>A memorable stay.</strong></p><span className="hotel-note-line" /></div>
+            <div className="hotel-welcome-note" aria-label="Jo Fiane Hotel — at a glance">
+              <div className="hotel-welcome-signature">
+                <span className="hotel-welcome-mark">J.</span>
+                <span className="hotel-welcome-sig-line" aria-hidden="true" />
+              </div>
+              <div className="hotel-welcome-body">
+                <p className="hotel-welcome-tagline">A warm welcome.<br /><strong>A memorable stay.</strong></p>
+                <div className="hotel-welcome-stats" aria-label="Hotel highlights">
+                  <div className="hotel-welcome-stat">
+                    <span className="hotel-stat-value">5</span>
+                    <span className="hotel-stat-label">Room types</span>
+                  </div>
+                  <div className="hotel-welcome-stat-divider" aria-hidden="true" />
+                  <div className="hotel-welcome-stat">
+                    <span className="hotel-stat-value">24/7</span>
+                    <span className="hotel-stat-label">Front desk</span>
+                  </div>
+                  <div className="hotel-welcome-stat-divider" aria-hidden="true" />
+                  <div className="hotel-welcome-stat">
+                    <span className="hotel-stat-value hotel-stat-available"><span className="hotel-stat-dot" aria-hidden="true" />Now open</span>
+                    <span className="hotel-stat-label">Availability</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </section>
 

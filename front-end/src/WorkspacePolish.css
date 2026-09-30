@@ -84,10 +84,12 @@
 .segmented-control button[aria-pressed='true'] { background:#d1b363; color:#30230e; box-shadow:inset 0 0 0 1px #b39344; }
 .reservation-toolbar .reservation-reset { align-self:flex-start; margin-top:23px; min-height:46px; }
 .portal-shell.employee-portal-shell .reservation-panel { padding:0 !important; overflow:hidden; }
+.portal-shell.employee-portal-shell .txn-panel { padding:0 !important; overflow:hidden; }
 .portal-shell.employee-portal-shell :is(.reservation-panel,.txn-panel) .panel-header { padding:22px 24px !important; margin:0; }
 .record-count { display:inline-flex; justify-content:center; min-width:26px; margin-left:8px; padding:3px 8px; border-radius:7px; font-size:11px; font-weight:650; background:#c9a84c1c; color:var(--text-secondary); vertical-align:middle; }
 .portal-shell.employee-portal-shell .ledger-table-scroll { padding:0; max-width:100%; overflow:auto; overscroll-behavior-x:contain; scrollbar-color:#aa936c66 transparent; }
 .portal-shell.employee-portal-shell .reservation-table { min-width:1160px; border-collapse:collapse; }
+.reservation-table :is(td:nth-child(1),td:nth-child(3),td:nth-child(4),td:nth-child(5),td:nth-child(8),td:nth-child(9)) { white-space:nowrap; }
 .portal-shell.employee-portal-shell .txn-table { min-width:1120px; }
 .portal-shell.employee-portal-shell :is(.reservation-table,.txn-table) th { text-align:left !important; color:var(--text-secondary) !important; background:#bfa35518 !important; font-size:10px; font-weight:700; letter-spacing:.055em; padding:15px 18px !important; white-space:nowrap; border-right:0 !important; }
 .portal-shell.employee-portal-shell :is(.reservation-table,.txn-table) td { text-align:left; padding:19px 18px !important; border-right:0 !important; border-bottom:1px solid var(--border-light); font-size:13px; line-height:1.5; }
@@ -133,6 +135,7 @@
 .dialog-actions .btn { min-height:44px; padding:10px 20px; border-radius:9px; }
 .portal-theme .finance-modal .modal-close { display:grid; place-items:center; width:36px; height:36px; top:18px; right:18px; font-size:26px; border-radius:9px; color:var(--text-secondary) !important; }
 .portal-theme .finance-modal .modal-close:hover { background:#9b82621a; }
+.portal-theme:is(.theme-dark,.theme-light) .modal-content .modal-close { color:var(--text-secondary) !important; }
 .portal-theme .finance-danger { background:#b62e2e !important; border-color:#b62e2e !important; color:#fff !important; }
 .refund-summary { padding:17px 18px; border:1px solid var(--border-light); border-radius:12px; margin:0 0 24px; background:var(--bg-input); }
 .refund-summary > div { display:flex; justify-content:space-between; gap:16px; margin:6px 0; font-size:13px; }
