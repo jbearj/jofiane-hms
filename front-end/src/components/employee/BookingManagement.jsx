@@ -8,6 +8,7 @@ import { authFetch, readError } from '../../utils/api';
 import { todayISO } from '../../utils/dateUtils';
 import ConfirmModal from '../common/ConfirmModal';
 import RecordPaymentModal from './RecordPaymentModal';
+import { exportToCSV } from '../../utils/exportUtils';
 
 // ─── Accent colour adapts to dark/light mode
 // Dark mode: amber/gold (matches the overall dark theme warmth)
@@ -109,6 +110,25 @@ function BookingManagement({ employee }) {
     if (dateTo)   r = r.filter(b => b.checkIn <= dateTo);
     return invalidDates ? [] : r;
   }, [bookings, searchQuery, filterStatus, dateFrom, dateTo, invalidDates]);
+
+  const handleExportCSV = () => {
+    const columns = [
+      { header: 'Booking ID', key: 'id' },
+      { header: 'Guest Name', key: 'guest' },
+      { header: 'Room Number', key: 'room' },
+      { header: 'Room Type', key: 'roomType' },
+      { header: 'Check-In', key: 'checkIn' },
+      { header: 'Check-Out', key: 'checkOut' },
+      { header: 'Nights', key: 'nights' },
+      { header: 'Status', key: 'status' },
+      { header: 'Booking Source', key: 'source' },
+      { header: 'Total Amount (PHP)', accessor: b => Number(b.totalAmount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 }) },
+      { header: 'Paid (PHP)', accessor: b => Number(b.paidAmount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 }) },
+      { header: 'Balance Due (PHP)', accessor: b => Number(b.balanceDue || 0).toLocaleString('en-US', { minimumFractionDigits: 2 }) },
+    ];
+    const todayStr = new Date().toISOString().slice(0, 10);
+    exportToCSV(filtered, columns, `jofiane-reservations-${todayStr}`);
+  };
 
   // One initial request, then silent background refreshes.
   usePolling(() => fetchBookings({ background: !initialLoad.current }), 10000);
@@ -248,7 +268,15 @@ function BookingManagement({ employee }) {
             {employee?.name && <> · <strong>{employee.name}</strong></>}
           </p>
         </div>
-        <div className="right">
+        <div className="right" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <button
+            className="btn btn-sm"
+            style={{ background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border-light)', borderRadius: '8px', padding: '9px 16px', fontWeight: '600', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}
+            onClick={handleExportCSV}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            Export CSV
+          </button>
           <button
             className="btn btn-sm"
             style={{ background: FD.accent, color: '#fff', border: 'none', borderRadius: '8px', padding: '9px 18px', fontWeight: '700', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}

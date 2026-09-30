@@ -2,6 +2,7 @@ import { Select } from '../../common/FormControls';
 import React, { useState, useEffect } from 'react';
 import { authFetch } from '../../../utils/api';
 import { PageSkeleton } from '../../common/SkeletonLoader';
+import { exportToCSV } from '../../../utils/exportUtils';
 
 const SHIFT_TYPES = [
   { id: 'morning',   label: 'Morning',   time: '6am–2pm',   color: '#fef3c7', textColor: '#92400e', dot: '#f59e0b' },
@@ -12,13 +13,15 @@ const SHIFT_TYPES = [
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
+let cachedShiftSchedule = null;
+
 function ShiftSchedules() {
-  const [isLoading, setIsLoading]       = useState(true);
+  const [isLoading, setIsLoading]       = useState(() => !cachedShiftSchedule);
   const [isNavigating, setIsNavigating] = useState(false);
-  const [employees, setEmployees]       = useState([]);
-  const [schedule, setSchedule]         = useState({});    // key: "empId-dayIdx" → shiftTypeId
-  const [assignmentIds, setAssignmentIds] = useState({});  // key: "empId-dayIdx" → MongoDB _id
-  const [dbShifts, setDbShifts]         = useState([]);    // raw shifts from DB
+  const [employees, setEmployees]       = useState(() => cachedShiftSchedule?.employees || []);
+  const [schedule, setSchedule]         = useState(() => cachedShiftSchedule?.schedule || {});
+  const [assignmentIds, setAssignmentIds] = useState(() => cachedShiftSchedule?.assignmentIds || {});
+  const [dbShifts, setDbShifts]         = useState(() => cachedShiftSchedule?.dbShifts || []);
   const [swapRequests, setSwapRequests] = useState([]);
   const [filterDept, setFilterDept]     = useState('all');
   const [weekOffset, setWeekOffset]     = useState(0);
@@ -79,7 +82,7 @@ function ShiftSchedules() {
   };
 
   const fetchSchedule = async () => {
-    employees.length ? setIsNavigating(true) : setIsLoading(true);
+    (employees.length || cachedShiftSchedule) ? setIsNavigating(true) : setIsLoading(true);
     try {
       const startDate = weekDates[0].toISOString().slice(0, 10);
       const endDate   = weekDates[6].toISOString().slice(0, 10);
@@ -121,6 +124,12 @@ function ShiftSchedules() {
       setSchedule(newSchedule);
       setAssignmentIds(newAssignIds);
       setSwapRequests([]);
+      cachedShiftSchedule = {
+        employees: normalizedEmployees,
+        schedule: newSchedule,
+        assignmentIds: newAssignIds,
+        dbShifts: shiftsData,
+      };
     } catch (err) {
       console.error('Failed to fetch schedule:', err);
     } finally {
@@ -197,6 +206,29 @@ function ShiftSchedules() {
     : employees.filter(e => e.department === filterDept);
 
   const pendingSwaps = swapRequests.filter(s => s.status === 'pending');
+
+  const handleExportCSV = () => {
+    const formatShift = (typeId) => {
+      const type = SHIFT_TYPES.find(s => s.id === typeId);
+      if (!type || type.id === 'off') return 'Off';
+      return `${type.label} (${type.time})`;
+    };
+
+    const columns = [
+      { header: 'Employee ID', key: 'id' },
+      { header: 'Full Name', key: 'name' },
+      { header: 'Department', key: 'department' },
+      { header: 'Role', key: 'role' },
+      ...DAYS.map((day, idx) => ({
+        header: `${day} (${weekDates[idx].toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' })})`,
+        accessor: emp => formatShift(schedule[`${emp.id}-${idx}`]),
+      })),
+    ];
+
+    const startStr = weekDates[0].toISOString().slice(0, 10);
+    const endStr = weekDates[6].toISOString().slice(0, 10);
+    exportToCSV(filteredEmployees, columns, `jofiane-shifts-${startStr}_to_${endStr}`);
+  };
 
   if (isLoading) {
     return (
@@ -300,6 +332,10 @@ function ShiftSchedules() {
                   {pendingSwaps.length} swap request{pendingSwaps.length > 1 ? 's' : ''}
                 </span>
               )}
+              <button className="btn btn-sm" style={{ display: 'inline-flex', alignItems: 'center', padding: '6px 14px' }} onClick={handleExportCSV}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                Export CSV
+              </button>
               <button className="btn btn-sm btn-outline-gold" style={{ display: 'inline-flex', alignItems: 'center', padding: '6px 14px' }} onClick={() => window.print()}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
                 Print

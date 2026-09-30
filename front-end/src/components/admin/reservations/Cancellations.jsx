@@ -2,6 +2,7 @@ import { Input, Select } from '../../common/FormControls';
 import React, { useState, useEffect } from 'react';
 import { API_BASE } from '../../../utils/api';
 import { PageSkeleton } from '../../common/SkeletonLoader';
+import { exportToCSV } from '../../../utils/exportUtils';
 
 function Cancellations() {
   const [isLoading, setIsLoading] = useState(true);
@@ -63,6 +64,26 @@ function Cancellations() {
       else result = result.filter(c => !c.penaltyApplied);
     }
     setFilteredList(result);
+  };
+
+  const handleExportCSV = () => {
+    const columns = [
+      { header: 'Booking ID', key: 'id' },
+      { header: 'Guest Name', key: 'guest' },
+      { header: 'Room Number', key: 'room' },
+      { header: 'Check-In', key: 'checkIn' },
+      { header: 'Check-Out', key: 'checkOut' },
+      { header: 'Nights', key: 'nights' },
+      { header: 'Original Amount (PHP)', accessor: c => Number(c.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 }) },
+      { header: 'Reason', key: 'reason' },
+      { header: 'Cancelled By', key: 'cancelledBy' },
+      { header: 'Cancellation Date', accessor: c => c.cancelledDate ? new Date(c.cancelledDate).toLocaleDateString('en-US') : '' },
+      { header: 'Penalty Applied', accessor: c => c.penaltyApplied ? 'Yes' : 'No' },
+      { header: 'Penalty Amount (PHP)', accessor: c => Number(c.penaltyAmount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 }) },
+      { header: 'Source', key: 'source' },
+    ];
+    const todayStr = new Date().toISOString().slice(0, 10);
+    exportToCSV(filteredList, columns, `jofiane-cancellations-${todayStr}`);
   };
 
   const handleRebook = (cancellation) => {
@@ -129,6 +150,10 @@ function Cancellations() {
               <option value="applied">Penalty Applied</option>
               <option value="waived">No Penalty</option>
             </Select>
+            <button className="btn btn-sm" onClick={handleExportCSV}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+              Export CSV
+            </button>
           </div>
         </div>
         <div className="table-wrap">

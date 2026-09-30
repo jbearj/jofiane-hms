@@ -2,6 +2,7 @@ import { Select } from '../../common/FormControls';
 import React, { useState, useEffect } from 'react';
 import { API_BASE } from '../../../utils/api';
 import { PageSkeleton } from '../../common/SkeletonLoader';
+import { exportToCSV } from '../../../utils/exportUtils';
 
 function FinancialReports() {
   const [isLoading, setIsLoading] = useState(true);
@@ -32,6 +33,30 @@ function FinancialReports() {
   const sourceColors = ['#4a3728', '#C9A84C', '#3b82f6', '#059669', '#8b5cf6', '#ef4444'];
   const expenseColors = ['#ef4444', '#f59e0b', '#3b82f6', '#6b7280', '#8b5cf6'];
 
+  const handleExportCSV = () => {
+    if (!data) return;
+    const rows = [
+      { section: 'KPI Summary', item: 'Total Revenue', amount: kpis.totalRevenue, share: '100%', detail: `Period: ${period}` },
+      { section: 'KPI Summary', item: 'Total Expenses', amount: kpis.totalExpenses, share: `${((kpis.totalExpenses / (kpis.totalRevenue || 1)) * 100).toFixed(1)}%`, detail: '' },
+      { section: 'KPI Summary', item: 'Net Profit', amount: kpis.netProfit, share: `${kpis.profitMargin}%`, detail: 'Margin' },
+      { section: 'KPI Summary', item: 'Outstanding Balance', amount: outstanding.total, share: `${outstanding.count} folios`, detail: 'Unsettled' },
+      ...(revenueBySource || []).map(r => ({ section: 'Revenue by Source', item: r.source, amount: r.amount, share: `${r.percentage}%`, detail: '' })),
+      ...(expenses || []).map(e => ({ section: 'Operating Expenses', item: e.category, amount: e.amount, share: `${e.percentage}%`, detail: '' })),
+      ...(paymentMethods || []).map(p => ({ section: 'Payment Methods', item: p.method, amount: p.amount, share: `${p.percentage}%`, detail: `${p.count} txns` })),
+    ];
+
+    const columns = [
+      { header: 'Section', key: 'section' },
+      { header: 'Item / Category', key: 'item' },
+      { header: 'Amount (PHP)', accessor: r => Number(r.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 }) },
+      { header: 'Share / Ratio', key: 'share' },
+      { header: 'Notes / Details', key: 'detail' },
+    ];
+
+    const todayStr = new Date().toISOString().slice(0, 10);
+    exportToCSV(rows, columns, `jofiane-financial-report-${period}-${todayStr}`);
+  };
+
   return (
     <section className="admin-tab-content active">
       <div className="page-header">
@@ -58,7 +83,7 @@ function FinancialReports() {
               <option value="monthly">Monthly</option>
               <option value="quarterly">Quarterly</option>
             </Select>
-            <button className="btn btn-sm" onClick={() => alert('Exporting financial report...')}>Export CSV</button>
+            <button className="btn btn-sm" onClick={handleExportCSV}>Export CSV</button>
             <button className="btn btn-sm btn-outline-gold" onClick={() => window.print()}>Print</button>
           </div>
         </div>

@@ -2,6 +2,7 @@ import { Select } from '../../common/FormControls';
 import React, { useState, useEffect } from 'react';
 import { API_BASE } from '../../../utils/api';
 import { PageSkeleton } from '../../common/SkeletonLoader';
+import { exportToCSV } from '../../../utils/exportUtils';
 
 function GuestReports() {
   const [isLoading, setIsLoading] = useState(true);
@@ -33,6 +34,44 @@ function GuestReports() {
   const feedback = data.feedback;
   const sourceColors = ['#C9A84C', '#4a3728', '#3b82f6', '#059669', '#8b5cf6', '#9ca3af'];
 
+  const handleExportCSV = () => {
+    if (!data) return;
+    const rows = [
+      ...(topGuests || []).map((g, idx) => ({
+        category: 'Top Guest',
+        name: g.name,
+        visits: g.visits,
+        revenue: g.totalSpent,
+        detail: `Rank #${idx + 1}, Last Visit: ${new Date(g.lastVisit).toLocaleDateString('en-US')}`,
+      })),
+      ...(bookingSource || []).map(b => ({
+        category: 'Booking Source',
+        name: b.source,
+        visits: b.count,
+        revenue: '',
+        detail: `Share: ${b.percentage}%`,
+      })),
+      ...(nationalities || []).map(n => ({
+        category: 'Guest Nationality',
+        name: n.country,
+        visits: n.count,
+        revenue: '',
+        detail: `Share: ${n.percentage}%`,
+      })),
+    ];
+
+    const columns = [
+      { header: 'Category', key: 'category' },
+      { header: 'Guest / Segment', key: 'name' },
+      { header: 'Visits / Count', key: 'visits' },
+      { header: 'Total Spend (PHP)', accessor: r => r.revenue ? Number(r.revenue).toLocaleString('en-US', { minimumFractionDigits: 2 }) : '' },
+      { header: 'Details / Share', key: 'detail' },
+    ];
+
+    const todayStr = new Date().toISOString().slice(0, 10);
+    exportToCSV(rows, columns, `jofiane-guest-report-${period}-${todayStr}`);
+  };
+
   return (
     <section className="admin-tab-content active">
       <div className="page-header">
@@ -59,7 +98,7 @@ function GuestReports() {
               <option value="monthly">Monthly</option>
               <option value="quarterly">Quarterly</option>
             </Select>
-            <button className="btn btn-sm btn-outline-gold" onClick={() => alert('Exporting guest report...')}>Export</button>
+            <button className="btn btn-sm btn-outline-gold" onClick={handleExportCSV}>Export CSV</button>
           </div>
         </div>
       </div>

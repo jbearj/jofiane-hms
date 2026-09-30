@@ -6,6 +6,7 @@ import { Input, Select, Textarea, ValidatedForm, SubmitButton } from '../../comm
 import PortalModal from '../../common/PortalModal';
 import ConfirmModal from '../../common/ConfirmModal';
 import { money, parseMoney } from '../../../utils/formatters';
+import { exportToCSV, printReportDocument } from '../../../utils/exportUtils';
 
 function Transactions() {
   const [isLoading, setIsLoading] = useState(true);
@@ -119,8 +120,47 @@ function Transactions() {
   };
 
   const handleExport = (format) => {
-    // TODO: Implement actual export
-    alert(`Exporting ${filteredTransactions.length} transactions as ${format.toUpperCase()}`);
+    const columns = [
+      { header: 'Transaction ID', key: 'id' },
+      { header: 'Date', accessor: t => new Date(t.date).toLocaleString('en-US') },
+      { header: 'Booking ID', accessor: t => t._bookingId || '' },
+      { header: 'Guest', key: 'guest' },
+      { header: 'Room', key: 'room' },
+      { header: 'Description', key: 'description' },
+      { header: 'Type', accessor: t => (t.type || '').toUpperCase() },
+      { header: 'Method', key: 'method' },
+      { header: 'Amount', accessor: t => money(t.amount) },
+      { header: 'Status', accessor: t => (t.status || '').toUpperCase() },
+    ];
+
+    const todayStr = new Date().toISOString().slice(0, 10);
+
+    if (format === 'csv') {
+      exportToCSV(filteredTransactions, columns, `jofiane-transactions-${filterPeriod}-${todayStr}`);
+    } else if (format === 'pdf') {
+      const meta = [
+        { label: 'Timeframe', value: filterPeriod.toUpperCase() },
+        { label: 'Payment Method', value: filterMethod === 'all' ? 'All Methods' : filterMethod },
+        { label: 'Status', value: filterStatus === 'all' ? 'All Statuses' : filterStatus },
+        { label: 'Transaction Type', value: filterType === 'all' ? 'All Types' : filterType },
+      ];
+      const kpisList = kpis ? [
+        { label: 'Total Revenue', value: money(kpis.totalRevenue) },
+        { label: 'Total Payments', value: money(kpis.totalPayments) },
+        { label: 'Pending Processing', value: String(kpis.pendingCount) },
+        { label: 'Refunds / Voids', value: String(kpis.refundCount) },
+      ] : [];
+
+      printReportDocument({
+        title: 'Transaction Audit & Revenue Report',
+        subtitle: `Period: ${filterPeriod.toUpperCase()}`,
+        meta,
+        kpis: kpisList,
+        columns,
+        rows: filteredTransactions,
+        orientation: 'landscape',
+      });
+    }
   };
 
   // Keep a failed form open, and prevent repeated clicks from posting twice.

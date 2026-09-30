@@ -4,6 +4,7 @@ import { authFetch } from '../../../utils/api';
 import { Input, Select, Textarea, ValidatedForm, SubmitButton } from '../../common/FormControls';
 import { PageSkeleton, CardsSkeleton } from '../../common/SkeletonLoader';
 import { createThemedPortal as createPortal } from '../../common/ThemePortal';
+import { exportToCSV } from '../../../utils/exportUtils';
 
 function AllBookings() {
   const [isLoading, setIsLoading] = useState(true);
@@ -71,6 +72,25 @@ function AllBookings() {
     if (filterSource !== 'all') result = result.filter(b => b.source === filterSource);
     if (filterRoomType !== 'all') result = result.filter(b => b.roomType === filterRoomType);
     setFilteredBookings(result);
+  };
+
+  const handleExport = () => {
+    const columns = [
+      { header: 'Booking ID', key: 'id' },
+      { header: 'Guest Name', key: 'guest' },
+      { header: 'Email', key: 'email' },
+      { header: 'Phone', key: 'phone' },
+      { header: 'Room Number', key: 'room' },
+      { header: 'Check-In', key: 'checkIn' },
+      { header: 'Check-Out', key: 'checkOut' },
+      { header: 'Nights', key: 'nights' },
+      { header: 'Source', key: 'source' },
+      { header: 'Expected Total', accessor: b => Number(b.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 }) },
+      { header: 'Payment Status', key: 'paymentStatus' },
+      { header: 'Reservation Status', key: 'status' },
+    ];
+    const todayStr = new Date().toISOString().slice(0, 10);
+    exportToCSV(filteredBookings, columns, `jofiane-bookings-${todayStr}`);
   };
 
   const handleCreateBooking = async (bookingData) => {
@@ -242,7 +262,7 @@ function AllBookings() {
               <option value="Suite">Suite</option>
               <option value="Presidential">Presidential</option>
             </Select>
-            <button className="btn btn-sm" onClick={() => alert('Exporting bookings...')}>
+            <button className="btn btn-sm" onClick={handleExport}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
               Export
             </button>

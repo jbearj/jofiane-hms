@@ -5,11 +5,14 @@ import { createThemedPortal as createPortal } from '../../common/ThemePortal';
 import employee1 from '../../../assets/employee1.jpeg';
 import { usePolling } from '../../../hooks/usePolling';
 import { authFetch, readError, validatePassword, PASSWORD_RULE_TEXT } from '../../../utils/api';
+import { exportToCSV } from '../../../utils/exportUtils';
+
+let cachedStaffList = null;
 
 function StaffList() {
-  const [isLoading, setIsLoading] = useState(true);
-  const [employees, setEmployees] = useState([]);
-  const [filteredEmployees, setFilteredEmployees] = useState([]);
+  const [isLoading, setIsLoading] = useState(() => !cachedStaffList);
+  const [employees, setEmployees] = useState(() => cachedStaffList || []);
+  const [filteredEmployees, setFilteredEmployees] = useState(() => cachedStaffList || []);
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -25,12 +28,11 @@ function StaffList() {
 
   useEffect(() => { applyFilters(); }, [employees, searchQuery, filterDept, filterStatus]);
 
-  const hasLoadedOnce = useRef(false);
+  const hasLoadedOnce = useRef(Boolean(cachedStaffList));
 
   const fetchEmployees = async () => {
-    // Only show the full-page skeleton on the very first load. Background
-    // poll refreshes update the data silently so the view doesn't flicker.
-    if (!hasLoadedOnce.current) setIsLoading(true);
+    // Only show the full-page skeleton on the very first load if no cache exists.
+    if (!hasLoadedOnce.current && !cachedStaffList) setIsLoading(true);
     try {
       const today = new Date().toISOString().slice(0, 10);
 
@@ -80,6 +82,7 @@ function StaffList() {
         _id: e._id,
       }));
       setEmployees(normalized);
+      cachedStaffList = normalized;
     } catch (err) {
       console.error('Failed to fetch employees:', err);
     } finally {
@@ -99,6 +102,24 @@ function StaffList() {
     if (filterDept !== 'all') result = result.filter(e => e.department === filterDept);
     if (filterStatus !== 'all') result = result.filter(e => e.status === filterStatus);
     setFilteredEmployees(result);
+  };
+
+  const handleExportCSV = () => {
+    const columns = [
+      { header: 'Employee ID', key: 'employeeId' },
+      { header: 'Full Name', key: 'name' },
+      { header: 'Email', key: 'email' },
+      { header: 'Phone', key: 'phone' },
+      { header: 'Department', key: 'department' },
+      { header: 'Role', key: 'role' },
+      { header: 'Status', key: 'status' },
+      { header: "Today's Shift", key: 'shift' },
+      { header: 'Hire Date', key: 'hireDate' },
+      { header: 'Monthly Salary (PHP)', accessor: e => Number(e.salary || 0).toLocaleString('en-US', { minimumFractionDigits: 2 }) },
+      { header: 'Portal Access', accessor: e => e.portalAccess ? 'Enabled' : 'Disabled' },
+    ];
+    const todayStr = new Date().toISOString().slice(0, 10);
+    exportToCSV(filteredEmployees, columns, `jofiane-staff-list-${todayStr}`);
   };
 
   const handleAdd = () => { setEditingEmployee(null); setShowAddEdit(true); };
@@ -332,7 +353,10 @@ function StaffList() {
               <option value="Terminated">Terminated</option>
             </Select>
             
-            {/* Added button right here */}
+            <button className="btn btn-sm" onClick={handleExportCSV} title="Export staff roster as CSV">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+              Export CSV
+            </button>
             <button className="btn btn-sm btn-gold" onClick={handleAdd}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
               Add Employee

@@ -2,6 +2,7 @@ import { Select } from '../../common/FormControls';
 import React, { useState, useEffect } from 'react';
 import { API_BASE } from '../../../utils/api';
 import { PageSkeleton } from '../../common/SkeletonLoader';
+import { exportToCSV } from '../../../utils/exportUtils';
 
 function OccupancyReports() {
   const [isLoading, setIsLoading] = useState(true);
@@ -29,6 +30,51 @@ function OccupancyReports() {
 
   const { kpis, trend, byRoomType, byFloor, forecast } = data;
   const maxForecast = Math.max(...forecast.map(f => Math.max(f.confirmed, f.projected)));
+
+  const handleExportCSV = () => {
+    if (!data) return;
+    const rows = [
+      ...(trend || []).map(t => ({
+        section: 'Occupancy Trend',
+        segment: t.label,
+        rate: `${t.rate}%`,
+        occupied: Math.round((t.rate / 100) * (kpis.totalRooms || 0)),
+        total: kpis.totalRooms,
+      })),
+      ...(byRoomType || []).map(r => ({
+        section: 'By Room Type',
+        segment: r.type,
+        rate: `${r.rate}%`,
+        occupied: r.occupied,
+        total: r.total,
+      })),
+      ...(byFloor || []).map(f => ({
+        section: 'By Floor',
+        segment: f.floor,
+        rate: `${f.rate}%`,
+        occupied: f.occupied,
+        total: f.total,
+      })),
+      ...(forecast || []).map(fc => ({
+        section: '7-Day Forecast',
+        segment: fc.day,
+        rate: `${fc.projected}% (Projected)`,
+        occupied: fc.confirmed,
+        total: fc.projected,
+      })),
+    ];
+
+    const columns = [
+      { header: 'Report Section', key: 'section' },
+      { header: 'Period / Segment', key: 'segment' },
+      { header: 'Occupancy Rate', key: 'rate' },
+      { header: 'Occupied Units', key: 'occupied' },
+      { header: 'Total Capacity', key: 'total' },
+    ];
+
+    const todayStr = new Date().toISOString().slice(0, 10);
+    exportToCSV(rows, columns, `jofiane-occupancy-report-${period}-${todayStr}`);
+  };
 
   return (
     <section className="admin-tab-content active">
@@ -59,7 +105,7 @@ function OccupancyReports() {
               <option value="monthly">Monthly</option>
               <option value="quarterly">Quarterly</option>
             </Select>
-            <button className="btn btn-sm btn-outline-gold" onClick={() => alert('Exporting occupancy report...')}>Export</button>
+            <button className="btn btn-sm btn-outline-gold" onClick={handleExportCSV}>Export CSV</button>
           </div>
         </div>
       </div>
