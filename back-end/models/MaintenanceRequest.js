@@ -21,4 +21,5 @@ const maintenanceRequestSchema = new mongoose.Schema({
   }],
 }, { timestamps: true });
 
+maintenanceRequestSchema.plugin(require('../lib/softDelete').softDelete, { identity: 'maintenance_id' });
 module.exports = mongoose.model('MaintenanceRequest', maintenanceRequestSchema, 'maintenance_requests');

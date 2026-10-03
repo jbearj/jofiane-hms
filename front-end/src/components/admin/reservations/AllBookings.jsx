@@ -368,7 +368,7 @@ function BookingDetailModal({ booking, getStatusTag, formatDate, onClose, onDele
   }, [booking._id]);
 
   const handleDelete = async () => {
-    if (!window.confirm(`Delete booking ${booking.id} for ${booking.guest}? This cannot be undone.`)) return;
+    if (!window.confirm(`Archive booking ${booking.id} for ${booking.guest}? An administrator can restore it from Archive.`)) return;
     setIsDeleting(true);
     try {
       const res = await authFetch(`/api/bookings/${booking._id}`, {
@@ -391,7 +391,7 @@ function BookingDetailModal({ booking, getStatusTag, formatDate, onClose, onDele
   };
 
   const parseAmount = (str) => parseFloat((str || '0').replace(/,/g, '')) || 0;
-  const canDelete = !loadingTxns && transactions.length === 0;
+  const canDelete = !loadingTxns && ['Checked Out', 'Cancelled', 'No Show'].includes(booking.status) && booking.paymentStatus === 'Paid';
   const canCancel = !['Cancelled', 'Checked Out'].includes(booking.status);
 
   const handleCancel = async (e) => {
@@ -573,7 +573,7 @@ function BookingDetailModal({ booking, getStatusTag, formatDate, onClose, onDele
         )}
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          {/* Delete — only shown when there are no transactions */}
+          {/* Archive settled, completed stays without altering their ledger. */}
           {canDelete ? (
             <button
               className="btn btn-sm"
@@ -581,11 +581,11 @@ function BookingDetailModal({ booking, getStatusTag, formatDate, onClose, onDele
               onClick={handleDelete}
               disabled={isDeleting}
             >
-              {isDeleting ? 'Deleting...' : 'Delete Booking'}
+              {isDeleting ? 'Archiving…' : 'Archive Booking'}
             </button>
           ) : (
             <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-              {loadingTxns ? '' : 'Transactions: recorded'}
+              {loadingTxns ? '' : 'Archive is available after the stay ends and the balance is settled.'}
             </span>
           )}
           <button className="btn" onClick={onClose}>Close</button>

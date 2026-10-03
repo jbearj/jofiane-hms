@@ -9,4 +9,5 @@ const roomTypeSchema = new mongoose.Schema({
 });
 
 // The third argument specifically targets your exact collection name
+roomTypeSchema.plugin(require('../lib/softDelete').softDelete, { identity: 'type_id' });
 module.exports = mongoose.model('RoomType', roomTypeSchema, 'room_types');

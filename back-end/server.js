@@ -41,6 +41,9 @@ const CleaningTask = require('./models/CleaningTask');
 const LostAndFound = require('./models/LostAndFound');
 const MaintenanceRequest = require('./models/MaintenanceRequest');
 const HousekeepingLog = require('./models/HousekeepingLog');
+const { containsArchiveFields } = require('./lib/softDelete');
+const { createArchiveRouter, archiveResponse } = require('./archive/router');
+const { createRequireAuth } = require('./lib/auth');
 
 
 const app = express();
@@ -62,6 +65,10 @@ app.use(cors({
 // Raised from the 100kb default so base64 profile photos (a 2MB image is
 // ~2.7MB once base64-encoded) fit in the request body.
 app.use(express.json({ limit: '5mb' }));
+app.use((req, res, next) => {
+  if (containsArchiveFields(req.body)) return res.status(400).json({ error: 'Archive fields can only be changed through the archive workflow.' });
+  next();
+});
 
 
 // ─────────────────────────────────────────────
@@ -307,6 +314,7 @@ app.post('/api/auth/login', async (req, res) => {
     const token = jwt.sign(
       {
         sub:      String(employee._id),
+        auth_version: employee.auth_version || 0,
         username: employee.portal_access.username,
         role,
         module,
@@ -344,23 +352,7 @@ app.post('/api/auth/login', async (req, res) => {
 // ─────────────────────────────────────────────
 
 // Verify the Bearer token and attach the decoded payload to req.user.
-function requireAuth(req, res, next) {
-  const header = req.headers.authorization || '';
-  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
-  if (!token) {
-    return res.status(401).json({ error: 'Authentication required. Please log in.' });
-  }
-  try {
-    req.user = jwt.verify(token, JWT_SECRET);
-    next();
-  } catch (err) {
-    // Covers both tampered tokens and expired ones.
-    const expired = err.name === 'TokenExpiredError';
-    return res.status(401).json({
-      error: expired ? 'Session expired. Please log in again.' : 'Invalid authentication token.',
-    });
-  }
-}
+const requireAuth = createRequireAuth(Employee, JWT_SECRET);
 
 // Gate a route to admins only. Must run after requireAuth.
 function requireAdmin(req, res, next) {
@@ -372,6 +364,8 @@ function requireAdmin(req, res, next) {
   }
   next();
 }
+
+app.use('/api/archive', createArchiveRouter({ requireAuth, requireAdmin, Employee }));
 
 
 // ─────────────────────────────────────────────
@@ -613,18 +607,11 @@ app.delete('/api/bookings/:id', requireAuth, requireAdmin, async (req, res) => {
 
 
    
-    const activeTxns = (booking.transactions || []).filter(
-      t => t && t.status !== 'VOIDED'
-    );
-    if (activeTxns.length > 0) {
-      return res.status(400).json({
-        error: 'Cannot delete a booking that has transactions. Void all transactions first.'
-      });
-    }
+    // The archive service distinguishes recoverable archival from destructive
+    // purging. Never ask staff to void genuine payments just to archive a stay.
 
 
-    await Booking.findByIdAndDelete(req.params.id);
-    res.json({ success: true });
+    return archiveResponse(req, res, 'bookings');
   } catch (error) {
     console.error('Delete booking error:', error);
     res.status(500).json({ error: 'Failed to delete booking', detail: error.message });
@@ -806,7 +793,7 @@ app.patch('/api/bookings/:id/transactions/:txnId/void', requireAuth, requireAdmi
     const booking = await Booking.findById(req.params.id);
     if (!booking) return res.status(404).json({ error: 'Booking or transaction not found' });
 
-    const txn = (booking.transactions || []).find(t => t.txn_id === req.params.txnId);
+    const txn = (booking.transactions || []).find(t => t.txn_id === req.params.txnId && !t.deleted_at);
     if (!txn) return res.status(404).json({ error: 'Booking or transaction not found' });
 
     txn.status = 'VOIDED';
@@ -932,6 +919,7 @@ app.get('/api/transactions', async (req, res) => {
 
     const result = await Booking.aggregate([
       { $unwind: '$transactions' },
+      { $match: { 'transactions.deleted_at': null } },
       {
         $project: {
           _id: 0,
@@ -1152,8 +1140,7 @@ app.delete('/api/employees/:id', requireAuth, requireAdmin, async (req, res) => 
       });
     }
 
-    await Employee.findByIdAndDelete(req.params.id);
-    res.json({ success: true });
+    return archiveResponse(req, res, 'employees');
   } catch (error) {
     console.error('Delete employee error:', error);
     res.status(500).json({ error: 'Failed to delete employee', detail: error.message });
@@ -1228,7 +1215,7 @@ app.patch('/api/shift-assignments/upsert', requireAuth, requireAdmin, async (req
       existing.status   = status || 'PUBLISHED';
       result = await existing.save();
     } else {
-      const maxDoc = await ShiftAssignment.findOne().sort({ assignment_id: -1 });
+      const maxDoc = await ShiftAssignment.findOne().withArchived().sort({ assignment_id: -1 });
       const nextId = (maxDoc?.assignment_id || 0) + 1;
       result = await ShiftAssignment.create({
         assignment_id: nextId,
@@ -1263,9 +1250,7 @@ app.put('/api/shift-assignments/:id', requireAuth, requireAdmin, async (req, res
 
 app.delete('/api/shift-assignments/:id', requireAuth, requireAdmin, async (req, res) => {
   try {
-    const deleted = await ShiftAssignment.findByIdAndDelete(req.params.id);
-    if (!deleted) return res.status(404).json({ error: 'Assignment not found' });
-    res.json({ success: true });
+    return archiveResponse(req, res, 'shift_assignments');
   } catch (error) {
     res.status(500).json({ error: 'Failed to delete assignment' });
   }
@@ -1292,7 +1277,7 @@ app.post('/api/shift-assignments', requireAuth, requireAdmin, async (req, res) =
 
 
 
-app.get('/api/audits', async (req, res) => {
+app.get('/api/audits', requireAuth, requireAdmin, async (req, res) => {
   try {
     const audits = await Audit.find().sort({ datetime: -1 });
     res.json(audits);
@@ -1880,7 +1865,7 @@ app.get('/api/guest-requests', async (req, res) => {
 
 app.post('/api/guest-requests', requireAuth, async (req, res) => {
   try {
-    const max = await GuestRequest.findOne().sort({ request_id: -1 });
+    const max = await GuestRequest.findOne().withArchived().sort({ request_id: -1 });
     const body = { ...req.body, request_id: (max?.request_id || 0) + 1, requested_at: new Date() };
     const saved = await new GuestRequest(body).save();
     res.status(201).json(saved);
@@ -1897,8 +1882,7 @@ app.put('/api/guest-requests/:id', requireAuth, async (req, res) => {
 
 app.delete('/api/guest-requests/:id', requireAuth, async (req, res) => {
   try {
-    await GuestRequest.findByIdAndDelete(req.params.id);
-    res.json({ success: true });
+    return archiveResponse(req, res, 'guest_requests');
   } catch (e) { res.status(500).json({ error: 'Failed to delete guest request', detail: e.message }); }
 });
 
@@ -1918,7 +1902,7 @@ app.get('/api/cleaning-tasks', async (req, res) => {
 
 app.post('/api/cleaning-tasks', requireAuth, async (req, res) => {
   try {
-    const max = await CleaningTask.findOne().sort({ task_id: -1 });
+    const max = await CleaningTask.findOne().withArchived().sort({ task_id: -1 });
     const body = { ...req.body, task_id: (max?.task_id || 0) + 1 };
     const saved = await new CleaningTask(body).save();
     res.status(201).json(saved);
@@ -1935,8 +1919,7 @@ app.put('/api/cleaning-tasks/:id', requireAuth, async (req, res) => {
 
 app.delete('/api/cleaning-tasks/:id', requireAuth, async (req, res) => {
   try {
-    await CleaningTask.findByIdAndDelete(req.params.id);
-    res.json({ success: true });
+    return archiveResponse(req, res, 'cleaning_tasks');
   } catch (e) { res.status(500).json({ error: 'Failed to delete cleaning task', detail: e.message }); }
 });
 
@@ -1964,7 +1947,7 @@ app.post('/api/housekeeping-logs', requireAuth, async (req, res) => {
     if (!room_number || !description) {
       return res.status(400).json({ error: 'Room number and description are required.' });
     }
-    const max = await HousekeepingLog.findOne().sort({ log_id: -1 });
+    const max = await HousekeepingLog.findOne().withArchived().sort({ log_id: -1 });
     const saved = await new HousekeepingLog({
       log_id: (max?.log_id || 0) + 1,
       room_number: String(room_number),
@@ -1982,8 +1965,7 @@ app.delete('/api/housekeeping-logs/:id', requireAuth, async (req, res) => {
     if (!isValidObjectId(req.params.id)) {
       return res.status(400).json({ error: 'Invalid log id' });
     }
-    await HousekeepingLog.findByIdAndDelete(req.params.id);
-    res.json({ success: true });
+    return archiveResponse(req, res, 'housekeeping_logs');
   } catch (e) { res.status(500).json({ error: 'Failed to delete housekeeping log', detail: e.message }); }
 });
 
@@ -2002,7 +1984,7 @@ app.get('/api/lost-and-found', async (req, res) => {
 
 app.post('/api/lost-and-found', requireAuth, async (req, res) => {
   try {
-    const max = await LostAndFound.findOne().sort({ item_id: -1 });
+    const max = await LostAndFound.findOne().withArchived().sort({ item_id: -1 });
     const body = { ...req.body, item_id: (max?.item_id || 0) + 1, found_date: req.body.found_date || new Date() };
     const saved = await new LostAndFound(body).save();
     res.status(201).json(saved);
@@ -2019,8 +2001,7 @@ app.put('/api/lost-and-found/:id', requireAuth, async (req, res) => {
 
 app.delete('/api/lost-and-found/:id', requireAuth, async (req, res) => {
   try {
-    await LostAndFound.findByIdAndDelete(req.params.id);
-    res.json({ success: true });
+    return archiveResponse(req, res, 'lost_and_found');
   } catch (e) { res.status(500).json({ error: 'Failed to delete lost and found record', detail: e.message }); }
 });
 
@@ -2039,7 +2020,7 @@ app.get('/api/maintenance-requests', async (req, res) => {
 
 app.post('/api/maintenance-requests', requireAuth, async (req, res) => {
   try {
-    const max = await MaintenanceRequest.findOne().sort({ maintenance_id: -1 });
+    const max = await MaintenanceRequest.findOne().withArchived().sort({ maintenance_id: -1 });
     const body = { ...req.body, maintenance_id: (max?.maintenance_id || 0) + 1, reported_at: new Date() };
     const saved = await new MaintenanceRequest(body).save();
     res.status(201).json(saved);
@@ -2056,8 +2037,7 @@ app.put('/api/maintenance-requests/:id', requireAuth, async (req, res) => {
 
 app.delete('/api/maintenance-requests/:id', requireAuth, async (req, res) => {
   try {
-    await MaintenanceRequest.findByIdAndDelete(req.params.id);
-    res.json({ success: true });
+    return archiveResponse(req, res, 'maintenance_requests');
   } catch (e) { res.status(500).json({ error: 'Failed to delete maintenance request', detail: e.message }); }
 });
 
@@ -2067,7 +2047,7 @@ app.delete('/api/maintenance-requests/:id', requireAuth, async (req, res) => {
 
 app.get('/api/front-desk-logs', async (req, res) => {
   try {
-    const filter = {};
+    const filter = { audit_id: /^LOG-/ };
     if (req.query.date) {
       const start = new Date(req.query.date);
       const end   = new Date(new Date(req.query.date).getTime() + 86400000);
@@ -2080,7 +2060,7 @@ app.get('/api/front-desk-logs', async (req, res) => {
 
 app.post('/api/front-desk-logs', requireAuth, async (req, res) => {
   try {
-    const max = await Audit.findOne().sort({ audit_id: -1 });
+    const max = await Audit.findOne({ audit_id: /^LOG-/ }).withArchived().sort({ createdAt: -1, _id: -1 });
     const nextId = `LOG-${String((parseInt((max?.audit_id || 'LOG-0').split('-')[1]) || 0) + 1).padStart(3,'0')}`;
     const body = {
       ...req.body,
@@ -2094,7 +2074,9 @@ app.post('/api/front-desk-logs', requireAuth, async (req, res) => {
 
 app.put('/api/front-desk-logs/:id', requireAuth, async (req, res) => {
   try {
-    const updated = await Audit.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const update = buildSafeSet(req.body, ['action_type', 'description', 'status']);
+    if (!update) return res.status(400).json({ error: 'No valid log fields to update' });
+    const updated = await Audit.findOneAndUpdate({ _id: req.params.id, audit_id: /^LOG-/ }, update, { new: true });
     if (!updated) return res.status(404).json({ error: 'Not found' });
     res.json(updated);
   } catch (e) { res.status(500).json({ error: 'Failed to update log entry', detail: e.message }); }
@@ -2102,8 +2084,7 @@ app.put('/api/front-desk-logs/:id', requireAuth, async (req, res) => {
 
 app.delete('/api/front-desk-logs/:id', requireAuth, async (req, res) => {
   try {
-    await Audit.findByIdAndDelete(req.params.id);
-    res.json({ success: true });
+    return archiveResponse(req, res, 'front_desk_logs');
   } catch (e) { res.status(500).json({ error: 'Failed to delete log entry', detail: e.message }); }
 });
 
@@ -2115,7 +2096,7 @@ app.delete('/api/front-desk-logs/:id', requireAuth, async (req, res) => {
 const PORT = process.env.PORT || 5000;
 
 
-mongoose.connect(process.env.MONGO_URI)
+mongoose.connect(process.env.MONGO_URI, { autoIndex: false })
   .then(() => {
     console.log('✅ Connected to MongoDB successfully!');
     app.listen(PORT, () => {

@@ -8,4 +8,6 @@ const shiftAssignmentSchema = new mongoose.Schema({
   status: String,            // "PUBLISHED", "DRAFT", "CANCELLED"
 }, { timestamps: true });
 
+shiftAssignmentSchema.plugin(require('../lib/softDelete').softDelete, { identity: 'assignment_id' });
+shiftAssignmentSchema.index({ employee_id: 1, shift_date: 1 }, { name: 'active_employee_day_unique', unique: true, partialFilterExpression: { deleted_at: null, employee_id: { $type: 'number' }, shift_date: { $type: 'date' } } });
 module.exports = mongoose.model('ShiftAssignment', shiftAssignmentSchema, 'shift_assignments');

@@ -12,4 +12,5 @@ const cleaningTaskSchema = new mongoose.Schema({
   notes: String
 }, { timestamps: true });
 
+cleaningTaskSchema.plugin(require('../lib/softDelete').softDelete, { identity: 'task_id' });
 module.exports = mongoose.model('CleaningTask', cleaningTaskSchema, 'cleaning_tasks');

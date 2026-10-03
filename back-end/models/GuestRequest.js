@@ -14,4 +14,5 @@ const guestRequestSchema = new mongoose.Schema({
   notes: String
 }, { timestamps: true });
 
+guestRequestSchema.plugin(require('../lib/softDelete').softDelete, { identity: 'request_id' });
 module.exports = mongoose.model('GuestRequest', guestRequestSchema, 'guest_requests');

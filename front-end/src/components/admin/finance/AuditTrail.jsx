@@ -1,6 +1,6 @@
 import { Input, Select } from '../../common/FormControls';
 import React, { useState, useEffect } from 'react';
-import { API_BASE } from '../../../utils/api';
+import { authFetch } from '../../../utils/api';
 import { PageSkeleton } from '../../common/SkeletonLoader';
 import { exportToCSV } from '../../../utils/exportUtils';
 
@@ -33,7 +33,7 @@ function AuditTrail() {
       setIsRefreshing(true);
     }
     try {
-      const res = await fetch(`${API_BASE}/api/audits?period=${filterPeriod}`);
+      const res = await authFetch(`/api/audits?period=${filterPeriod}`);
       if (!res.ok) throw new Error(`Server error: ${res.status}`);
       const data = await res.json();
 

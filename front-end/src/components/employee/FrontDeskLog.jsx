@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { authFetch } from '../../utils/api';
+import { authFetch, readError } from '../../utils/api';
 import { todayISO, shiftISODate } from '../../utils/dateUtils';
 import { Input, Select, Textarea, ValidatedForm, SubmitButton } from '../common/FormControls';
 import { CardsSkeleton } from '../common/SkeletonLoader';
@@ -99,15 +99,15 @@ function FrontDeskLog({ employee = null }) {
 
   const deleteEntry = async (id) => {
     const entry = entries.find(e => e.id === id);
-    // Optimistic remove
-    setEntries(prev => prev.filter(e => e.id !== id));
     if (entry?._dbId) {
       try {
-        await authFetch(`/api/front-desk-logs/${entry._dbId}`, { method: 'DELETE' });
+        const response = await authFetch(`/api/front-desk-logs/${entry._dbId}`, { method: 'DELETE' });
+        if (!response.ok) throw new Error(await readError(response, 'Unable to archive this log.'));
+        setEntries(prev => prev.filter(e => e.id !== id));
       } catch (e) {
-        console.error('Failed to delete log entry:', e);
+        setError(e.message || 'Unable to archive this log. The entry has been kept.');
       }
-    }
+    } else setError('This entry has not been saved to the database and cannot be archived.');
   };
 
   const addComment = (id, commentText) => {
