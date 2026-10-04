@@ -6,4 +6,5 @@ const shiftSchema = new mongoose.Schema({
   schedule: String,          // e.g. "06:00 - 14:00"
 }, { timestamps: true });
 
+shiftSchema.plugin(require('../lib/softDelete').softDelete, { identity: 'shift_id' });
 module.exports = mongoose.model('Shift', shiftSchema, 'shifts');

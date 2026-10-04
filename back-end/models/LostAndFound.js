@@ -14,4 +14,5 @@ const lostAndFoundSchema = new mongoose.Schema({
   notes: String
 }, { timestamps: true });
 
+lostAndFoundSchema.plugin(require('../lib/softDelete').softDelete, { identity: 'item_id' });
 module.exports = mongoose.model('LostAndFound', lostAndFoundSchema, 'lost_and_found');

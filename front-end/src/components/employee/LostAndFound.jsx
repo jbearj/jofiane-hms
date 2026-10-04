@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { usePolling } from '../../hooks/usePolling';
 import PortalModal from '../common/PortalModal';
 import { PageSkeleton } from '../common/SkeletonLoader';
-import { authFetch } from '../../utils/api';
+import { authFetch, readError } from '../../utils/api';
 import { Input, Textarea, ValidatedForm, SubmitButton } from '../common/FormControls';
 const API = '/api/lost-and-found';
 
@@ -94,13 +94,14 @@ function LostAndFound() {
 
   // ── DELETE ─────────────────────────────────────────
   const deleteItem = async (id) => {
-    if (!window.confirm('Delete this Lost & Found record?')) return;
+    if (!window.confirm('Archive this Lost & Found record? An administrator can restore it later.')) return;
     try {
-      await authFetch(`${API}/${id}`, { method: 'DELETE' });
+      const response = await authFetch(`${API}/${id}`, { method: 'DELETE' });
+      if (!response.ok) throw new Error(await readError(response, 'Unable to archive this record.'));
       setItems(prev => prev.filter(i => i._id !== id));
     } catch (e) {
       console.error(e);
-      alert('Failed to delete record.');
+      setError(e.message || 'Unable to archive this record. The record has been kept.');
     }
   };
 

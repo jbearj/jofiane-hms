@@ -9,6 +9,8 @@ const transactionSchema = new mongoose.Schema({
   payment_method: String,    // "Credit Card", "Cash", "Room Charge", etc.
   payment_details: String,   // e.g. "Visa ....4242"
   status: String,            // "COMPLETED", "PENDING", "VOIDED"
+  deleted_at: { type: Date, default: null },
+  deleted_by: { type: String, default: null },
 }, { _id: false });
 
 const bookingSchema = new mongoose.Schema({
@@ -48,4 +50,11 @@ const bookingSchema = new mongoose.Schema({
   },
 }, { timestamps: true });
 
+bookingSchema.plugin(require('../lib/softDelete').softDelete, { identity: 'booking_id' });
+// Keep archived ledger rows intact in storage, but never expose them in normal
+// booking responses. Internal services use toObject() explicitly when needed.
+bookingSchema.set('toJSON', { transform(doc, ret) {
+  if (ret.transactions) ret.transactions = ret.transactions.filter(t => !t.deleted_at);
+  return ret;
+} });
 module.exports = mongoose.model('Booking', bookingSchema, 'bookings');

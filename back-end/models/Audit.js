@@ -9,4 +9,5 @@ const auditSchema = new mongoose.Schema({
   status: String,            // "BALANCED", "VARIANCE", "APPROVED", "COMPLETED"
 }, { timestamps: true });
 
+auditSchema.plugin(require('../lib/softDelete').softDelete, { identity: 'audit_id' });
 module.exports = mongoose.model('Audit', auditSchema, 'audits');

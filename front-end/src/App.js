@@ -10,6 +10,7 @@ import Sidebar from './components/admin/Sidebar';
 import Overview from './components/admin/Overview';
 import Transactions from './components/admin/finance/Transactions';
 import AuditTrail from './components/admin/finance/AuditTrail';
+import ArchiveDashboard from './components/admin/archive/ArchiveDashboard';
 import RoomInventory from './components/admin/rooms/RoomInventory';
 import HousekeepingStatus from './components/admin/rooms/HousekeepingStatus';
 import Maintenance from './components/admin/rooms/Maintenance';
@@ -164,9 +165,11 @@ function App() {
         return <Overview setActiveTab={setActiveTab} adminProfile={adminProfile} />;
       case 'transactions':
       case 'payments':
-        return <Transactions />;
+        return <Transactions allowArchive={canViewAdmin} />;
       case 'audit-trail':
         return <AuditTrail />;
+      case 'archive':
+        return canViewAdmin ? <ArchiveDashboard /> : null;
       case 'rooms':
         return <Rooms />;
       case 'room-inventory':

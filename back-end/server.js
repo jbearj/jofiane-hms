@@ -1,10 +1,8 @@
-// ============================================================================
-// LAYER 1: INFRASTRUCTURE & NETWORK CONFIGURATION
-// DNS, Package Imports, CORS, and Payload Limits
-// ============================================================================
+
 
 const dns = require('dns');
 dns.setServers(['8.8.8.8', '8.8.4.4']);
+
 
 const express = require('express');
 const mongoose = require('mongoose');
@@ -14,6 +12,22 @@ const bcrypt = require('bcryptjs');
 require('dotenv').config();
 
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+
+// The JWT secret MUST be provided via the environment. In production we refuse
+// to start without it — falling back to a hardcoded, publicly-known secret would
+// let anyone forge admin tokens. In development we allow a clearly-labelled
+// fallback but warn loudly so it's never mistaken for a real secret.
+let JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  if (IS_PRODUCTION) {
+    console.error('❌ JWT_SECRET is not set. Refusing to start in production without it.');
+    process.exit(1);
+  }
+  console.warn('⚠️  JWT_SECRET is not set — using an INSECURE development fallback. Set JWT_SECRET before deploying.');
+  JWT_SECRET = 'dev-fallback-secret-set-JWT_SECRET-in-env';
+}
+const TOKEN_TTL = '12h'; // tokens expire after a shift-length window
+
 
 const Room = require('./models/Room');
 const RoomType = require('./models/RoomType');
@@ -27,6 +41,10 @@ const CleaningTask = require('./models/CleaningTask');
 const LostAndFound = require('./models/LostAndFound');
 const MaintenanceRequest = require('./models/MaintenanceRequest');
 const HousekeepingLog = require('./models/HousekeepingLog');
+const { containsArchiveFields } = require('./lib/softDelete');
+const { createArchiveRouter, archiveResponse } = require('./archive/router');
+const { createRequireAuth } = require('./lib/auth');
+
 
 const app = express();
 
@@ -47,61 +65,196 @@ app.use(cors({
 // Raised from the 100kb default so base64 profile photos (a 2MB image is
 // ~2.7MB once base64-encoded) fit in the request body.
 app.use(express.json({ limit: '5mb' }));
-
-
-// ============================================================================
-// LAYER 2: AUTHENTICATION & ROLE-BASED ACCESS CONTROL (RBAC)
-// Security Checks, JWT Generation, Auth Routes, and Middleware Guards
-// ============================================================================
-
-// The JWT secret MUST be provided via the environment. In production we refuse
-// to start without it — falling back to a hardcoded, publicly-known secret would
-// let anyone forge admin tokens. In development we allow a clearly-labelled
-// fallback but warn loudly so it's never mistaken for a real secret.
-let JWT_SECRET = process.env.JWT_SECRET;
-if (!JWT_SECRET) {
-  if (IS_PRODUCTION) {
-    console.error('❌ JWT_SECRET is not set. Refusing to start in production without it.');
-    process.exit(1);
-  }
-  console.warn('⚠️  JWT_SECRET is not set — using an INSECURE development fallback. Set JWT_SECRET before deploying.');
-  JWT_SECRET = 'dev-fallback-secret-set-JWT_SECRET-in-env';
-}
-const TOKEN_TTL = '12h'; // tokens expire after a shift-length window
-
-// ─────────────────────────────────────────────
-// AUTH MIDDLEWARE
-// ─────────────────────────────────────────────
-function requireAuth(req, res, next) {
-  const header = req.headers.authorization || '';
-  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
-  if (!token) {
-    return res.status(401).json({ error: 'Authentication required. Please log in.' });
-  }
-  try {
-    req.user = jwt.verify(token, JWT_SECRET);
-    next();
-  } catch (err) {
-    const expired = err.name === 'TokenExpiredError';
-    return res.status(401).json({
-      error: expired ? 'Session expired. Please log in again.' : 'Invalid authentication token.',
-    });
-  }
-}
-
-function requireAdmin(req, res, next) {
-  if (!req.user) {
-    return res.status(401).json({ error: 'Authentication required. Please log in.' });
-  }
-  if (req.user.role !== 'admin') {
-    return res.status(403).json({ error: 'Admin access required for this action.' });
-  }
+app.use((req, res, next) => {
+  if (containsArchiveFields(req.body)) return res.status(400).json({ error: 'Archive fields can only be changed through the archive workflow.' });
   next();
-}
+});
+
 
 // ─────────────────────────────────────────────
-// AUTH ROUTES
+// VALIDATION HELPERS
+// Shared guards for update/delete routes so callers can't inject
+// unexpected fields, MongoDB operators, or malformed ids.
 // ─────────────────────────────────────────────
+
+// True only for a well-formed Mongo ObjectId. Guards against CastErrors
+// and lookups on attacker-controlled junk ids.
+const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
+
+// Reject keys that start with "$" (update operators like $rename/$unset/$inc)
+// or contain "." only where we explicitly allow it. Blocks operator injection.
+const hasMongoOperators = (obj) =>
+  obj && typeof obj === 'object' &&
+  Object.keys(obj).some(k => k.startsWith('$'));
+
+// Build a $set object from an incoming payload, keeping only allowed dot-paths.
+// Accepts either a raw flat object or an already-{$set:{...}} wrapped body.
+// Anything not on the allow-list is silently dropped. Returns { $set } or null
+// if nothing valid remains.
+const buildSafeSet = (body, allowedPaths) => {
+  const source = (body && typeof body.$set === 'object') ? body.$set : body;
+  if (!source || typeof source !== 'object') return null;
+  const set = {};
+  for (const path of allowedPaths) {
+    if (Object.prototype.hasOwnProperty.call(source, path) && source[path] !== undefined) {
+      set[path] = source[path];
+    }
+  }
+  return Object.keys(set).length ? { $set: set } : null;
+};
+
+// ── Employee: fields an admin is allowed to write via update ──
+const EMPLOYEE_ALLOWED_PATHS = [
+  'full_name',
+  'photo',
+  'contact.email',
+  'contact.phone',
+  'portal_access.username',
+  'portal_access.has_access',
+  'portal_access.password',
+  'employment_details.hire_date',
+  'employment_details.status',
+  'employment_details.department',
+  'employment_details.role.title',
+  'employment_details.role.base_salary',
+];
+
+const VALID_EMP_STATUS = ['ACTIVE', 'ON LEAVE', 'TERMINATED', 'INACTIVE'];
+const isValidEmail = (e) => typeof e === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
+
+// Password policy: 5–8 chars, with an uppercase, a lowercase, a number,
+// and a special character. Returns an error string, or null if valid.
+const PASSWORD_RULE_MSG =
+  'Password must be 5–8 characters and include an uppercase letter, a lowercase letter, a number, and a special character.';
+const validatePasswordPolicy = (pw) => {
+  const s = String(pw || '');
+  if (s.length < 5 || s.length > 8) return PASSWORD_RULE_MSG;
+  if (!/[A-Z]/.test(s))            return PASSWORD_RULE_MSG;
+  if (!/[a-z]/.test(s))            return PASSWORD_RULE_MSG;
+  if (!/[0-9]/.test(s))            return PASSWORD_RULE_MSG;
+  if (!/[^A-Za-z0-9]/.test(s))     return PASSWORD_RULE_MSG;
+  return null;
+};
+
+// Field-level validation for an employee $set payload. Returns an error string
+// or null if everything checks out.
+const validateEmployeeSet = (set) => {
+  if ('full_name' in set) {
+    const n = String(set['full_name'] || '').trim();
+    if (n.length < 2) return 'Full name must be at least 2 characters';
+  }
+  if ('contact.email' in set && set['contact.email'] && !isValidEmail(set['contact.email'])) {
+    return 'Invalid email address';
+  }
+  if ('employment_details.status' in set &&
+      !VALID_EMP_STATUS.includes(String(set['employment_details.status']).toUpperCase())) {
+    return `Invalid status. Allowed: ${VALID_EMP_STATUS.join(', ')}`;
+  }
+  if ('employment_details.role.base_salary' in set) {
+    const s = Number(set['employment_details.role.base_salary']);
+    if (Number.isNaN(s) || s < 0) return 'Salary must be a non-negative number';
+  }
+  return null;
+};
+
+// Is this employee an admin? (department contains "admin")
+const isAdminEmployee = (emp) =>
+  (emp?.employment_details?.department || '').toLowerCase().includes('admin');
+
+
+// ─────────────────────────────────────────────
+// MONEY / BILLING HELPERS
+// The transaction ledger is the single source of truth. Every money route
+// mutates the ledger, then calls recomputeBilling() so expected_total,
+// total_paid and balance_due are always derived consistently.
+//
+// Each (non-voided) transaction is one of three kinds:
+//   charge  — what the guest owes (room charge, F&B, penalty). amount > 0.
+//   payment — money received (deposit, balance payment).       amount > 0.
+//   refund  — money returned to the guest.                      amount < 0.
+// We infer the kind from the transaction's fields so existing records (which
+// have no explicit type) still classify correctly.
+// ─────────────────────────────────────────────
+
+// Parse a money string like "12,500.00" (or "-2,100.00") into a Number.
+const money = (str) => parseFloat(String(str ?? '0').replace(/,/g, '')) || 0;
+
+// Format a Number back into the stored "12,500.00" string form.
+const moneyStr = (n) => Number(n || 0).toLocaleString('en-US', {
+  minimumFractionDigits: 2, maximumFractionDigits: 2,
+});
+
+// Classify a transaction as 'charge' | 'payment' | 'refund'.
+// Prefers an explicit t.type if present; otherwise infers from amount sign,
+// payment_method and description keywords.
+const classifyTxn = (t) => {
+  if (!t) return 'charge';
+  const explicit = String(t.type || '').toLowerCase();
+  if (explicit === 'charge' || explicit === 'payment' || explicit === 'refund') return explicit;
+
+  const amt = money(t.amount);
+  const desc = String(t.description || '').toLowerCase();
+  const method = String(t.payment_method || '').toLowerCase();
+
+  // Negative amounts are money leaving the till → refunds.
+  if (amt < 0 || desc.includes('refund')) return 'refund';
+
+  // Charges: things the guest owes. Penalties/fees and explicit "charge" lines.
+  if (method === 'penalty' || desc.includes('charge') || desc.includes('penalty') ||
+      desc.includes('fee') || desc.includes('minibar') || desc.includes('f&b') ||
+      desc.includes('room service') || desc.includes('laundry') || desc.includes('spa')) {
+    return 'charge';
+  }
+
+  // Everything else positive is treated as a payment (deposit / balance payment).
+  return 'payment';
+};
+
+// Recompute billing totals from the ledger (ignoring VOIDED transactions) and
+// write them back onto the booking object. Returns the same booking.
+//   expected_total = sum of charges
+//   total_paid     = sum of payments  − sum of |refunds|
+//   balance_due    = max(0, expected_total − total_paid)
+const recomputeBilling = (booking) => {
+  const txns = (booking.transactions || []).filter(
+    t => String(t.status || '').toUpperCase() !== 'VOIDED'
+  );
+
+  let charges = 0, payments = 0, refunds = 0;
+  for (const t of txns) {
+    const kind = classifyTxn(t);
+    const amt = Math.abs(money(t.amount));
+    if (kind === 'charge')       charges  += amt;
+    else if (kind === 'payment') payments += amt;
+    else if (kind === 'refund')  refunds  += amt;
+  }
+
+  // If the booking already carried an expected_total that isn't represented as
+  // charge transactions (e.g. legacy bookings whose room total was stored only
+  // in billing), keep the larger of the two so we never understate what's owed.
+  const storedExpected = money(booking.billing?.expected_total);
+  const expectedTotal = Math.max(charges, storedExpected);
+
+  const totalPaid = Math.max(0, payments - refunds);
+  const balanceDue = Math.max(0, expectedTotal - totalPaid);
+
+  booking.billing = {
+    ...(booking.billing || {}),
+    expected_total: moneyStr(expectedTotal),
+    total_paid: moneyStr(totalPaid),
+    balance_due: moneyStr(balanceDue),
+  };
+  return booking;
+};
+
+
+// ─────────────────────────────────────────────
+// AUTH
+// ─────────────────────────────────────────────
+
+
+
+
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -109,15 +262,23 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(400).json({ error: 'Username and password are required' });
     }
 
+
+
+
     const employee = await Employee.findOne({
       'portal_access.username': { $regex: `^${username}$`, $options: 'i' },
       'portal_access.has_access': true,
     });
 
+
     if (!employee) {
       return res.status(401).json({ error: 'Invalid credentials or portal access not granted' });
     }
 
+
+    // Verify password. Stored hashes start with "$2" (bcrypt). Accounts that
+    // haven't been migrated yet still hold plain text — accept those too so no
+    // one is locked out, then transparently upgrade them to a hash on login.
     const stored = employee.portal_access.password || '';
     const looksHashed = stored.startsWith('$2');
     let passwordOk;
@@ -138,6 +299,8 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
+
+    // Determine department for routing to correct module
     const dept = (employee.employment_details?.department || '').toLowerCase();
     let module = 'frontdesk'; // default
     if (dept.includes('housekeeping'))  module = 'housekeeping';
@@ -146,17 +309,27 @@ app.post('/api/auth/login', async (req, res) => {
 
     const role = module === 'admin' ? 'admin' : 'employee';
 
+    // Sign a JWT carrying identity + role. The middleware trusts this token
+    // instead of re-querying the DB on every request.
     const token = jwt.sign(
-      { sub: String(employee._id), username: employee.portal_access.username, role, module },
+      {
+        sub:      String(employee._id),
+        auth_version: employee.auth_version || 0,
+        username: employee.portal_access.username,
+        role,
+        module,
+      },
       JWT_SECRET,
       { expiresIn: TOKEN_TTL }
     );
 
     res.json({
-      token, role, module,
+      token,
+      role,
+      module,
       employee: {
         _id:         employee._id,
-        employee_id: employee.employee_id,
+        employee_id: employee.employee_id,   // numeric id that tasks/requests reference
         name:        employee.full_name,
         email:       employee.contact?.email,
         department:  employee.employment_details?.department,
@@ -171,6 +344,36 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
+
+// ─────────────────────────────────────────────
+// AUTH MIDDLEWARE
+// requireAuth  → caller must present a valid, unexpired token (else 401)
+// requireAdmin → caller must additionally be an admin (else 403)
+// ─────────────────────────────────────────────
+
+// Verify the Bearer token and attach the decoded payload to req.user.
+const requireAuth = createRequireAuth(Employee, JWT_SECRET);
+
+// Gate a route to admins only. Must run after requireAuth.
+function requireAdmin(req, res, next) {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Authentication required. Please log in.' });
+  }
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required for this action.' });
+  }
+  next();
+}
+
+app.use('/api/archive', createArchiveRouter({ requireAuth, requireAdmin, Employee }));
+
+
+// ─────────────────────────────────────────────
+// CHANGE OWN PASSWORD
+// Any logged-in user can change their own password. They must prove they
+// know the current one. The token identifies who they are (req.user.sub),
+// so a user can never change someone else's password through this route.
+// ─────────────────────────────────────────────
 app.post('/api/auth/change-password', requireAuth, async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body || {};
@@ -189,6 +392,8 @@ app.post('/api/auth/change-password', requireAuth, async (req, res) => {
     const employee = await Employee.findById(req.user.sub);
     if (!employee) return res.status(404).json({ error: 'Account not found.' });
 
+    // Verify the current password. Handle both hashed and any lingering
+    // plain-text password the same way the login route does.
     const stored = employee.portal_access?.password || '';
     const currentOk = stored.startsWith('$2')
       ? await bcrypt.compare(currentPassword, stored)
@@ -210,6 +415,13 @@ app.post('/api/auth/change-password', requireAuth, async (req, res) => {
   }
 });
 
+
+// ─────────────────────────────────────────────
+// UPDATE OWN PROFILE
+// Any logged-in user can update THEIR OWN name / email / photo (identified by
+// the token's sub). It never touches role, department, salary, or the login
+// username — so non-admins can save their profile without admin rights.
+// ─────────────────────────────────────────────
 app.put('/api/auth/me', requireAuth, async (req, res) => {
   try {
     const body = req.body || {};
@@ -217,6 +429,9 @@ app.put('/api/auth/me', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Update operators are not allowed' });
     }
 
+    // Defense-in-depth: the client tells us WHO it thinks it is (expectUsername).
+    // If that doesn't match the token's identity, the token is stale/mismatched —
+    // reject rather than silently updating the wrong person's record.
     if (body.expectUsername && req.user.username &&
         String(body.expectUsername).toLowerCase() !== String(req.user.username).toLowerCase()) {
       return res.status(409).json({
@@ -270,136 +485,11 @@ app.put('/api/auth/me', requireAuth, async (req, res) => {
 });
 
 
-// ============================================================================
-// LAYER 3: DEFENSIVE PROGRAMMING & INTEGRITY GUARDS
-// Field Whitelists, Validation Helpers, and Ledger Computations
-// ============================================================================
-
-const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
-
-const hasMongoOperators = (obj) =>
-  obj && typeof obj === 'object' &&
-  Object.keys(obj).some(k => k.startsWith('$'));
-
-const buildSafeSet = (body, allowedPaths) => {
-  const source = (body && typeof body.$set === 'object') ? body.$set : body;
-  if (!source || typeof source !== 'object') return null;
-  const set = {};
-  for (const path of allowedPaths) {
-    if (Object.prototype.hasOwnProperty.call(source, path) && source[path] !== undefined) {
-      set[path] = source[path];
-    }
-  }
-  return Object.keys(set).length ? { $set: set } : null;
-};
-
-const EMPLOYEE_ALLOWED_PATHS = [
-  'full_name', 'photo', 'contact.email', 'contact.phone',
-  'portal_access.username', 'portal_access.has_access', 'portal_access.password',
-  'employment_details.hire_date', 'employment_details.status',
-  'employment_details.department', 'employment_details.role.title',
-  'employment_details.role.base_salary',
-];
-
-const VALID_EMP_STATUS = ['ACTIVE', 'ON LEAVE', 'TERMINATED', 'INACTIVE'];
-const isValidEmail = (e) => typeof e === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
-
-const PASSWORD_RULE_MSG =
-  'Password must be 5–8 characters and include an uppercase letter, a lowercase letter, a number, and a special character.';
-const validatePasswordPolicy = (pw) => {
-  const s = String(pw || '');
-  if (s.length < 5 || s.length > 8) return PASSWORD_RULE_MSG;
-  if (!/[A-Z]/.test(s))            return PASSWORD_RULE_MSG;
-  if (!/[a-z]/.test(s))            return PASSWORD_RULE_MSG;
-  if (!/[0-9]/.test(s))            return PASSWORD_RULE_MSG;
-  if (!/[^A-Za-z0-9]/.test(s))     return PASSWORD_RULE_MSG;
-  return null;
-};
-
-const validateEmployeeSet = (set) => {
-  if ('full_name' in set) {
-    const n = String(set['full_name'] || '').trim();
-    if (n.length < 2) return 'Full name must be at least 2 characters';
-  }
-  if ('contact.email' in set && set['contact.email'] && !isValidEmail(set['contact.email'])) {
-    return 'Invalid email address';
-  }
-  if ('employment_details.status' in set &&
-      !VALID_EMP_STATUS.includes(String(set['employment_details.status']).toUpperCase())) {
-    return `Invalid status. Allowed: ${VALID_EMP_STATUS.join(', ')}`;
-  }
-  if ('employment_details.role.base_salary' in set) {
-    const s = Number(set['employment_details.role.base_salary']);
-    if (Number.isNaN(s) || s < 0) return 'Salary must be a non-negative number';
-  }
-  return null;
-};
-
-const isAdminEmployee = (emp) =>
-  (emp?.employment_details?.department || '').toLowerCase().includes('admin');
-
-const money = (str) => parseFloat(String(str ?? '0').replace(/,/g, '')) || 0;
-const moneyStr = (n) => Number(n || 0).toLocaleString('en-US', {
-  minimumFractionDigits: 2, maximumFractionDigits: 2,
-});
-
-const classifyTxn = (t) => {
-  if (!t) return 'charge';
-  const explicit = String(t.type || '').toLowerCase();
-  if (explicit === 'charge' || explicit === 'payment' || explicit === 'refund') return explicit;
-
-  const amt = money(t.amount);
-  const desc = String(t.description || '').toLowerCase();
-  const method = String(t.payment_method || '').toLowerCase();
-
-  if (amt < 0 || desc.includes('refund')) return 'refund';
-
-  if (method === 'penalty' || desc.includes('charge') || desc.includes('penalty') ||
-      desc.includes('fee') || desc.includes('minibar') || desc.includes('f&b') ||
-      desc.includes('room service') || desc.includes('laundry') || desc.includes('spa')) {
-    return 'charge';
-  }
-  return 'payment';
-};
-
-const recomputeBilling = (booking) => {
-  const txns = (booking.transactions || []).filter(
-    t => String(t.status || '').toUpperCase() !== 'VOIDED'
-  );
-
-  let charges = 0, payments = 0, refunds = 0;
-  for (const t of txns) {
-    const kind = classifyTxn(t);
-    const amt = Math.abs(money(t.amount));
-    if (kind === 'charge')       charges  += amt;
-    else if (kind === 'payment') payments += amt;
-    else if (kind === 'refund')  refunds  += amt;
-  }
-
-  const storedExpected = money(booking.billing?.expected_total);
-  const expectedTotal = Math.max(charges, storedExpected);
-
-  const totalPaid = Math.max(0, payments - refunds);
-  const balanceDue = Math.max(0, expectedTotal - totalPaid);
-
-  booking.billing = {
-    ...(booking.billing || {}),
-    expected_total: moneyStr(expectedTotal),
-    total_paid: moneyStr(totalPaid),
-    balance_due: moneyStr(balanceDue),
-  };
-  return booking;
-};
-
-
-// ============================================================================
-// LAYER 4: REAL-TIME OPERATIONAL ENDPOINTS
-// Rooms, Bookings, Employees, Tasks, Logs, Shifts, etc.
-// ============================================================================
-
 // ─────────────────────────────────────────────
 // ROOMS
 // ─────────────────────────────────────────────
+
+
 app.get('/api/rooms', async (req, res) => {
   try {
     const rooms = await Room.find();
@@ -409,6 +499,7 @@ app.get('/api/rooms', async (req, res) => {
   }
 });
 
+// PUT update a room by _id (housekeeping status, assignment, notes, etc.)
 app.put('/api/rooms/:id', requireAuth, async (req, res) => {
   try {
     const updated = await Room.findByIdAndUpdate(req.params.id, req.body, { new: true });
@@ -418,6 +509,7 @@ app.put('/api/rooms/:id', requireAuth, async (req, res) => {
     res.status(500).json({ error: 'Failed to update room' });
   }
 });
+
 
 app.get('/api/room-types', async (req, res) => {
   try {
@@ -429,8 +521,12 @@ app.get('/api/room-types', async (req, res) => {
 });
 
 // ─────────────────────────────────────────────
-// BOOKINGS & WORKFLOWS
+// BOOKINGS
 // ─────────────────────────────────────────────
+
+
+
+
 app.get('/api/bookings', async (req, res) => {
   try {
     const filter = {};
@@ -444,6 +540,9 @@ app.get('/api/bookings', async (req, res) => {
   }
 });
 
+
+
+
 app.get('/api/arrivals', async (req, res) => {
   try {
     const date = req.query.date || new Date().toISOString().slice(0, 10);
@@ -453,6 +552,9 @@ app.get('/api/arrivals', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch arrivals' });
   }
 });
+
+
+
 
 app.get('/api/departures', async (req, res) => {
   try {
@@ -467,6 +569,9 @@ app.get('/api/departures', async (req, res) => {
   }
 });
 
+
+
+
 app.get('/api/guests/in-house', async (req, res) => {
   try {
     const guests = await Booking.find({ status: 'Checked In' }).sort({ 'dates.check_in': 1 });
@@ -475,6 +580,9 @@ app.get('/api/guests/in-house', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch in-house guests' });
   }
 });
+
+
+
 
 app.get('/api/bookings/:id', async (req, res) => {
   try {
@@ -486,45 +594,8 @@ app.get('/api/bookings/:id', async (req, res) => {
   }
 });
 
-app.post('/api/bookings', requireAuth, async (req, res) => {
-  try {
-    const booking = new Booking(req.body);
-    recomputeBilling(booking);
-    const saved = await booking.save();
-    res.status(201).json(saved);
-  } catch (error) {
-    console.error('Create booking error:', error);
-    res.status(500).json({ error: 'Failed to create booking' });
-  }
-});
 
-app.put('/api/bookings/:id', requireAuth, requireAdmin, async (req, res) => {
-  try {
-    if (!isValidObjectId(req.params.id)) {
-      return res.status(400).json({ error: 'Invalid booking id' });
-    }
-    if (hasMongoOperators(req.body)) {
-      return res.status(400).json({ error: 'Update operators are not allowed' });
-    }
-    const update = { ...req.body };
-    delete update._id;
-    delete update.transactions;
-    delete update.booking_id;
 
-    if (!Object.keys(update).length) {
-      return res.status(400).json({ error: 'No valid fields to update' });
-    }
-
-    const updated = await Booking.findByIdAndUpdate(
-      req.params.id, update, { new: true, runValidators: true }
-    );
-    if (!updated) return res.status(404).json({ error: 'Booking not found' });
-    res.json(updated);
-  } catch (error) {
-    console.error('Update booking error:', error);
-    res.status(500).json({ error: 'Failed to update booking', detail: error.message });
-  }
-});
 
 app.delete('/api/bookings/:id', requireAuth, requireAdmin, async (req, res) => {
   try {
@@ -533,23 +604,22 @@ app.delete('/api/bookings/:id', requireAuth, requireAdmin, async (req, res) => {
     }
     const booking = await Booking.findById(req.params.id);
     if (!booking) return res.status(404).json({ error: 'Booking not found' });
-   
-    const activeTxns = (booking.transactions || []).filter(
-      t => t && t.status !== 'VOIDED'
-    );
-    if (activeTxns.length > 0) {
-      return res.status(400).json({
-        error: 'Cannot delete a booking that has transactions. Void all transactions first.'
-      });
-    }
 
-    await Booking.findByIdAndDelete(req.params.id);
-    res.json({ success: true });
+
+   
+    // The archive service distinguishes recoverable archival from destructive
+    // purging. Never ask staff to void genuine payments just to archive a stay.
+
+
+    return archiveResponse(req, res, 'bookings');
   } catch (error) {
     console.error('Delete booking error:', error);
     res.status(500).json({ error: 'Failed to delete booking', detail: error.message });
   }
 });
+
+
+
 
 app.post('/api/bookings/:id/cancel', requireAuth, async (req, res) => {
   try {
@@ -563,6 +633,7 @@ app.post('/api/bookings/:id/cancel', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Cannot cancel a booking that is already checked out' });
     }
 
+
     booking.status = 'Cancelled';
     booking.cancellation = {
       cancelled_by: cancelled_by || 'Staff',
@@ -572,6 +643,7 @@ app.post('/api/bookings/:id/cancel', requireAuth, async (req, res) => {
       penalty_amount: penalty_applied ? moneyStr(money(penalty_amount)) : '0.00',
     };
 
+    // A cancellation penalty is a CHARGE the guest owes.
     if (penalty_applied && money(penalty_amount) > 0) {
       booking.transactions.push({
         txn_id: `TXN-${Date.now()}`,
@@ -593,30 +665,96 @@ app.post('/api/bookings/:id/cancel', requireAuth, async (req, res) => {
   }
 });
 
+
+
+
+app.post('/api/bookings', requireAuth, async (req, res) => {
+  try {
+    const booking = new Booking(req.body);
+    // Keep billing consistent with whatever transactions the booking was
+    // created with (deposit payments, room charges, etc.).
+    recomputeBilling(booking);
+    const saved = await booking.save();
+    res.status(201).json(saved);
+  } catch (error) {
+    console.error('Create booking error:', error);
+    res.status(500).json({ error: 'Failed to create booking' });
+  }
+});
+
+
+
+
+app.put('/api/bookings/:id', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    if (!isValidObjectId(req.params.id)) {
+      return res.status(400).json({ error: 'Invalid booking id' });
+    }
+    if (hasMongoOperators(req.body)) {
+      return res.status(400).json({ error: 'Update operators are not allowed' });
+    }
+
+    // Never let this generic route rewrite the ledger or the id. Transactions
+    // must go through the dedicated void/refund routes that enforce their rules.
+    const update = { ...req.body };
+    delete update._id;
+    delete update.transactions;
+    delete update.booking_id;
+
+    if (!Object.keys(update).length) {
+      return res.status(400).json({ error: 'No valid fields to update' });
+    }
+
+    const updated = await Booking.findByIdAndUpdate(
+      req.params.id,
+      update,
+      { new: true, runValidators: true }
+    );
+    if (!updated) return res.status(404).json({ error: 'Booking not found' });
+    res.json(updated);
+  } catch (error) {
+    console.error('Update booking error:', error);
+    res.status(500).json({ error: 'Failed to update booking', detail: error.message });
+  }
+});
+
+
+
+
 app.post('/api/bookings/:id/checkin', requireAuth, async (req, res) => {
   try {
     const updated = await Booking.findByIdAndUpdate(
-      req.params.id, { status: 'Checked In' }, { new: true }
+      req.params.id,
+      { status: 'Checked In' },
+      { new: true }
     );
     if (!updated) return res.status(404).json({ error: 'Booking not found' });
 
+    // Keep the linked room in sync so room-based views (RoomRack, Housekeeping)
+    // reflect the in-house guest. Best-effort: don't fail check-in if no match.
     const roomNum = String(updated.room_number || '').trim();
     if (roomNum) {
       await Room.updateOne({ room_number: roomNum }, { $set: { status: 'Occupied' } });
     }
+
     res.json(updated);
   } catch (error) {
     res.status(500).json({ error: 'Failed to check in' });
   }
 });
 
+
+// POST check-out: set status to "Checked Out"
 app.post('/api/bookings/:id/checkout', requireAuth, async (req, res) => {
   try {
     const updated = await Booking.findByIdAndUpdate(
-      req.params.id, { status: 'Checked Out' }, { new: true }
+      req.params.id,
+      { status: 'Checked Out' },
+      { new: true }
     );
     if (!updated) return res.status(404).json({ error: 'Booking not found' });
 
+    // Free up the linked room. Flag it dirty for housekeeping to turn over.
     const roomNum = String(updated.room_number || '').trim();
     if (roomNum) {
       await Room.updateOne(
@@ -624,11 +762,15 @@ app.post('/api/bookings/:id/checkout', requireAuth, async (req, res) => {
         { $set: { status: 'Vacant', housekeeping: 'Dirty' } }
       );
     }
+
     res.json(updated);
   } catch (error) {
     res.status(500).json({ error: 'Failed to check out' });
   }
 });
+
+
+
 
 app.post('/api/bookings/:id/transactions', requireAuth, requireAdmin, async (req, res) => {
   try {
@@ -636,7 +778,7 @@ app.post('/api/bookings/:id/transactions', requireAuth, requireAdmin, async (req
     if (!booking) return res.status(404).json({ error: 'Booking not found' });
 
     booking.transactions.push(req.body);
-    recomputeBilling(booking);
+    recomputeBilling(booking);           // keep billing in sync with the ledger
     const saved = await booking.save();
     res.status(201).json(saved);
   } catch (error) {
@@ -645,16 +787,17 @@ app.post('/api/bookings/:id/transactions', requireAuth, requireAdmin, async (req
   }
 });
 
+
 app.patch('/api/bookings/:id/transactions/:txnId/void', requireAuth, requireAdmin, async (req, res) => {
   try {
     const booking = await Booking.findById(req.params.id);
     if (!booking) return res.status(404).json({ error: 'Booking or transaction not found' });
 
-    const txn = (booking.transactions || []).find(t => t.txn_id === req.params.txnId);
+    const txn = (booking.transactions || []).find(t => t.txn_id === req.params.txnId && !t.deleted_at);
     if (!txn) return res.status(404).json({ error: 'Booking or transaction not found' });
 
     txn.status = 'VOIDED';
-    recomputeBilling(booking);
+    recomputeBilling(booking);           // voiding a payment reopens the balance, etc.
     const saved = await booking.save();
     res.json(saved);
   } catch (error) {
@@ -663,6 +806,11 @@ app.patch('/api/bookings/:id/transactions/:txnId/void', requireAuth, requireAdmi
   }
 });
 
+
+// ─────────────────────────────────────────────
+// RECORD A PAYMENT against a booking's balance (staff-level).
+// Adds a PAYMENT transaction and recomputes billing so the balance drops.
+// ─────────────────────────────────────────────
 app.post('/api/bookings/:id/payments', requireAuth, async (req, res) => {
   try {
     if (!isValidObjectId(req.params.id)) {
@@ -703,6 +851,12 @@ app.post('/api/bookings/:id/payments', requireAuth, async (req, res) => {
   }
 });
 
+
+// ─────────────────────────────────────────────
+// ISSUE A REFUND against a booking (admin-level).
+// Adds a REFUND transaction (money out), capped at what has been paid, and
+// recomputes billing so the balance rises by the refunded amount.
+// ─────────────────────────────────────────────
 app.post('/api/bookings/:id/refunds', requireAuth, requireAdmin, async (req, res) => {
   try {
     if (!isValidObjectId(req.params.id)) {
@@ -728,7 +882,7 @@ app.post('/api/bookings/:id/refunds', requireAuth, requireAdmin, async (req, res
       type: 'refund',
       datetime: new Date().toLocaleString('en-CA', { hour12: false }).replace(',', ''),
       description: `Refund - ${req.body?.reason || 'Guest request'}`,
-      amount: `-${moneyStr(amountNum)}`,
+      amount: `-${moneyStr(amountNum)}`,   // negative = money out
       payment_method: String(req.body?.payment_method || 'Cash'),
       payment_details: req.body?.reference ? String(req.body.reference) : 'Front Desk',
       status: 'COMPLETED',
@@ -743,9 +897,12 @@ app.post('/api/bookings/:id/refunds', requireAuth, requireAdmin, async (req, res
   }
 });
 
+
 // ─────────────────────────────────────────────
-// GLOBAL TRANSACTIONS & EMPLOYEES & SHIFTS
+// TRANSACTIONS  (read across all bookings)
 // ─────────────────────────────────────────────
+
+
 app.get('/api/transactions', async (req, res) => {
   try {
     const period = req.query.period || 'today';
@@ -759,8 +916,10 @@ app.get('/api/transactions', async (req, res) => {
       default:      startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     }
 
+
     const result = await Booking.aggregate([
       { $unwind: '$transactions' },
+      { $match: { 'transactions.deleted_at': null } },
       {
         $project: {
           _id: 0,
@@ -780,14 +939,22 @@ app.get('/api/transactions', async (req, res) => {
       }
     ]);
 
+    // Only COMPLETED transactions count toward money in/out; VOIDED are ignored.
     const completed = result.filter(t => String(t.status || '').toUpperCase() === 'COMPLETED');
+
+    // Income = money actually received (payments). Charges are what's owed, not
+    // cash in hand, so they don't count as income here.
     const totalIncome = completed
       .filter(t => classifyTxn(t) === 'payment')
       .reduce((sum, t) => sum + Math.abs(money(t.amount)), 0);
+
+    // Money out = refunds returned to guests.
     const totalExpenses = completed
       .filter(t => classifyTxn(t) === 'refund')
       .reduce((sum, t) => sum + Math.abs(money(t.amount)), 0);
 
+    // Outstanding = the sum of every booking's current balance due (live figure),
+    // independent of the selected period.
     const activeBookings = await Booking.find(
       { status: { $nin: ['Cancelled'] } },
       { 'billing.balance_due': 1 }
@@ -811,11 +978,20 @@ app.get('/api/transactions', async (req, res) => {
   }
 });
 
+
+// ─────────────────────────────────────────────
+// EMPLOYEES
+// ─────────────────────────────────────────────
+
+
+
+
 app.get('/api/employees', async (req, res) => {
   try {
     const filter = {};
     if (req.query.department) filter['employment_details.department'] = req.query.department;
     if (req.query.status)     filter['employment_details.status'] = req.query.status;
+    // Never expose the (hashed) password to the client.
     const employees = await Employee.find(filter)
       .select('-portal_access.password')
       .sort({ full_name: 1 });
@@ -825,9 +1001,13 @@ app.get('/api/employees', async (req, res) => {
   }
 });
 
+
+
+
 app.post('/api/employees', requireAuth, requireAdmin, async (req, res) => {
   try {
     const body = { ...req.body };
+    // Hash the portal password before storing (if one was provided).
     if (body.portal_access && body.portal_access.password) {
       const policyError = validatePasswordPolicy(body.portal_access.password);
       if (policyError) return res.status(400).json({ error: policyError });
@@ -838,6 +1018,7 @@ app.post('/api/employees', requireAuth, requireAdmin, async (req, res) => {
     }
     const employee = new Employee(body);
     const saved = await employee.save();
+    // Strip the password hash from the response.
     const out = saved.toObject();
     if (out.portal_access) delete out.portal_access.password;
     res.status(201).json(out);
@@ -847,24 +1028,34 @@ app.post('/api/employees', requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
+
+
+
 app.put('/api/employees/:id', requireAuth, requireAdmin, async (req, res) => {
   try {
+    // 1. Validate the id shape before touching the DB.
     if (!isValidObjectId(req.params.id)) {
       return res.status(400).json({ error: 'Invalid employee id' });
     }
+
+    // 2. Reject raw operator injection ($rename, $unset, $inc, ...).
+    //    We only ever accept a whitelisted $set (or flat) payload.
     const rawSource = (req.body && typeof req.body.$set === 'object') ? req.body.$set : req.body;
     if (hasMongoOperators(rawSource)) {
       return res.status(400).json({ error: 'Update operators are not allowed' });
     }
 
+    // 3. Whitelist fields — anything not explicitly allowed is dropped.
     const safeUpdate = buildSafeSet(req.body, EMPLOYEE_ALLOWED_PATHS);
     if (!safeUpdate) {
       return res.status(400).json({ error: 'No valid fields to update' });
     }
 
+    // 4. Field-level validation (email format, status enum, salary range, ...).
     const fieldError = validateEmployeeSet(safeUpdate.$set);
     if (fieldError) return res.status(400).json({ error: fieldError });
 
+    // 4b. If a new portal password was supplied, validate + hash it.
     if (safeUpdate.$set['portal_access.password']) {
       const policyError = validatePasswordPolicy(safeUpdate.$set['portal_access.password']);
       if (policyError) return res.status(400).json({ error: policyError });
@@ -872,6 +1063,8 @@ app.put('/api/employees/:id', requireAuth, requireAdmin, async (req, res) => {
         await bcrypt.hash(String(safeUpdate.$set['portal_access.password']), 10);
     }
 
+    // 5. Guard: don't let the last active admin be demoted or deactivated,
+    //    which would lock everyone out of the admin module.
     const target = await Employee.findById(req.params.id);
     if (!target) return res.status(404).json({ error: 'Employee not found' });
 
@@ -894,8 +1087,11 @@ app.put('/api/employees/:id', requireAuth, requireAdmin, async (req, res) => {
       }
     }
 
+    // 6. Run schema validators on the update.
     const updated = await Employee.findByIdAndUpdate(
-      req.params.id, safeUpdate, { new: true, runValidators: true }
+      req.params.id,
+      safeUpdate,
+      { new: true, runValidators: true }
     ).select('-portal_access.password');
     if (!updated) return res.status(404).json({ error: 'Employee not found' });
     res.json(updated);
@@ -905,14 +1101,21 @@ app.put('/api/employees/:id', requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
+
+
+
 app.delete('/api/employees/:id', requireAuth, requireAdmin, async (req, res) => {
   try {
+    // 1. Validate id shape.
     if (!isValidObjectId(req.params.id)) {
       return res.status(400).json({ error: 'Invalid employee id' });
     }
+
+    // 2. Load first so we can run protective checks before deleting.
     const target = await Employee.findById(req.params.id);
     if (!target) return res.status(404).json({ error: 'Employee not found' });
 
+    // 3. Never delete the last active admin — that would lock out the admin module.
     if (isAdminEmployee(target)) {
       const activeAdmins = await Employee.countDocuments({
         'employment_details.department': { $regex: 'admin', $options: 'i' },
@@ -925,6 +1128,9 @@ app.delete('/api/employees/:id', requireAuth, requireAdmin, async (req, res) => 
       }
     }
 
+    // 4. Dependency check: block deletion while the employee still has shift
+    //    assignments, so schedules don't end up pointing at a ghost record.
+    //    (Consistent with how bookings block delete when transactions exist.)
     const assignedShifts = await ShiftAssignment.countDocuments({
       employee_id: target.employee_id,
     });
@@ -934,13 +1140,20 @@ app.delete('/api/employees/:id', requireAuth, requireAdmin, async (req, res) => 
       });
     }
 
-    await Employee.findByIdAndDelete(req.params.id);
-    res.json({ success: true });
+    return archiveResponse(req, res, 'employees');
   } catch (error) {
     console.error('Delete employee error:', error);
     res.status(500).json({ error: 'Failed to delete employee', detail: error.message });
   }
 });
+
+
+// ─────────────────────────────────────────────
+// SHIFTS
+// ─────────────────────────────────────────────
+
+
+
 
 app.get('/api/shifts', async (req, res) => {
   try {
@@ -950,6 +1163,14 @@ app.get('/api/shifts', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch shifts' });
   }
 });
+
+
+// ─────────────────────────────────────────────
+// SHIFT ASSIGNMENTS
+// ─────────────────────────────────────────────
+
+
+
 
 app.get('/api/shift-assignments', async (req, res) => {
   try {
@@ -969,21 +1190,15 @@ app.get('/api/shift-assignments', async (req, res) => {
   }
 });
 
-app.post('/api/shift-assignments', requireAuth, requireAdmin, async (req, res) => {
-  try {
-    const assignment = new ShiftAssignment(req.body);
-    const saved = await assignment.save();
-    res.status(201).json(saved);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to create assignment' });
-  }
-});
+
+
 
 app.patch('/api/shift-assignments/upsert', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { employee_id, shift_date, shift_id, status } = req.body;
     const dateStr = typeof shift_date === 'string' ? shift_date.slice(0, 10) : new Date(shift_date).toISOString().slice(0, 10);
     const dateObj = new Date(`${dateStr}T00:00:00.000Z`);
+
 
     const existing = await ShiftAssignment.findOne({
       employee_id,
@@ -993,13 +1208,14 @@ app.patch('/api/shift-assignments/upsert', requireAuth, requireAdmin, async (req
       },
     });
 
+
     let result;
     if (existing) {
       existing.shift_id = shift_id;
       existing.status   = status || 'PUBLISHED';
       result = await existing.save();
     } else {
-      const maxDoc = await ShiftAssignment.findOne().sort({ assignment_id: -1 });
+      const maxDoc = await ShiftAssignment.findOne().withArchived().sort({ assignment_id: -1 });
       const nextId = (maxDoc?.assignment_id || 0) + 1;
       result = await ShiftAssignment.create({
         assignment_id: nextId,
@@ -1016,6 +1232,9 @@ app.patch('/api/shift-assignments/upsert', requireAuth, requireAdmin, async (req
   }
 });
 
+
+
+
 app.put('/api/shift-assignments/:id', requireAuth, requireAdmin, async (req, res) => {
   try {
     const updated = await ShiftAssignment.findByIdAndUpdate(req.params.id, req.body, { new: true });
@@ -1026,20 +1245,39 @@ app.put('/api/shift-assignments/:id', requireAuth, requireAdmin, async (req, res
   }
 });
 
+
+
+
 app.delete('/api/shift-assignments/:id', requireAuth, requireAdmin, async (req, res) => {
   try {
-    const deleted = await ShiftAssignment.findByIdAndDelete(req.params.id);
-    if (!deleted) return res.status(404).json({ error: 'Assignment not found' });
-    res.json({ success: true });
+    return archiveResponse(req, res, 'shift_assignments');
   } catch (error) {
     res.status(500).json({ error: 'Failed to delete assignment' });
   }
 });
 
+
+
+
+app.post('/api/shift-assignments', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const assignment = new ShiftAssignment(req.body);
+    const saved = await assignment.save();
+    res.status(201).json(saved);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to create assignment' });
+  }
+});
+
+
 // ─────────────────────────────────────────────
-// AUDITS, TASKS, REQUESTS, LOGS
+// AUDITS
 // ─────────────────────────────────────────────
-app.get('/api/audits', async (req, res) => {
+
+
+
+
+app.get('/api/audits', requireAuth, requireAdmin, async (req, res) => {
   try {
     const audits = await Audit.find().sort({ datetime: -1 });
     res.json(audits);
@@ -1047,6 +1285,7 @@ app.get('/api/audits', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch audit logs' });
   }
 });
+
 
 app.post('/api/audits', requireAuth, requireAdmin, async (req, res) => {
   try {
@@ -1058,238 +1297,32 @@ app.post('/api/audits', requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
-app.get('/api/guest-requests', async (req, res) => {
-  try {
-    const filter = {};
-    if (req.query.status) filter.status = req.query.status;
-    if (req.query.room_number) filter.room_number = Number(req.query.room_number);
-    const items = await GuestRequest.find(filter).sort({ requested_at: -1 });
-    res.json(items);
-  } catch (e) { res.status(500).json({ error: 'Failed to fetch guest requests', detail: e.message }); }
-});
 
-app.post('/api/guest-requests', requireAuth, async (req, res) => {
-  try {
-    const max = await GuestRequest.findOne().sort({ request_id: -1 });
-    const body = { ...req.body, request_id: (max?.request_id || 0) + 1, requested_at: new Date() };
-    const saved = await new GuestRequest(body).save();
-    res.status(201).json(saved);
-  } catch (e) { res.status(500).json({ error: 'Failed to create guest request', detail: e.message }); }
-});
+// ─────────────────────────────────────────────
+// DASHBOARD OVERVIEW
+// ─────────────────────────────────────────────
 
-app.put('/api/guest-requests/:id', requireAuth, async (req, res) => {
-  try {
-    const updated = await GuestRequest.findByIdAndUpdate(req.params.id, req.body, { new: true });
-    if (!updated) return res.status(404).json({ error: 'Not found' });
-    res.json(updated);
-  } catch (e) { res.status(500).json({ error: 'Failed to update guest request', detail: e.message }); }
-});
-
-app.delete('/api/guest-requests/:id', requireAuth, async (req, res) => {
-  try {
-    await GuestRequest.findByIdAndDelete(req.params.id);
-    res.json({ success: true });
-  } catch (e) { res.status(500).json({ error: 'Failed to delete guest request', detail: e.message }); }
-});
-
-app.get('/api/cleaning-tasks', async (req, res) => {
-  try {
-    const filter = {};
-    if (req.query.status) filter.status = req.query.status;
-    if (req.query.date) filter.scheduled_date = { $gte: new Date(req.query.date), $lt: new Date(new Date(req.query.date).getTime() + 86400000) };
-    const items = await CleaningTask.find(filter).sort({ scheduled_date: 1 });
-    res.json(items);
-  } catch (e) { res.status(500).json({ error: 'Failed to fetch cleaning tasks', detail: e.message }); }
-});
-
-app.post('/api/cleaning-tasks', requireAuth, async (req, res) => {
-  try {
-    const max = await CleaningTask.findOne().sort({ task_id: -1 });
-    const body = { ...req.body, task_id: (max?.task_id || 0) + 1 };
-    const saved = await new CleaningTask(body).save();
-    res.status(201).json(saved);
-  } catch (e) { res.status(500).json({ error: 'Failed to create cleaning task', detail: e.message }); }
-});
-
-app.put('/api/cleaning-tasks/:id', requireAuth, async (req, res) => {
-  try {
-    const updated = await CleaningTask.findByIdAndUpdate(req.params.id, req.body, { new: true });
-    if (!updated) return res.status(404).json({ error: 'Not found' });
-    res.json(updated);
-  } catch (e) { res.status(500).json({ error: 'Failed to update cleaning task', detail: e.message }); }
-});
-
-app.delete('/api/cleaning-tasks/:id', requireAuth, async (req, res) => {
-  try {
-    await CleaningTask.findByIdAndDelete(req.params.id);
-    res.json({ success: true });
-  } catch (e) { res.status(500).json({ error: 'Failed to delete cleaning task', detail: e.message }); }
-});
-
-app.get('/api/housekeeping-logs', async (req, res) => {
-  try {
-    const filter = {};
-    if (req.query.today) {
-      const start = new Date(); start.setHours(0, 0, 0, 0);
-      const end = new Date(start.getTime() + 86400000);
-      filter.datetime = { $gte: start, $lt: end };
-    }
-    const items = await HousekeepingLog.find(filter).sort({ datetime: -1 });
-    res.json(items);
-  } catch (e) { res.status(500).json({ error: 'Failed to fetch housekeeping logs', detail: e.message }); }
-});
-
-app.post('/api/housekeeping-logs', requireAuth, async (req, res) => {
-  try {
-    const { room_number, category, description, employee } = req.body || {};
-    if (!room_number || !description) {
-      return res.status(400).json({ error: 'Room number and description are required.' });
-    }
-    const max = await HousekeepingLog.findOne().sort({ log_id: -1 });
-    const saved = await new HousekeepingLog({
-      log_id: (max?.log_id || 0) + 1,
-      room_number: String(room_number),
-      category: category || 'Room Note',
-      description,
-      employee: employee || '',
-      datetime: new Date(),
-    }).save();
-    res.status(201).json(saved);
-  } catch (e) { res.status(500).json({ error: 'Failed to create housekeeping log', detail: e.message }); }
-});
-
-app.delete('/api/housekeeping-logs/:id', requireAuth, async (req, res) => {
-  try {
-    if (!isValidObjectId(req.params.id)) {
-      return res.status(400).json({ error: 'Invalid log id' });
-    }
-    await HousekeepingLog.findByIdAndDelete(req.params.id);
-    res.json({ success: true });
-  } catch (e) { res.status(500).json({ error: 'Failed to delete housekeeping log', detail: e.message }); }
-});
-
-app.get('/api/lost-and-found', async (req, res) => {
-  try {
-    const filter = {};
-    if (req.query.status) filter.status = req.query.status;
-    const items = await LostAndFound.find(filter).sort({ found_date: -1 });
-    res.json(items);
-  } catch (e) { res.status(500).json({ error: 'Failed to fetch lost and found', detail: e.message }); }
-});
-
-app.post('/api/lost-and-found', requireAuth, async (req, res) => {
-  try {
-    const max = await LostAndFound.findOne().sort({ item_id: -1 });
-    const body = { ...req.body, item_id: (max?.item_id || 0) + 1, found_date: req.body.found_date || new Date() };
-    const saved = await new LostAndFound(body).save();
-    res.status(201).json(saved);
-  } catch (e) { res.status(500).json({ error: 'Failed to create lost and found record', detail: e.message }); }
-});
-
-app.put('/api/lost-and-found/:id', requireAuth, async (req, res) => {
-  try {
-    const updated = await LostAndFound.findByIdAndUpdate(req.params.id, req.body, { new: true });
-    if (!updated) return res.status(404).json({ error: 'Not found' });
-    res.json(updated);
-  } catch (e) { res.status(500).json({ error: 'Failed to update lost and found record', detail: e.message }); }
-});
-
-app.delete('/api/lost-and-found/:id', requireAuth, async (req, res) => {
-  try {
-    await LostAndFound.findByIdAndDelete(req.params.id);
-    res.json({ success: true });
-  } catch (e) { res.status(500).json({ error: 'Failed to delete lost and found record', detail: e.message }); }
-});
-
-app.get('/api/maintenance-requests', async (req, res) => {
-  try {
-    const filter = {};
-    if (req.query.status) filter.status = req.query.status;
-    const items = await MaintenanceRequest.find(filter).sort({ reported_at: -1 });
-    res.json(items);
-  } catch (e) { res.status(500).json({ error: 'Failed to fetch maintenance requests', detail: e.message }); }
-});
-
-app.post('/api/maintenance-requests', requireAuth, async (req, res) => {
-  try {
-    const max = await MaintenanceRequest.findOne().sort({ maintenance_id: -1 });
-    const body = { ...req.body, maintenance_id: (max?.maintenance_id || 0) + 1, reported_at: new Date() };
-    const saved = await new MaintenanceRequest(body).save();
-    res.status(201).json(saved);
-  } catch (e) { res.status(500).json({ error: 'Failed to create maintenance request', detail: e.message }); }
-});
-
-app.put('/api/maintenance-requests/:id', requireAuth, async (req, res) => {
-  try {
-    const updated = await MaintenanceRequest.findByIdAndUpdate(req.params.id, req.body, { new: true });
-    if (!updated) return res.status(404).json({ error: 'Not found' });
-    res.json(updated);
-  } catch (e) { res.status(500).json({ error: 'Failed to update maintenance request', detail: e.message }); }
-});
-
-app.delete('/api/maintenance-requests/:id', requireAuth, async (req, res) => {
-  try {
-    await MaintenanceRequest.findByIdAndDelete(req.params.id);
-    res.json({ success: true });
-  } catch (e) { res.status(500).json({ error: 'Failed to delete maintenance request', detail: e.message }); }
-});
-
-app.get('/api/front-desk-logs', async (req, res) => {
-  try {
-    const filter = {};
-    if (req.query.date) {
-      const start = new Date(req.query.date);
-      const end   = new Date(new Date(req.query.date).getTime() + 86400000);
-      filter.datetime = { $gte: start.toISOString().slice(0,10), $lt: end.toISOString().slice(0,10) };
-    }
-    const logs = await Audit.find(filter).sort({ datetime: -1 });
-    res.json(logs);
-  } catch (e) { res.status(500).json({ error: 'Failed to fetch logs', detail: e.message }); }
-});
-
-app.post('/api/front-desk-logs', requireAuth, async (req, res) => {
-  try {
-    const max = await Audit.findOne().sort({ audit_id: -1 });
-    const nextId = `LOG-${String((parseInt((max?.audit_id || 'LOG-0').split('-')[1]) || 0) + 1).padStart(3,'0')}`;
-    const body = {
-      ...req.body,
-      audit_id: nextId,
-      datetime: req.body.datetime || new Date().toISOString().slice(0, 19).replace('T', ' '),
-    };
-    const saved = await new Audit(body).save();
-    res.status(201).json(saved);
-  } catch (e) { res.status(500).json({ error: 'Failed to create log entry', detail: e.message }); }
-});
-
-app.put('/api/front-desk-logs/:id', requireAuth, async (req, res) => {
-  try {
-    const updated = await Audit.findByIdAndUpdate(req.params.id, req.body, { new: true });
-    if (!updated) return res.status(404).json({ error: 'Not found' });
-    res.json(updated);
-  } catch (e) { res.status(500).json({ error: 'Failed to update log entry', detail: e.message }); }
-});
-
-app.delete('/api/front-desk-logs/:id', requireAuth, async (req, res) => {
-  try {
-    await Audit.findByIdAndDelete(req.params.id);
-    res.json({ success: true });
-  } catch (e) { res.status(500).json({ error: 'Failed to delete log entry', detail: e.message }); }
-});
-
-
-// ============================================================================
-// LAYER 5: BUSINESS INTELLIGENCE & REPORTING ENGINES
-// Live System Dashboards & Analytics
-// ============================================================================
 
 app.get('/api/dashboard/overview', async (req, res) => {
   try {
     const today = new Date().toISOString().slice(0, 10);
 
+
     const [
-      totalArrivals, checkedInArrivals, totalDepartures, checkedOutDepartures,
-      inHouseTotal, inHouseWithBalance, totalBookings, confirmedBookings,
-      checkedInBookings, totalRooms, occupiedRooms, vacantRooms, maintenanceRooms, recentAudits,
+      totalArrivals,
+      checkedInArrivals,
+      totalDepartures,
+      checkedOutDepartures,
+      inHouseTotal,
+      inHouseWithBalance,
+      totalBookings,
+      confirmedBookings,
+      checkedInBookings,
+      totalRooms,
+      occupiedRooms,
+      vacantRooms,
+      maintenanceRooms,
+      recentAudits,
     ] = await Promise.all([
       Booking.countDocuments({ 'dates.check_in': today }),
       Booking.countDocuments({ 'dates.check_in': today, status: 'Checked In' }),
@@ -1307,8 +1340,10 @@ app.get('/api/dashboard/overview', async (req, res) => {
       Audit.find({}).sort({ datetime: -1 }).limit(5),
     ]);
 
+
     const pendingArrivals = totalArrivals - checkedInArrivals;
     const pendingDepartures = totalDepartures - checkedOutDepartures;
+
 
     const recentActivity = recentAudits.map(a => ({
       id: a._id,
@@ -1318,12 +1353,14 @@ app.get('/api/dashboard/overview', async (req, res) => {
       icon: 'fa-circle-info',
     }));
 
+
     res.json({
       arrivals:   { total: totalArrivals, pending: pendingArrivals, checkedIn: checkedInArrivals, vip: 0 },
       departures: { total: totalDepartures, pending: pendingDepartures, checkedOut: checkedOutDepartures, balanceDue: 0 },
       inHouse:    { total: inHouseTotal, balanceOutstanding: inHouseWithBalance },
       bookings:   { total: totalBookings, confirmed: confirmedBookings, checkedIn: checkedInBookings },
       rooms:      (() => {
+        // Occupancy driven by checked-in bookings (source of truth), capped at total.
         const occ = Math.min(checkedInBookings, totalRooms);
         return { total: totalRooms, occupied: occ, vacant: Math.max(totalRooms - occ - maintenanceRooms, 0), maintenance: maintenanceRooms };
       })(),
@@ -1334,16 +1371,34 @@ app.get('/api/dashboard/overview', async (req, res) => {
   }
 });
 
+
+// ─────────────────────────────────────────────
+// ADMIN OPERATIONS MONITOR
+// One aggregated call powering the admin Overview dashboard.
+// Everything here is live from the database.
+// ─────────────────────────────────────────────
 app.get('/api/dashboard/admin-operations', async (req, res) => {
   try {
     const today = new Date().toISOString().slice(0, 10);
     const parseAmt = (str) => parseFloat((str || '0').replace(/,/g, '')) || 0;
 
+    // Pull the raw collections we need
     const [
-      rooms, allBookings, inHouseBookings, hkCleaningPending, guestReqPending,
-      maintPending, maintCritical, recentAudits, hkStaffTotal, hkStaffActive, fdStaffActive,
+      rooms,
+      allBookings,
+      inHouseBookings,
+      hkCleaningPending,
+      guestReqPending,
+      maintPending,
+      maintCritical,
+      recentAudits,
+      hkStaffTotal,
+      hkStaffActive,
+      fdStaffActive,
     ] = await Promise.all([
-      Room.find({}), Booking.find({}), Booking.find({ status: 'Checked In' }),
+      Room.find({}),
+      Booking.find({}),
+      Booking.find({ status: 'Checked In' }),
       CleaningTask.countDocuments({ status: { $ne: 'COMPLETED' } }),
       GuestRequest.countDocuments({ status: { $ne: 'COMPLETED' } }),
       MaintenanceRequest.countDocuments({ status: { $ne: 'COMPLETED' } }),
@@ -1354,6 +1409,10 @@ app.get('/api/dashboard/admin-operations', async (req, res) => {
       Employee.countDocuments({ 'employment_details.department': 'Front Desk', 'employment_details.status': 'ACTIVE' }),
     ]);
 
+    // ── ROOM STATUS (live) ──
+    // Occupancy is driven by checked-in bookings (the source of truth for who is
+    // in-house) rather than Room.status, which can drift out of sync. We cap it at
+    // the total room count so the rate never exceeds 100%.
     const maintenanceRooms = rooms.filter(r => (r.status || '').toLowerCase() === 'maintenance').length;
     const occupiedCount    = Math.min(inHouseBookings.length, rooms.length);
     const roomStatus = {
@@ -1361,10 +1420,14 @@ app.get('/api/dashboard/admin-operations', async (req, res) => {
       occupied:    occupiedCount,
       vacant:      Math.max(rooms.length - occupiedCount - maintenanceRooms, 0),
       maintenance: maintenanceRooms,
+      // "cleaning" = rooms flagged dirty / in progress by housekeeping
       cleaning:    rooms.filter(r => ['dirty', 'in progress'].includes((r.housekeeping || '').toLowerCase())).length,
     };
-    const occupancyRate = roomStatus.total > 0 ? Math.round((roomStatus.occupied / roomStatus.total) * 1000) / 10 : 0;
+    const occupancyRate = roomStatus.total > 0
+      ? Math.round((roomStatus.occupied / roomStatus.total) * 1000) / 10
+      : 0;
 
+    // ── TODAY'S OPERATIONS (live from bookings) ──
     const arrivalsToday   = allBookings.filter(b => b.dates?.check_in  === today);
     const departuresToday = allBookings.filter(b => b.dates?.check_out === today);
     const ops = {
@@ -1384,6 +1447,7 @@ app.get('/api/dashboard/admin-operations', async (req, res) => {
       },
     };
 
+    // ── REVENUE (live: sum of all COMPLETED transactions across bookings) ──
     let todayRevenue = 0, totalRevenue = 0, outstanding = 0;
     allBookings.forEach(b => {
       (b.transactions || []).forEach(t => {
@@ -1396,39 +1460,97 @@ app.get('/api/dashboard/admin-operations', async (req, res) => {
       outstanding += parseAmt(b.billing?.balance_due);
     });
 
+    // ── 7-DAY REVENUE TREND (live, from transaction datetimes) ──
     const dayKeys = [];
     for (let i = 6; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
-      dayKeys.push({ iso: d.toISOString().slice(0, 10), label: d.toLocaleDateString('en-US', { weekday: 'short' }) });
+      dayKeys.push({
+        iso:   d.toISOString().slice(0, 10),
+        label: d.toLocaleDateString('en-US', { weekday: 'short' }),
+      });
     }
     const revenueByDay = dayKeys.map(dk => {
       let sum = 0;
       allBookings.forEach(b => (b.transactions || []).forEach(t => {
-        if (t.status === 'COMPLETED' && (t.datetime || '').slice(0, 10) === dk.iso) sum += parseAmt(t.amount);
+        if (t.status === 'COMPLETED' && (t.datetime || '').slice(0, 10) === dk.iso) {
+          sum += parseAmt(t.amount);
+        }
       }));
       return { day: dk.label, value: Math.round(sum) };
     });
 
+    // ── 7-DAY BOOKINGS TREND (live, by check-in date) ──
     const bookingsByDay = dayKeys.map(dk => ({
-      day: dk.label, count: allBookings.filter(b => b.dates?.check_in === dk.iso).length,
+      day:   dk.label,
+      count: allBookings.filter(b => b.dates?.check_in === dk.iso).length,
     }));
 
+    // ── DEPARTMENT HEALTH (live signals) ──
     const departmentHealth = [
-      { dept: 'Front Desk', status: ops.arrivals.pending > 0 ? `${ops.arrivals.pending} arrivals pending` : 'All clear', level: ops.arrivals.pending > 5 ? 'warning' : 'good', detail: `${fdStaffActive} staff active` },
-      { dept: 'Housekeeping', status: roomStatus.cleaning > 0 ? `${roomStatus.cleaning} rooms to clean` : 'All rooms clean', level: roomStatus.cleaning > 5 ? 'warning' : roomStatus.cleaning > 0 ? 'warning' : 'good', detail: `${hkStaffActive}/${hkStaffTotal} staff active` },
-      { dept: 'Maintenance', status: maintCritical > 0 ? `${maintCritical} urgent order${maintCritical > 1 ? 's' : ''}` : maintPending > 0 ? `${maintPending} open order${maintPending > 1 ? 's' : ''}` : 'No open orders', level: maintCritical > 0 ? 'critical' : maintPending > 0 ? 'warning' : 'good', detail: `${maintPending} total open` },
-      { dept: 'Guest Services', status: guestReqPending > 0 ? `${guestReqPending} request${guestReqPending > 1 ? 's' : ''} pending` : 'No pending requests', level: guestReqPending > 5 ? 'warning' : 'good', detail: `${hkCleaningPending} cleaning tasks open` },
+      {
+        dept: 'Front Desk',
+        status: ops.arrivals.pending > 0
+          ? `${ops.arrivals.pending} arrivals pending`
+          : 'All clear',
+        level: ops.arrivals.pending > 5 ? 'warning' : 'good',
+        detail: `${fdStaffActive} staff active`,
+      },
+      {
+        dept: 'Housekeeping',
+        status: roomStatus.cleaning > 0
+          ? `${roomStatus.cleaning} rooms to clean`
+          : 'All rooms clean',
+        level: roomStatus.cleaning > 5 ? 'warning' : roomStatus.cleaning > 0 ? 'warning' : 'good',
+        detail: `${hkStaffActive}/${hkStaffTotal} staff active`,
+      },
+      {
+        dept: 'Maintenance',
+        status: maintCritical > 0
+          ? `${maintCritical} urgent order${maintCritical > 1 ? 's' : ''}`
+          : maintPending > 0 ? `${maintPending} open order${maintPending > 1 ? 's' : ''}` : 'No open orders',
+        level: maintCritical > 0 ? 'critical' : maintPending > 0 ? 'warning' : 'good',
+        detail: `${maintPending} total open`,
+      },
+      {
+        dept: 'Guest Services',
+        status: guestReqPending > 0
+          ? `${guestReqPending} request${guestReqPending > 1 ? 's' : ''} pending`
+          : 'No pending requests',
+        level: guestReqPending > 5 ? 'warning' : 'good',
+        detail: `${hkCleaningPending} cleaning tasks open`,
+      },
     ];
 
+    // ── RECENT ACTIVITY (live from audits) ──
     const recentActivity = recentAudits.map(a => ({
-      id: a._id, type: a.action_type, text: a.description, user: a.user_id, time: a.datetime, status: a.status,
+      id:   a._id,
+      type: a.action_type,
+      text: a.description,
+      user: a.user_id,
+      time: a.datetime,
+      status: a.status,
     }));
 
     res.json({
-      kpis: { todayRevenue: Math.round(todayRevenue), totalRevenue: Math.round(totalRevenue), outstanding: Math.round(outstanding), occupancyRate },
-      roomStatus, ops, revenueTrend: revenueByDay, bookingsTrend: bookingsByDay, departmentHealth, recentActivity,
-      counts: { cleaningPending: hkCleaningPending, guestReqPending, maintPending, maintCritical },
+      kpis: {
+        todayRevenue:  Math.round(todayRevenue),
+        totalRevenue:  Math.round(totalRevenue),
+        outstanding:   Math.round(outstanding),
+        occupancyRate,
+      },
+      roomStatus,
+      ops,
+      revenueTrend: revenueByDay,
+      bookingsTrend: bookingsByDay,
+      departmentHealth,
+      recentActivity,
+      counts: {
+        cleaningPending: hkCleaningPending,
+        guestReqPending,
+        maintPending,
+        maintCritical,
+      },
     });
   } catch (error) {
     console.error('Admin operations dashboard error:', error);
@@ -1436,32 +1558,73 @@ app.get('/api/dashboard/admin-operations', async (req, res) => {
   }
 });
 
+
+// ─────────────────────────────────────────────
+// REPORTS — computed live from bookings / rooms
+// ─────────────────────────────────────────────
+
 const parseAmt = (str) => parseFloat((str || '0').replace(/,/g, '')) || 0;
 
+// ── OCCUPANCY REPORT ──
 app.get('/api/reports/occupancy', async (req, res) => {
   try {
-    const [rooms, roomTypes, bookings] = await Promise.all([ Room.find({}), RoomType.find({}), Booking.find({}) ]);
+    const [rooms, roomTypes, bookings] = await Promise.all([
+      Room.find({}),
+      RoomType.find({}),
+      Booking.find({}),
+    ]);
+
     const totalRooms = rooms.length || 1;
-    const occupiedRoomNums = new Set(bookings.filter(b => b.status === 'Checked In').map(b => String(b.room_number || '').trim()).filter(Boolean));
+
+    // Occupancy is driven by checked-in bookings (source of truth), not Room.status.
+    // Build the set of room numbers that currently have an in-house guest.
+    const occupiedRoomNums = new Set(
+      bookings
+        .filter(b => b.status === 'Checked In')
+        .map(b => String(b.room_number || '').trim())
+        .filter(Boolean)
+    );
     const isOccupied = (r) => occupiedRoomNums.has(String(r.room_number || '').trim());
-    const occupiedNow = Math.min(bookings.filter(b => b.status === 'Checked In').length, totalRooms);
+
+    // If some checked-in bookings reference rooms not found in the collection,
+    // still count them (capped at total) so the headline rate stays accurate.
+    const occupiedNow = Math.min(
+      bookings.filter(b => b.status === 'Checked In').length,
+      totalRooms
+    );
     const avgOccupancy = Math.round((occupiedNow / totalRooms) * 1000) / 10;
+
+    // Average length of stay from booking nights
     const nightsArr = bookings.map(b => parseInt(b.dates?.nights) || 0).filter(n => n > 0);
-    const alos = nightsArr.length ? Math.round((nightsArr.reduce((a, c) => a + c, 0) / nightsArr.length) * 10) / 10 : 0;
+    const alos = nightsArr.length
+      ? Math.round((nightsArr.reduce((a, c) => a + c, 0) / nightsArr.length) * 10) / 10
+      : 0;
+
+    // Peak / low day by check-in day-of-week
     const dowCount = [0, 0, 0, 0, 0, 0, 0];
-    bookings.forEach(b => { if (b.dates?.check_in) { const d = new Date(b.dates.check_in); if (!isNaN(d)) dowCount[d.getDay()]++; } });
+    bookings.forEach(b => {
+      if (b.dates?.check_in) {
+        const d = new Date(b.dates.check_in);
+        if (!isNaN(d)) dowCount[d.getDay()]++;
+      }
+    });
     const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     const peakDay = dayNames[dowCount.indexOf(Math.max(...dowCount))] || '—';
     const lowDay  = dayNames[dowCount.indexOf(Math.min(...dowCount))] || '—';
 
+    // Trend — last 4 weeks: % of rooms with a booking checked-in that week
     const trend = [];
     for (let w = 3; w >= 0; w--) {
       const start = new Date(); start.setDate(start.getDate() - (w + 1) * 7);
       const end   = new Date(); end.setDate(end.getDate() - w * 7);
-      const inWeek = bookings.filter(b => { const ci = new Date(b.dates?.check_in); return !isNaN(ci) && ci >= start && ci < end; }).length;
+      const inWeek = bookings.filter(b => {
+        const ci = new Date(b.dates?.check_in);
+        return !isNaN(ci) && ci >= start && ci < end;
+      }).length;
       trend.push({ label: `Week ${4 - w}`, rate: Math.min(100, Math.round((inWeek / totalRooms) * 100)) });
     }
 
+    // By room type — count rooms of each type vs how many are occupied
     const typeNameById = {};
     roomTypes.forEach(t => { typeNameById[t.type_id] = t.name; });
     const byTypeMap = {};
@@ -1471,8 +1634,13 @@ app.get('/api/reports/occupancy', async (req, res) => {
       byTypeMap[name].rooms++;
       if (isOccupied(r)) byTypeMap[name].occupied++;
     });
-    const byRoomType = Object.entries(byTypeMap).map(([type, v]) => ({ type, rooms: v.rooms, rate: v.rooms ? Math.round((v.occupied / v.rooms) * 100) : 0 })).sort((a, b) => b.rate - a.rate);
+    const byRoomType = Object.entries(byTypeMap).map(([type, v]) => ({
+      type,
+      rooms: v.rooms,
+      rate: v.rooms ? Math.round((v.occupied / v.rooms) * 100) : 0,
+    })).sort((a, b) => b.rate - a.rate);
 
+    // By floor
     const byFloorMap = {};
     rooms.forEach(r => {
       const f = r.floor || 0;
@@ -1480,58 +1648,106 @@ app.get('/api/reports/occupancy', async (req, res) => {
       byFloorMap[f].rooms++;
       if (isOccupied(r)) byFloorMap[f].occupied++;
     });
-    const byFloor = Object.entries(byFloorMap).sort((a, b) => Number(a[0]) - Number(b[0])).map(([floor, v]) => ({ floor: `Floor ${floor}`, rooms: v.rooms, rate: v.rooms ? Math.round((v.occupied / v.rooms) * 100) : 0 }));
+    const byFloor = Object.entries(byFloorMap)
+      .sort((a, b) => Number(a[0]) - Number(b[0]))
+      .map(([floor, v]) => ({
+        floor: `Floor ${floor}`,
+        rooms: v.rooms,
+        rate: v.rooms ? Math.round((v.occupied / v.rooms) * 100) : 0,
+      }));
 
+    // 7-day forecast — confirmed check-ins per upcoming day
     const forecast = [];
     for (let i = 0; i < 7; i++) {
       const d = new Date(); d.setDate(d.getDate() + i);
-      const confirmed = bookings.filter(b => b.dates?.check_in === d.toISOString().slice(0, 10)).length;
-      forecast.push({ date: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), confirmed, projected: confirmed });
+      const iso = d.toISOString().slice(0, 10);
+      const confirmed = bookings.filter(b => b.dates?.check_in === iso).length;
+      forecast.push({
+        date: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        confirmed,
+        projected: confirmed, // no separate projection source; mirror confirmed
+      });
     }
 
-    res.json({ kpis: { avgOccupancy, totalRooms: rooms.length, alos, peakDay, lowDay }, trend, byRoomType, byFloor, forecast });
-  } catch (error) { res.status(500).json({ error: 'Failed to build occupancy report', detail: error.message }); }
+    res.json({
+      kpis: { avgOccupancy, totalRooms: rooms.length, alos, peakDay, lowDay },
+      trend, byRoomType, byFloor, forecast,
+    });
+  } catch (error) {
+    console.error('Occupancy report error:', error);
+    res.status(500).json({ error: 'Failed to build occupancy report', detail: error.message });
+  }
 });
 
+// ── FINANCIAL REPORT ──
 app.get('/api/reports/financial', async (req, res) => {
   try {
     const [bookings, rooms] = await Promise.all([Booking.find({}), Room.find({})]);
+
+    // Total revenue = sum of COMPLETED transactions; outstanding = sum of balance_due
     let totalRevenue = 0, outstandingTotal = 0, outstandingCount = 0;
-    const methodTotals = {};
+    const methodTotals = {};   // payment_method → amount
     bookings.forEach(b => {
       (b.transactions || []).forEach(t => {
         const amt = parseAmt(t.amount);
-        if (t.status === 'COMPLETED') { totalRevenue += amt; const m = t.payment_method || 'Other'; methodTotals[m] = (methodTotals[m] || 0) + amt; }
+        if (t.status === 'COMPLETED') {
+          totalRevenue += amt;
+          const m = t.payment_method || 'Other';
+          methodTotals[m] = (methodTotals[m] || 0) + amt;
+        }
       });
       const bal = parseAmt(b.billing?.balance_due);
       if (bal > 0) { outstandingTotal += bal; outstandingCount++; }
     });
 
+    // Rooms revenue = room charge transactions; everything else grouped by description keyword
     const sourceTotals = { Rooms: 0, 'F&B': 0, 'Spa & Wellness': 0, Minibar: 0, Laundry: 0, 'Penalties & Fees': 0, Other: 0 };
     bookings.forEach(b => (b.transactions || []).forEach(t => {
       if (t.status !== 'COMPLETED') return;
       const amt = parseAmt(t.amount);
       const desc = (t.description || '').toLowerCase();
-      if (desc.includes('refund') || desc.includes('penalty') || desc.includes('fee') || desc.includes('cancel')) { sourceTotals['Penalties & Fees'] += amt; }
-      else if (desc.includes('f&b') || desc.includes('food') || desc.includes('restaurant') || desc.includes('room service')) { sourceTotals['F&B'] += amt; }
-      else if (desc.includes('spa')) { sourceTotals['Spa & Wellness'] += amt; }
-      else if (desc.includes('minibar')) { sourceTotals.Minibar += amt; }
-      else if (desc.includes('laundry')) { sourceTotals.Laundry += amt; }
-      else if (desc.includes('room')) { sourceTotals.Rooms += amt; }
-      else { sourceTotals.Other += amt; }
+      // Order matters: check specific categories BEFORE the generic "room" keyword,
+      // so "F&B - Room Service" is counted as F&B, not Rooms.
+      if (desc.includes('refund') || desc.includes('penalty') || desc.includes('fee') || desc.includes('cancel')) {
+        sourceTotals['Penalties & Fees'] += amt;   // refunds are negative → net reduces this bucket
+      } else if (desc.includes('f&b') || desc.includes('food') || desc.includes('restaurant') || desc.includes('room service')) {
+        sourceTotals['F&B'] += amt;
+      } else if (desc.includes('spa')) {
+        sourceTotals['Spa & Wellness'] += amt;
+      } else if (desc.includes('minibar')) {
+        sourceTotals.Minibar += amt;
+      } else if (desc.includes('laundry')) {
+        sourceTotals.Laundry += amt;
+      } else if (desc.includes('room')) {
+        sourceTotals.Rooms += amt;
+      } else {
+        sourceTotals.Other += amt;
+      }
     }));
+    // Only positive buckets are shown; base percentages on their sum so they total 100%
     const positiveSources = Object.entries(sourceTotals).filter(([, amt]) => amt > 0);
     const sourceSum = positiveSources.reduce((a, [, amt]) => a + amt, 0) || 1;
-    const revenueBySource = positiveSources.map(([source, amount]) => ({ source, amount: Math.round(amount), pct: Math.round((amount / sourceSum) * 1000) / 10 })).sort((a, b) => b.amount - a.amount);
+    const revenueBySource = positiveSources
+      .map(([source, amount]) => ({
+        source, amount: Math.round(amount),
+        pct: Math.round((amount / sourceSum) * 1000) / 10,
+      }))
+      .sort((a, b) => b.amount - a.amount);
 
+    // Payment methods breakdown
     const methodSum = Object.values(methodTotals).reduce((a, c) => a + c, 0) || 1;
-    const paymentMethods = Object.entries(methodTotals).map(([method, amount]) => ({ method, amount: Math.round(amount), pct: Math.round((amount / methodSum) * 1000) / 10 })).sort((a, b) => b.amount - a.amount);
+    const paymentMethods = Object.entries(methodTotals).map(([method, amount]) => ({
+      method, amount: Math.round(amount),
+      pct: Math.round((amount / methodSum) * 1000) / 10,
+    })).sort((a, b) => b.amount - a.amount);
 
+    // ADR = total room revenue / number of room-nights sold
     const roomNights = bookings.reduce((s, b) => s + (parseInt(b.dates?.nights) || 0), 0);
     const adr = roomNights ? Math.round(sourceTotals.Rooms / roomNights) : 0;
     const totalRooms = rooms.length || 1;
     const revpar = Math.round(totalRevenue / totalRooms);
 
+    // Weekly revenue trend (current 4 weeks) — from transaction datetimes
     const revenueTrend = [];
     for (let w = 3; w >= 0; w--) {
       const start = new Date(); start.setDate(start.getDate() - (w + 1) * 7);
@@ -1545,22 +1761,42 @@ app.get('/api/reports/financial', async (req, res) => {
       revenueTrend.push({ label: `Week ${4 - w}`, current: Math.round(sum), previous: 0 });
     }
 
-    const adrTrend = revenueTrend.map(r => ({ label: r.label, adr, revpar: totalRooms ? Math.round(r.current / totalRooms) : 0 }));
-    const expenses = []; const totalExpenses = 0;
+    // ADR/RevPAR trend mirrors the weekly revenue for a simple visual
+    const adrTrend = revenueTrend.map(r => ({
+      label: r.label,
+      adr,
+      revpar: totalRooms ? Math.round(r.current / totalRooms) : 0,
+    }));
+
+    // Expenses are not tracked in the DB → return empty so the UI shows nothing fabricated
+    const expenses = [];
+    const totalExpenses = 0;
     const netProfit = totalRevenue - totalExpenses;
     const profitMargin = totalRevenue ? Math.round((netProfit / totalRevenue) * 1000) / 10 : 0;
 
     res.json({
-      kpis: { totalRevenue: Math.round(totalRevenue), totalExpenses, netProfit: Math.round(netProfit), profitMargin, adr, revpar },
+      kpis: {
+        totalRevenue: Math.round(totalRevenue),
+        totalExpenses,
+        netProfit: Math.round(netProfit),
+        profitMargin,
+        adr, revpar,
+      },
       revenueTrend, revenueBySource, expenses, adrTrend, paymentMethods,
       outstanding: { total: Math.round(outstandingTotal), count: outstandingCount },
     });
-  } catch (error) { res.status(500).json({ error: 'Failed to build financial report', detail: error.message }); }
+  } catch (error) {
+    console.error('Financial report error:', error);
+    res.status(500).json({ error: 'Failed to build financial report', detail: error.message });
+  }
 });
 
+// ── GUEST REPORT ──
 app.get('/api/reports/guests', async (req, res) => {
   try {
     const bookings = await Booking.find({});
+
+    // Group by unique guest (by name)
     const guestMap = {};
     bookings.forEach(b => {
       const name = b.guest?.full_name || 'Unknown';
@@ -1579,29 +1815,288 @@ app.get('/api/reports/guests', async (req, res) => {
     const totalPaid = guests.reduce((s, g) => s + g.totalSpent, 0);
     const avgSpend = totalGuests ? Math.round(totalPaid / totalGuests) : 0;
 
+    // Booking source breakdown (real — from booking.source)
     const srcMap = {};
-    bookings.forEach(b => { const s = b.source || 'Other'; srcMap[s] = (srcMap[s] || 0) + 1; });
+    bookings.forEach(b => {
+      const s = b.source || 'Other';
+      srcMap[s] = (srcMap[s] || 0) + 1;
+    });
     const totalBookings = bookings.length || 1;
-    const bookingSource = Object.entries(srcMap).map(([source, count]) => ({ source, count, pct: Math.round((count / totalBookings) * 1000) / 10 })).sort((a, b) => b.count - a.count);
+    const bookingSource = Object.entries(srcMap).map(([source, count]) => ({
+      source, count,
+      pct: Math.round((count / totalBookings) * 1000) / 10,
+    })).sort((a, b) => b.count - a.count);
 
-    const topGuests = [...guests].sort((a, b) => b.totalSpent - a.totalSpent).slice(0, 5).map(g => ({ ...g, totalSpent: Math.round(g.totalSpent) }));
+    // Top guests by revenue
+    const topGuests = [...guests]
+      .sort((a, b) => b.totalSpent - a.totalSpent)
+      .slice(0, 5)
+      .map(g => ({ ...g, totalSpent: Math.round(g.totalSpent) }));
 
     res.json({
       kpis: { totalGuests, newGuests, returning, avgSpend, returnRate },
-      bookingSource, topGuests, nationalities: [], purpose: [], feedback: null,
+      bookingSource,
+      topGuests,
+      // Not tracked in the DB → empty; UI will simply render nothing for these
+      nationalities: [],
+      purpose: [],
+      feedback: null,
     });
-  } catch (error) { res.status(500).json({ error: 'Failed to build guest report', detail: error.message }); }
+  } catch (error) {
+    console.error('Guest report error:', error);
+    res.status(500).json({ error: 'Failed to build guest report', detail: error.message });
+  }
 });
 
 
-// ============================================================================
-// LAYER 1 (Cont.): SERVER IGNITION
-// Database Connection & Server Listening (Must be at EOF)
-// ============================================================================
+// ─────────────────────────────────────────────
+// GUEST REQUESTS
+// ─────────────────────────────────────────────
+
+app.get('/api/guest-requests', async (req, res) => {
+  try {
+    const filter = {};
+    if (req.query.status) filter.status = req.query.status;
+    if (req.query.room_number) filter.room_number = Number(req.query.room_number);
+    const items = await GuestRequest.find(filter).sort({ requested_at: -1 });
+    res.json(items);
+  } catch (e) { res.status(500).json({ error: 'Failed to fetch guest requests', detail: e.message }); }
+});
+
+app.post('/api/guest-requests', requireAuth, async (req, res) => {
+  try {
+    const max = await GuestRequest.findOne().withArchived().sort({ request_id: -1 });
+    const body = { ...req.body, request_id: (max?.request_id || 0) + 1, requested_at: new Date() };
+    const saved = await new GuestRequest(body).save();
+    res.status(201).json(saved);
+  } catch (e) { res.status(500).json({ error: 'Failed to create guest request', detail: e.message }); }
+});
+
+app.put('/api/guest-requests/:id', requireAuth, async (req, res) => {
+  try {
+    const updated = await GuestRequest.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    if (!updated) return res.status(404).json({ error: 'Not found' });
+    res.json(updated);
+  } catch (e) { res.status(500).json({ error: 'Failed to update guest request', detail: e.message }); }
+});
+
+app.delete('/api/guest-requests/:id', requireAuth, async (req, res) => {
+  try {
+    return archiveResponse(req, res, 'guest_requests');
+  } catch (e) { res.status(500).json({ error: 'Failed to delete guest request', detail: e.message }); }
+});
+
+// ─────────────────────────────────────────────
+// CLEANING TASKS
+// ─────────────────────────────────────────────
+
+app.get('/api/cleaning-tasks', async (req, res) => {
+  try {
+    const filter = {};
+    if (req.query.status) filter.status = req.query.status;
+    if (req.query.date) filter.scheduled_date = { $gte: new Date(req.query.date), $lt: new Date(new Date(req.query.date).getTime() + 86400000) };
+    const items = await CleaningTask.find(filter).sort({ scheduled_date: 1 });
+    res.json(items);
+  } catch (e) { res.status(500).json({ error: 'Failed to fetch cleaning tasks', detail: e.message }); }
+});
+
+app.post('/api/cleaning-tasks', requireAuth, async (req, res) => {
+  try {
+    const max = await CleaningTask.findOne().withArchived().sort({ task_id: -1 });
+    const body = { ...req.body, task_id: (max?.task_id || 0) + 1 };
+    const saved = await new CleaningTask(body).save();
+    res.status(201).json(saved);
+  } catch (e) { res.status(500).json({ error: 'Failed to create cleaning task', detail: e.message }); }
+});
+
+app.put('/api/cleaning-tasks/:id', requireAuth, async (req, res) => {
+  try {
+    const updated = await CleaningTask.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    if (!updated) return res.status(404).json({ error: 'Not found' });
+    res.json(updated);
+  } catch (e) { res.status(500).json({ error: 'Failed to update cleaning task', detail: e.message }); }
+});
+
+app.delete('/api/cleaning-tasks/:id', requireAuth, async (req, res) => {
+  try {
+    return archiveResponse(req, res, 'cleaning_tasks');
+  } catch (e) { res.status(500).json({ error: 'Failed to delete cleaning task', detail: e.message }); }
+});
+
+// ─────────────────────────────────────────────
+// HOUSEKEEPING LOGS
+// ─────────────────────────────────────────────
+
+app.get('/api/housekeeping-logs', async (req, res) => {
+  try {
+    const filter = {};
+    // Optional: only today's logs when ?today=1
+    if (req.query.today) {
+      const start = new Date(); start.setHours(0, 0, 0, 0);
+      const end = new Date(start.getTime() + 86400000);
+      filter.datetime = { $gte: start, $lt: end };
+    }
+    const items = await HousekeepingLog.find(filter).sort({ datetime: -1 });
+    res.json(items);
+  } catch (e) { res.status(500).json({ error: 'Failed to fetch housekeeping logs', detail: e.message }); }
+});
+
+app.post('/api/housekeeping-logs', requireAuth, async (req, res) => {
+  try {
+    const { room_number, category, description, employee } = req.body || {};
+    if (!room_number || !description) {
+      return res.status(400).json({ error: 'Room number and description are required.' });
+    }
+    const max = await HousekeepingLog.findOne().withArchived().sort({ log_id: -1 });
+    const saved = await new HousekeepingLog({
+      log_id: (max?.log_id || 0) + 1,
+      room_number: String(room_number),
+      category: category || 'Room Note',
+      description,
+      employee: employee || '',
+      datetime: new Date(),
+    }).save();
+    res.status(201).json(saved);
+  } catch (e) { res.status(500).json({ error: 'Failed to create housekeeping log', detail: e.message }); }
+});
+
+app.delete('/api/housekeeping-logs/:id', requireAuth, async (req, res) => {
+  try {
+    if (!isValidObjectId(req.params.id)) {
+      return res.status(400).json({ error: 'Invalid log id' });
+    }
+    return archiveResponse(req, res, 'housekeeping_logs');
+  } catch (e) { res.status(500).json({ error: 'Failed to delete housekeeping log', detail: e.message }); }
+});
+
+// ─────────────────────────────────────────────
+// LOST AND FOUND
+// ─────────────────────────────────────────────
+
+app.get('/api/lost-and-found', async (req, res) => {
+  try {
+    const filter = {};
+    if (req.query.status) filter.status = req.query.status;
+    const items = await LostAndFound.find(filter).sort({ found_date: -1 });
+    res.json(items);
+  } catch (e) { res.status(500).json({ error: 'Failed to fetch lost and found', detail: e.message }); }
+});
+
+app.post('/api/lost-and-found', requireAuth, async (req, res) => {
+  try {
+    const max = await LostAndFound.findOne().withArchived().sort({ item_id: -1 });
+    const body = { ...req.body, item_id: (max?.item_id || 0) + 1, found_date: req.body.found_date || new Date() };
+    const saved = await new LostAndFound(body).save();
+    res.status(201).json(saved);
+  } catch (e) { res.status(500).json({ error: 'Failed to create lost and found record', detail: e.message }); }
+});
+
+app.put('/api/lost-and-found/:id', requireAuth, async (req, res) => {
+  try {
+    const updated = await LostAndFound.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    if (!updated) return res.status(404).json({ error: 'Not found' });
+    res.json(updated);
+  } catch (e) { res.status(500).json({ error: 'Failed to update lost and found record', detail: e.message }); }
+});
+
+app.delete('/api/lost-and-found/:id', requireAuth, async (req, res) => {
+  try {
+    return archiveResponse(req, res, 'lost_and_found');
+  } catch (e) { res.status(500).json({ error: 'Failed to delete lost and found record', detail: e.message }); }
+});
+
+// ─────────────────────────────────────────────
+// MAINTENANCE REQUESTS
+// ─────────────────────────────────────────────
+
+app.get('/api/maintenance-requests', async (req, res) => {
+  try {
+    const filter = {};
+    if (req.query.status) filter.status = req.query.status;
+    const items = await MaintenanceRequest.find(filter).sort({ reported_at: -1 });
+    res.json(items);
+  } catch (e) { res.status(500).json({ error: 'Failed to fetch maintenance requests', detail: e.message }); }
+});
+
+app.post('/api/maintenance-requests', requireAuth, async (req, res) => {
+  try {
+    const max = await MaintenanceRequest.findOne().withArchived().sort({ maintenance_id: -1 });
+    const body = { ...req.body, maintenance_id: (max?.maintenance_id || 0) + 1, reported_at: new Date() };
+    const saved = await new MaintenanceRequest(body).save();
+    res.status(201).json(saved);
+  } catch (e) { res.status(500).json({ error: 'Failed to create maintenance request', detail: e.message }); }
+});
+
+app.put('/api/maintenance-requests/:id', requireAuth, async (req, res) => {
+  try {
+    const updated = await MaintenanceRequest.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    if (!updated) return res.status(404).json({ error: 'Not found' });
+    res.json(updated);
+  } catch (e) { res.status(500).json({ error: 'Failed to update maintenance request', detail: e.message }); }
+});
+
+app.delete('/api/maintenance-requests/:id', requireAuth, async (req, res) => {
+  try {
+    return archiveResponse(req, res, 'maintenance_requests');
+  } catch (e) { res.status(500).json({ error: 'Failed to delete maintenance request', detail: e.message }); }
+});
+
+// ─────────────────────────────────────────────
+// FRONT DESK LOGS  (stored in the audits collection)
+// ─────────────────────────────────────────────
+
+app.get('/api/front-desk-logs', async (req, res) => {
+  try {
+    const filter = { audit_id: /^LOG-/ };
+    if (req.query.date) {
+      const start = new Date(req.query.date);
+      const end   = new Date(new Date(req.query.date).getTime() + 86400000);
+      filter.datetime = { $gte: start.toISOString().slice(0,10), $lt: end.toISOString().slice(0,10) };
+    }
+    const logs = await Audit.find(filter).sort({ datetime: -1 });
+    res.json(logs);
+  } catch (e) { res.status(500).json({ error: 'Failed to fetch logs', detail: e.message }); }
+});
+
+app.post('/api/front-desk-logs', requireAuth, async (req, res) => {
+  try {
+    const max = await Audit.findOne({ audit_id: /^LOG-/ }).withArchived().sort({ createdAt: -1, _id: -1 });
+    const nextId = `LOG-${String((parseInt((max?.audit_id || 'LOG-0').split('-')[1]) || 0) + 1).padStart(3,'0')}`;
+    const body = {
+      ...req.body,
+      audit_id: nextId,
+      datetime: req.body.datetime || new Date().toISOString().slice(0, 19).replace('T', ' '),
+    };
+    const saved = await new Audit(body).save();
+    res.status(201).json(saved);
+  } catch (e) { res.status(500).json({ error: 'Failed to create log entry', detail: e.message }); }
+});
+
+app.put('/api/front-desk-logs/:id', requireAuth, async (req, res) => {
+  try {
+    const update = buildSafeSet(req.body, ['action_type', 'description', 'status']);
+    if (!update) return res.status(400).json({ error: 'No valid log fields to update' });
+    const updated = await Audit.findOneAndUpdate({ _id: req.params.id, audit_id: /^LOG-/ }, update, { new: true });
+    if (!updated) return res.status(404).json({ error: 'Not found' });
+    res.json(updated);
+  } catch (e) { res.status(500).json({ error: 'Failed to update log entry', detail: e.message }); }
+});
+
+app.delete('/api/front-desk-logs/:id', requireAuth, async (req, res) => {
+  try {
+    return archiveResponse(req, res, 'front_desk_logs');
+  } catch (e) { res.status(500).json({ error: 'Failed to delete log entry', detail: e.message }); }
+});
+
+// ─────────────────────────────────────────────
+// START SERVER (only after MongoDB connects)
+// ─────────────────────────────────────────────
+
 
 const PORT = process.env.PORT || 5000;
 
-mongoose.connect(process.env.MONGO_URI)
+
+mongoose.connect(process.env.MONGO_URI, { autoIndex: false })
   .then(() => {
     console.log('✅ Connected to MongoDB successfully!');
     app.listen(PORT, () => {

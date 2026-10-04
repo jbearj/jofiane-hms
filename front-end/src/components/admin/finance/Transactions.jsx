@@ -8,7 +8,7 @@ import ConfirmModal from '../../common/ConfirmModal';
 import { money, parseMoney } from '../../../utils/formatters';
 import { exportToCSV, printReportDocument } from '../../../utils/exportUtils';
 
-function Transactions() {
+function Transactions({ allowArchive = false }) {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -26,6 +26,7 @@ function Transactions() {
   // Transaction detail modal (replaces inline row actions)
   const [viewingTxn, setViewingTxn] = useState(null);
   const [voidingTxn, setVoidingTxn] = useState(null);
+  const [archivingTxn, setArchivingTxn] = useState(null);
   const [savingAction, setSavingAction] = useState(false);
   const [actionError, setActionError] = useState('');
   const actionLock = useRef(false);
@@ -229,6 +230,14 @@ function Transactions() {
     if (!res.ok) throw new Error(await readError(res, 'Failed to void transaction.'));
     setTransactions(prev => prev.map(t => t.id === transaction.id ? { ...t, status: 'voided' } : t));
     setVoidingTxn(null);
+    await fetchTransactions();
+  });
+
+  const handleArchive = () => runAction(async () => {
+    const id = `${archivingTxn._bookingObjectId}:${archivingTxn.id}`;
+    const response = await authFetch(`/api/archive/transactions/${encodeURIComponent(id)}/archive`, { method: 'POST' });
+    if (!response.ok) throw new Error(await readError(response, 'Unable to archive this transaction.'));
+    setArchivingTxn(null);
     await fetchTransactions();
   });
 
@@ -486,9 +495,13 @@ function Transactions() {
         busy={savingAction} error={actionError} onRefund={handleRefund}
         onClose={() => { if (!savingAction) { setShowRefundModal(false); setSelectedTransaction(null); } }} />}
       {viewingTxn && <TransactionDetailModal transaction={viewingTxn} onClose={() => setViewingTxn(null)}
+        onArchive={allowArchive ? txn => { setActionError(''); setViewingTxn(null); setArchivingTxn(txn); } : null}
         onRefund={txn => { setActionError(''); setViewingTxn(null); setSelectedTransaction(txn); setShowRefundModal(true); }}
         onVoid={txn => { setActionError(''); setViewingTxn(null); setVoidingTxn(txn); }}
         formatDate={formatDate} formatTime={formatTime} getStatusTag={getStatusTag} />}
+      {archivingTxn && <ConfirmModal title="Archive transaction?" busy={savingAction} confirmLabel="Archive transaction" onConfirm={handleArchive}
+        onCancel={() => { setViewingTxn(archivingTxn); setArchivingTxn(null); }}
+        message={<><p>This voided entry will move to Archive. Its original data will be kept and can be restored by an administrator.</p>{actionError && <p role="alert" className="form-submit-error">{actionError}</p>}</>} />}
       {voidingTxn && <ConfirmModal title="Void transaction?" tone="danger" busy={savingAction}
         confirmLabel="Void Transaction" onConfirm={handleVoid}
         onCancel={() => { setViewingTxn(voidingTxn); setVoidingTxn(null); }}
@@ -577,7 +590,7 @@ function RefundModal({ transaction, onClose, onRefund, busy, error }) {
   );
 }
 
-function TransactionDetailModal({ transaction: txn, onClose, onRefund, onVoid, formatDate, formatTime, getStatusTag }) {
+function TransactionDetailModal({ transaction: txn, onClose, onRefund, onVoid, onArchive, formatDate, formatTime, getStatusTag }) {
   const facts = [
     ['Reference', txn.id], ['Date & Time', `${formatDate(txn.date)} · ${formatTime(txn.date)}`],
     ['Guest', txn.guest], ['Room', txn.room], ['Description', txn.description],
@@ -598,6 +611,7 @@ function TransactionDetailModal({ transaction: txn, onClose, onRefund, onVoid, f
       <div className="txn-modal-actions">
         {txn.status === 'completed' && txn.amount > 0 && <button className="ledger-btn" onClick={() => onRefund(txn)}>↶ Issue Refund</button>}
         {txn.status !== 'voided' && <button className="ledger-btn btn-danger" onClick={() => onVoid(txn)}>⊘ Void Transaction</button>}
+        {txn.status === 'voided' && onArchive && <button className="ledger-btn" onClick={() => onArchive(txn)}>Archive transaction</button>}
         <button className="ledger-btn dialog-close-action" onClick={onClose}>Close</button>
       </div>
     </PortalModal>

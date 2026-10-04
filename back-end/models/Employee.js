@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 
 const employeeSchema = new mongoose.Schema({
+  auth_version: { type: Number, default: 0 }, // incremented on archive to revoke existing tokens
   employee_id: Number,       // e.g. 1
 
   full_name: String,         // e.g. "Ana Buenaflor"
@@ -29,4 +30,6 @@ const employeeSchema = new mongoose.Schema({
   },
 }, { timestamps: true });
 
+employeeSchema.plugin(require('../lib/softDelete').softDelete, { identity: 'employee_id' });
+employeeSchema.index({ 'portal_access.username': 1 }, { name: 'active_username_unique', unique: true, collation: { locale: 'en', strength: 2 }, partialFilterExpression: { deleted_at: null, 'portal_access.has_access': true, 'portal_access.username': { $type: 'string' } } });
 module.exports = mongoose.model('Employee', employeeSchema, 'employees');

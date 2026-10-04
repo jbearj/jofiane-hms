@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { API_BASE } from '../../../utils/api';
+import { API_BASE, authFetch, readError } from '../../../utils/api';
 import { Input, Select, ValidatedForm, SubmitButton } from '../../common/FormControls';
 import { PageSkeleton } from '../../common/SkeletonLoader';
 
@@ -105,9 +105,13 @@ function RoomInventory() {
     setShowModal(true);
   };
 
-  const handleDeleteRoom = (room) => {
-    if (!window.confirm(`Delete Room ${room.number}? This cannot be undone.`)) return;
-    setRooms(prev => prev.filter(r => r.id !== room.id));
+  const handleDeleteRoom = async (room) => {
+    if (!window.confirm(`Archive Room ${room.number}? An administrator can restore it later.`)) return;
+    try {
+      const response = await authFetch(`/api/archive/rooms/${encodeURIComponent(room.id)}/archive`, { method: 'POST' });
+      if (!response.ok) throw new Error(await readError(response, 'Unable to archive this room.'));
+      setRooms(prev => prev.filter(r => r.id !== room.id));
+    } catch (error) { alert(error.message); }
   };
 
   const handleSaveRoom = (roomData) => {
@@ -321,7 +325,7 @@ function RoomInventory() {
                     <td style={{ textAlign: 'center' }}>
                       <div className="action-links" style={{ justifyContent: 'center' }}>
                         <button className="action-link link-edit" onClick={() => handleEditRoom(room)}>Edit</button>
-                        <button className="action-link link-delete" onClick={() => handleDeleteRoom(room)}>Delete</button>
+                        <button className="action-link link-delete" onClick={() => handleDeleteRoom(room)}>Archive</button>
                       </div>
                     </td>
                   </tr>

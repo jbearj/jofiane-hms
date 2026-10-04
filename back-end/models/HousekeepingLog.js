@@ -9,4 +9,5 @@ const housekeepingLogSchema = new mongoose.Schema({
   datetime: Date,           // when the log was created
 }, { timestamps: true });
 
+housekeepingLogSchema.plugin(require('../lib/softDelete').softDelete, { identity: 'log_id' });
 module.exports = mongoose.model('HousekeepingLog', housekeepingLogSchema, 'housekeeping_logs');

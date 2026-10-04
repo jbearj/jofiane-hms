@@ -127,7 +127,7 @@ function StaffList() {
   const handleEdit = (emp) => { setEditingEmployee(emp); setShowAddEdit(true); setSelectedEmployee(null); };
 
   const handleDelete = async (emp) => {
-    if (!window.confirm(`Delete ${emp.name}? This cannot be undone.`)) return;
+    if (!window.confirm(`Archive ${emp.name}? An administrator can restore this record from Archive.`)) return;
     try {
       const res = await authFetch(`/api/employees/${emp._id}`, { method: 'DELETE' });
       if (!res.ok) {
@@ -531,7 +531,7 @@ function ProfileModal({ employee, getStatusTag, onEdit, onDelete, onStatusChange
 
         {/* Actions */}
         <div style={{ display: 'flex', gap: '10px', justifyContent: 'space-between' }}>
-          <button className="btn btn-sm" style={{ color: 'var(--status-occ)' }} onClick={onDelete}>Delete Employee</button>
+          <button className="btn btn-sm" style={{ color: 'var(--status-occ)' }} onClick={onDelete}>Archive Employee</button>
           <button className="btn btn-sm btn-gold" onClick={onEdit}>Edit Profile</button>
         </div>
       </div>

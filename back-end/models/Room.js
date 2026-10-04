@@ -13,4 +13,5 @@ const roomSchema = new mongoose.Schema({
   last_cleaned: Date,        // timestamp of last clean
 }, { timestamps: true });
 
+roomSchema.plugin(require('../lib/softDelete').softDelete, { identity: 'room_number' });
 module.exports = mongoose.model('Room', roomSchema, 'rooms');
