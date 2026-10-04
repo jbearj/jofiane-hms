@@ -1,5 +1,10 @@
 
 
+// ============================================================
+// LAYER 1: INFRASTRUCTURE & NETWORK CONFIGURATION
+// DNS, Package Imports, CORS, and Payload Limits
+// ============================================================
+
 const dns = require('dns');
 dns.setServers(['8.8.8.8', '8.8.4.4']);
 
@@ -70,6 +75,11 @@ app.use((req, res, next) => {
   next();
 });
 
+
+// ============================================================
+// LAYER 3: DEFENSIVE PROGRAMMING & INTEGRITY GUARDS
+// Field Whitelists, Validation Helpers, and Ledger Computations
+// ============================================================
 
 // ─────────────────────────────────────────────
 // VALIDATION HELPERS
@@ -247,6 +257,11 @@ const recomputeBilling = (booking) => {
   return booking;
 };
 
+
+// ============================================================
+// LAYER 2: AUTHENTICATION & ROLE-BASED ACCESS CONTROL (RBAC)
+// Security Checks, JWT Generation, Auth Routes, and Middleware Guards
+// ============================================================
 
 // ─────────────────────────────────────────────
 // AUTH
@@ -484,6 +499,11 @@ app.put('/api/auth/me', requireAuth, async (req, res) => {
   }
 });
 
+
+// ============================================================
+// LAYER 4: REAL-TIME OPERATIONAL ENDPOINTS
+// Rooms, Bookings, Employees, Tasks, Logs, Shifts, etc.
+// ============================================================
 
 // ─────────────────────────────────────────────
 // ROOMS
@@ -1298,6 +1318,11 @@ app.post('/api/audits', requireAuth, requireAdmin, async (req, res) => {
 });
 
 
+// ============================================================
+// LAYER 5: BUSINESS INTELLIGENCE & REPORTING ENGINES
+// Live System Dashboards & Analytics
+// ============================================================
+
 // ─────────────────────────────────────────────
 // DASHBOARD OVERVIEW
 // ─────────────────────────────────────────────
@@ -2087,6 +2112,11 @@ app.delete('/api/front-desk-logs/:id', requireAuth, async (req, res) => {
     return archiveResponse(req, res, 'front_desk_logs');
   } catch (e) { res.status(500).json({ error: 'Failed to delete log entry', detail: e.message }); }
 });
+
+// ============================================================
+// LAYER 1 (Cont.): SERVER IGNITION
+// Database Connection & Server Listening (Must be at EOF)
+// ============================================================
 
 // ─────────────────────────────────────────────
 // START SERVER (only after MongoDB connects)
