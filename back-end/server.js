@@ -18,10 +18,7 @@ require('dotenv').config();
 
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 
-// The JWT secret MUST be provided via the environment. In production we refuse
-// to start without it — falling back to a hardcoded, publicly-known secret would
-// let anyone forge admin tokens. In development we allow a clearly-labelled
-// fallback but warn loudly so it's never mistaken for a real secret.
+// JWT_SECRET must be set via environment; production refuses to start without it.
 let JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
   if (IS_PRODUCTION) {
@@ -53,22 +50,19 @@ const { createRequireAuth } = require('./lib/auth');
 
 const app = express();
 
-// Restrict CORS to known front-end origins instead of allowing any site to call
-// the API. Set CORS_ORIGIN to a comma-separated list of allowed origins in
-// production (e.g. "https://hms.jofiane.com"). Defaults to the CRA dev server.
+// Only allow requests from whitelisted origins; defaults to the CRA dev server.
 const ALLOWED_ORIGINS = (process.env.CORS_ORIGIN || 'http://localhost:3000')
   .split(',')
   .map(o => o.trim())
   .filter(Boolean);
 app.use(cors({
   origin(origin, callback) {
-    // Allow non-browser clients (curl, server-to-server) that send no Origin.
+    // Allow non-browser clients (curl, Postman) that send no Origin header.
     if (!origin || ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
     return callback(new Error(`Origin ${origin} not allowed by CORS`));
   },
 }));
-// Raised from the 100kb default so base64 profile photos (a 2MB image is
-// ~2.7MB once base64-encoded) fit in the request body.
+// Raised to 5mb to accommodate base64-encoded profile photos.
 app.use(express.json({ limit: '5mb' }));
 app.use((req, res, next) => {
   if (containsArchiveFields(req.body)) return res.status(400).json({ error: 'Archive fields can only be changed through the archive workflow.' });
@@ -83,24 +77,18 @@ app.use((req, res, next) => {
 
 // ─────────────────────────────────────────────
 // VALIDATION HELPERS
-// Shared guards for update/delete routes so callers can't inject
-// unexpected fields, MongoDB operators, or malformed ids.
+// Shared guards that block invalid IDs, operator injection, and unknown fields.
 // ─────────────────────────────────────────────
 
-// True only for a well-formed Mongo ObjectId. Guards against CastErrors
-// and lookups on attacker-controlled junk ids.
+// Returns true only for a well-formed MongoDB ObjectId.
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 
-// Reject keys that start with "$" (update operators like $rename/$unset/$inc)
-// or contain "." only where we explicitly allow it. Blocks operator injection.
+// Rejects keys starting with "$" to block MongoDB operator injection.
 const hasMongoOperators = (obj) =>
   obj && typeof obj === 'object' &&
   Object.keys(obj).some(k => k.startsWith('$'));
 
-// Build a $set object from an incoming payload, keeping only allowed dot-paths.
-// Accepts either a raw flat object or an already-{$set:{...}} wrapped body.
-// Anything not on the allow-list is silently dropped. Returns { $set } or null
-// if nothing valid remains.
+// Builds a $set from the payload keeping only whitelisted paths; returns null if nothing valid remains.
 const buildSafeSet = (body, allowedPaths) => {
   const source = (body && typeof body.$set === 'object') ? body.$set : body;
   if (!source || typeof source !== 'object') return null;
@@ -132,8 +120,7 @@ const EMPLOYEE_ALLOWED_PATHS = [
 const VALID_EMP_STATUS = ['ACTIVE', 'ON LEAVE', 'TERMINATED', 'INACTIVE'];
 const isValidEmail = (e) => typeof e === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 
-// Password policy: 5–8 chars, with an uppercase, a lowercase, a number,
-// and a special character. Returns an error string, or null if valid.
+// Password must be 5–8 chars with uppercase, lowercase, number, and special character.
 const PASSWORD_RULE_MSG =
   'Password must be 5–8 characters and include an uppercase letter, a lowercase letter, a number, and a special character.';
 const validatePasswordPolicy = (pw) => {
@@ -146,8 +133,7 @@ const validatePasswordPolicy = (pw) => {
   return null;
 };
 
-// Field-level validation for an employee $set payload. Returns an error string
-// or null if everything checks out.
+// Validates employee $set fields (name, email, status, salary); returns an error string or null.
 const validateEmployeeSet = (set) => {
   if ('full_name' in set) {
     const n = String(set['full_name'] || '').trim();
@@ -174,29 +160,18 @@ const isAdminEmployee = (emp) =>
 
 // ─────────────────────────────────────────────
 // MONEY / BILLING HELPERS
-// The transaction ledger is the single source of truth. Every money route
-// mutates the ledger, then calls recomputeBilling() so expected_total,
-// total_paid and balance_due are always derived consistently.
-//
-// Each (non-voided) transaction is one of three kinds:
-//   charge  — what the guest owes (room charge, F&B, penalty). amount > 0.
-//   payment — money received (deposit, balance payment).       amount > 0.
-//   refund  — money returned to the guest.                      amount < 0.
-// We infer the kind from the transaction's fields so existing records (which
-// have no explicit type) still classify correctly.
+// Transaction ledger is the single source of truth; recomputeBilling() keeps totals consistent.
 // ─────────────────────────────────────────────
 
-// Parse a money string like "12,500.00" (or "-2,100.00") into a Number.
+// Parses a money string like "12,500.00" into a Number.
 const money = (str) => parseFloat(String(str ?? '0').replace(/,/g, '')) || 0;
 
-// Format a Number back into the stored "12,500.00" string form.
+// Formats a Number back to the stored "12,500.00" string form.
 const moneyStr = (n) => Number(n || 0).toLocaleString('en-US', {
   minimumFractionDigits: 2, maximumFractionDigits: 2,
 });
 
-// Classify a transaction as 'charge' | 'payment' | 'refund'.
-// Prefers an explicit t.type if present; otherwise infers from amount sign,
-// payment_method and description keywords.
+// Classifies a transaction as 'charge' | 'payment' | 'refund' using explicit type or field inference.
 const classifyTxn = (t) => {
   if (!t) return 'charge';
   const explicit = String(t.type || '').toLowerCase();
@@ -206,25 +181,21 @@ const classifyTxn = (t) => {
   const desc = String(t.description || '').toLowerCase();
   const method = String(t.payment_method || '').toLowerCase();
 
-  // Negative amounts are money leaving the till → refunds.
+  // Negative amounts → refunds.
   if (amt < 0 || desc.includes('refund')) return 'refund';
 
-  // Charges: things the guest owes. Penalties/fees and explicit "charge" lines.
+  // Penalties, fees, and itemized charges.
   if (method === 'penalty' || desc.includes('charge') || desc.includes('penalty') ||
       desc.includes('fee') || desc.includes('minibar') || desc.includes('f&b') ||
       desc.includes('room service') || desc.includes('laundry') || desc.includes('spa')) {
     return 'charge';
   }
 
-  // Everything else positive is treated as a payment (deposit / balance payment).
+  // Everything else positive is a payment (deposit / balance payment).
   return 'payment';
 };
 
-// Recompute billing totals from the ledger (ignoring VOIDED transactions) and
-// write them back onto the booking object. Returns the same booking.
-//   expected_total = sum of charges
-//   total_paid     = sum of payments  − sum of |refunds|
-//   balance_due    = max(0, expected_total − total_paid)
+// Recomputes expected_total, total_paid, and balance_due from the ledger and writes them back to the booking.
 const recomputeBilling = (booking) => {
   const txns = (booking.transactions || []).filter(
     t => String(t.status || '').toUpperCase() !== 'VOIDED'
@@ -239,9 +210,7 @@ const recomputeBilling = (booking) => {
     else if (kind === 'refund')  refunds  += amt;
   }
 
-  // If the booking already carried an expected_total that isn't represented as
-  // charge transactions (e.g. legacy bookings whose room total was stored only
-  // in billing), keep the larger of the two so we never understate what's owed.
+  // Preserve any legacy expected_total not represented as charge transactions.
   const storedExpected = money(booking.billing?.expected_total);
   const expectedTotal = Math.max(charges, storedExpected);
 
@@ -291,9 +260,7 @@ app.post('/api/auth/login', async (req, res) => {
     }
 
 
-    // Verify password. Stored hashes start with "$2" (bcrypt). Accounts that
-    // haven't been migrated yet still hold plain text — accept those too so no
-    // one is locked out, then transparently upgrade them to a hash on login.
+    // Accepts bcrypt hashes or plain-text (legacy); upgrades plain-text to hash on success.
     const stored = employee.portal_access.password || '';
     const looksHashed = stored.startsWith('$2');
     let passwordOk;
@@ -302,7 +269,7 @@ app.post('/api/auth/login', async (req, res) => {
     } else {
       passwordOk = stored === password;
       if (passwordOk) {
-        // Lazy migration: replace the plain-text password with a hash.
+        // Lazy migration: upgrade plain-text password to bcrypt hash.
         const hash = await bcrypt.hash(password, 10);
         await Employee.updateOne(
           { _id: employee._id },
@@ -315,7 +282,7 @@ app.post('/api/auth/login', async (req, res) => {
     }
 
 
-    // Determine department for routing to correct module
+    // Routes user to the correct module based on their department.
     const dept = (employee.employment_details?.department || '').toLowerCase();
     let module = 'frontdesk'; // default
     if (dept.includes('housekeeping'))  module = 'housekeeping';
@@ -324,8 +291,7 @@ app.post('/api/auth/login', async (req, res) => {
 
     const role = module === 'admin' ? 'admin' : 'employee';
 
-    // Sign a JWT carrying identity + role. The middleware trusts this token
-    // instead of re-querying the DB on every request.
+    // Signs a JWT with identity + role; middleware trusts this instead of re-querying the DB.
     const token = jwt.sign(
       {
         sub:      String(employee._id),
@@ -362,14 +328,13 @@ app.post('/api/auth/login', async (req, res) => {
 
 // ─────────────────────────────────────────────
 // AUTH MIDDLEWARE
-// requireAuth  → caller must present a valid, unexpired token (else 401)
-// requireAdmin → caller must additionally be an admin (else 403)
+// requireAuth → valid token required (401); requireAdmin → admin role required (403).
 // ─────────────────────────────────────────────
 
-// Verify the Bearer token and attach the decoded payload to req.user.
+// Verifies the Bearer token and attaches the decoded payload to req.user.
 const requireAuth = createRequireAuth(Employee, JWT_SECRET);
 
-// Gate a route to admins only. Must run after requireAuth.
+// Gates a route to admins only; must run after requireAuth.
 function requireAdmin(req, res, next) {
   if (!req.user) {
     return res.status(401).json({ error: 'Authentication required. Please log in.' });
@@ -385,9 +350,7 @@ app.use('/api/archive', createArchiveRouter({ requireAuth, requireAdmin, Employe
 
 // ─────────────────────────────────────────────
 // CHANGE OWN PASSWORD
-// Any logged-in user can change their own password. They must prove they
-// know the current one. The token identifies who they are (req.user.sub),
-// so a user can never change someone else's password through this route.
+// Authenticated users can change their own password after verifying the current one.
 // ─────────────────────────────────────────────
 app.post('/api/auth/change-password', requireAuth, async (req, res) => {
   try {
@@ -407,8 +370,7 @@ app.post('/api/auth/change-password', requireAuth, async (req, res) => {
     const employee = await Employee.findById(req.user.sub);
     if (!employee) return res.status(404).json({ error: 'Account not found.' });
 
-    // Verify the current password. Handle both hashed and any lingering
-    // plain-text password the same way the login route does.
+    // Handles both hashed and legacy plain-text passwords, same as login.
     const stored = employee.portal_access?.password || '';
     const currentOk = stored.startsWith('$2')
       ? await bcrypt.compare(currentPassword, stored)
@@ -433,9 +395,7 @@ app.post('/api/auth/change-password', requireAuth, async (req, res) => {
 
 // ─────────────────────────────────────────────
 // UPDATE OWN PROFILE
-// Any logged-in user can update THEIR OWN name / email / photo (identified by
-// the token's sub). It never touches role, department, salary, or the login
-// username — so non-admins can save their profile without admin rights.
+// Authenticated users can update their own name, email, and photo only.
 // ─────────────────────────────────────────────
 app.put('/api/auth/me', requireAuth, async (req, res) => {
   try {
@@ -444,9 +404,7 @@ app.put('/api/auth/me', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Update operators are not allowed' });
     }
 
-    // Defense-in-depth: the client tells us WHO it thinks it is (expectUsername).
-    // If that doesn't match the token's identity, the token is stale/mismatched —
-    // reject rather than silently updating the wrong person's record.
+    // Rejects stale/mismatched tokens where the client identity doesn't match the token's sub.
     if (body.expectUsername && req.user.username &&
         String(body.expectUsername).toLowerCase() !== String(req.user.username).toLowerCase()) {
       return res.status(409).json({
@@ -626,9 +584,7 @@ app.delete('/api/bookings/:id', requireAuth, requireAdmin, async (req, res) => {
     if (!booking) return res.status(404).json({ error: 'Booking not found' });
 
 
-   
-    // The archive service distinguishes recoverable archival from destructive
-    // purging. Never ask staff to void genuine payments just to archive a stay.
+    // Routes through the archive service instead of a hard delete.
 
 
     return archiveResponse(req, res, 'bookings');
@@ -691,8 +647,7 @@ app.post('/api/bookings/:id/cancel', requireAuth, async (req, res) => {
 app.post('/api/bookings', requireAuth, async (req, res) => {
   try {
     const booking = new Booking(req.body);
-    // Keep billing consistent with whatever transactions the booking was
-    // created with (deposit payments, room charges, etc.).
+    // Recomputes billing from initial transactions (deposits, room charges, etc.).
     recomputeBilling(booking);
     const saved = await booking.save();
     res.status(201).json(saved);
@@ -714,8 +669,7 @@ app.put('/api/bookings/:id', requireAuth, requireAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Update operators are not allowed' });
     }
 
-    // Never let this generic route rewrite the ledger or the id. Transactions
-    // must go through the dedicated void/refund routes that enforce their rules.
+    // Strips _id, transactions, and booking_id to prevent accidental ledger rewrites.
     const update = { ...req.body };
     delete update._id;
     delete update.transactions;
@@ -750,8 +704,7 @@ app.post('/api/bookings/:id/checkin', requireAuth, async (req, res) => {
     );
     if (!updated) return res.status(404).json({ error: 'Booking not found' });
 
-    // Keep the linked room in sync so room-based views (RoomRack, Housekeeping)
-    // reflect the in-house guest. Best-effort: don't fail check-in if no match.
+    // Syncs the room status to Occupied; best-effort, won't fail check-in if no match.
     const roomNum = String(updated.room_number || '').trim();
     if (roomNum) {
       await Room.updateOne({ room_number: roomNum }, { $set: { status: 'Occupied' } });
@@ -774,7 +727,7 @@ app.post('/api/bookings/:id/checkout', requireAuth, async (req, res) => {
     );
     if (!updated) return res.status(404).json({ error: 'Booking not found' });
 
-    // Free up the linked room. Flag it dirty for housekeeping to turn over.
+    // Frees the room and flags it Dirty for housekeeping turnover.
     const roomNum = String(updated.room_number || '').trim();
     if (roomNum) {
       await Room.updateOne(
@@ -828,8 +781,7 @@ app.patch('/api/bookings/:id/transactions/:txnId/void', requireAuth, requireAdmi
 
 
 // ─────────────────────────────────────────────
-// RECORD A PAYMENT against a booking's balance (staff-level).
-// Adds a PAYMENT transaction and recomputes billing so the balance drops.
+// RECORD A PAYMENT — adds a PAYMENT transaction and recomputes the balance.
 // ─────────────────────────────────────────────
 app.post('/api/bookings/:id/payments', requireAuth, async (req, res) => {
   try {
@@ -873,9 +825,7 @@ app.post('/api/bookings/:id/payments', requireAuth, async (req, res) => {
 
 
 // ─────────────────────────────────────────────
-// ISSUE A REFUND against a booking (admin-level).
-// Adds a REFUND transaction (money out), capped at what has been paid, and
-// recomputes billing so the balance rises by the refunded amount.
+// ISSUE A REFUND — admin-only; adds a negative REFUND transaction capped at total paid.
 // ─────────────────────────────────────────────
 app.post('/api/bookings/:id/refunds', requireAuth, requireAdmin, async (req, res) => {
   try {
@@ -959,22 +909,20 @@ app.get('/api/transactions', async (req, res) => {
       }
     ]);
 
-    // Only COMPLETED transactions count toward money in/out; VOIDED are ignored.
+    // Only COMPLETED transactions count; VOIDED are excluded.
     const completed = result.filter(t => String(t.status || '').toUpperCase() === 'COMPLETED');
 
-    // Income = money actually received (payments). Charges are what's owed, not
-    // cash in hand, so they don't count as income here.
+    // Income = sum of payment-type transactions.
     const totalIncome = completed
       .filter(t => classifyTxn(t) === 'payment')
       .reduce((sum, t) => sum + Math.abs(money(t.amount)), 0);
 
-    // Money out = refunds returned to guests.
+    // Expenses = sum of refund-type transactions.
     const totalExpenses = completed
       .filter(t => classifyTxn(t) === 'refund')
       .reduce((sum, t) => sum + Math.abs(money(t.amount)), 0);
 
-    // Outstanding = the sum of every booking's current balance due (live figure),
-    // independent of the selected period.
+    // Outstanding = live sum of balance_due across all non-cancelled bookings.
     const activeBookings = await Booking.find(
       { status: { $nin: ['Cancelled'] } },
       { 'billing.balance_due': 1 }
@@ -1058,14 +1006,13 @@ app.put('/api/employees/:id', requireAuth, requireAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Invalid employee id' });
     }
 
-    // 2. Reject raw operator injection ($rename, $unset, $inc, ...).
-    //    We only ever accept a whitelisted $set (or flat) payload.
+    // 2. Reject operator injection ($rename, $unset, $inc, etc.).
     const rawSource = (req.body && typeof req.body.$set === 'object') ? req.body.$set : req.body;
     if (hasMongoOperators(rawSource)) {
       return res.status(400).json({ error: 'Update operators are not allowed' });
     }
 
-    // 3. Whitelist fields — anything not explicitly allowed is dropped.
+    // 3. Whitelist fields — unrecognized keys are silently dropped.
     const safeUpdate = buildSafeSet(req.body, EMPLOYEE_ALLOWED_PATHS);
     if (!safeUpdate) {
       return res.status(400).json({ error: 'No valid fields to update' });
@@ -1083,8 +1030,7 @@ app.put('/api/employees/:id', requireAuth, requireAdmin, async (req, res) => {
         await bcrypt.hash(String(safeUpdate.$set['portal_access.password']), 10);
     }
 
-    // 5. Guard: don't let the last active admin be demoted or deactivated,
-    //    which would lock everyone out of the admin module.
+    // 5. Block demotion/deactivation of the last active admin.
     const target = await Employee.findById(req.params.id);
     if (!target) return res.status(404).json({ error: 'Employee not found' });
 
@@ -1131,11 +1077,11 @@ app.delete('/api/employees/:id', requireAuth, requireAdmin, async (req, res) => 
       return res.status(400).json({ error: 'Invalid employee id' });
     }
 
-    // 2. Load first so we can run protective checks before deleting.
+    // 2. Load first to run protective checks before deleting.
     const target = await Employee.findById(req.params.id);
     if (!target) return res.status(404).json({ error: 'Employee not found' });
 
-    // 3. Never delete the last active admin — that would lock out the admin module.
+    // 3. Block deletion of the last active admin to prevent lockout.
     if (isAdminEmployee(target)) {
       const activeAdmins = await Employee.countDocuments({
         'employment_details.department': { $regex: 'admin', $options: 'i' },
@@ -1148,9 +1094,7 @@ app.delete('/api/employees/:id', requireAuth, requireAdmin, async (req, res) => 
       }
     }
 
-    // 4. Dependency check: block deletion while the employee still has shift
-    //    assignments, so schedules don't end up pointing at a ghost record.
-    //    (Consistent with how bookings block delete when transactions exist.)
+    // 4. Block deletion if employee has existing shift assignments.
     const assignedShifts = await ShiftAssignment.countDocuments({
       employee_id: target.employee_id,
     });
@@ -1385,7 +1329,7 @@ app.get('/api/dashboard/overview', async (req, res) => {
       inHouse:    { total: inHouseTotal, balanceOutstanding: inHouseWithBalance },
       bookings:   { total: totalBookings, confirmed: confirmedBookings, checkedIn: checkedInBookings },
       rooms:      (() => {
-        // Occupancy driven by checked-in bookings (source of truth), capped at total.
+        // Occupancy capped at total rooms; driven by checked-in bookings.
         const occ = Math.min(checkedInBookings, totalRooms);
         return { total: totalRooms, occupied: occ, vacant: Math.max(totalRooms - occ - maintenanceRooms, 0), maintenance: maintenanceRooms };
       })(),
@@ -1399,8 +1343,7 @@ app.get('/api/dashboard/overview', async (req, res) => {
 
 // ─────────────────────────────────────────────
 // ADMIN OPERATIONS MONITOR
-// One aggregated call powering the admin Overview dashboard.
-// Everything here is live from the database.
+// Single aggregated endpoint powering the admin Overview dashboard with live data.
 // ─────────────────────────────────────────────
 app.get('/api/dashboard/admin-operations', async (req, res) => {
   try {
@@ -1434,10 +1377,7 @@ app.get('/api/dashboard/admin-operations', async (req, res) => {
       Employee.countDocuments({ 'employment_details.department': 'Front Desk', 'employment_details.status': 'ACTIVE' }),
     ]);
 
-    // ── ROOM STATUS (live) ──
-    // Occupancy is driven by checked-in bookings (the source of truth for who is
-    // in-house) rather than Room.status, which can drift out of sync. We cap it at
-    // the total room count so the rate never exceeds 100%.
+    // ── ROOM STATUS — occupancy driven by checked-in bookings, capped at total rooms. ──
     const maintenanceRooms = rooms.filter(r => (r.status || '').toLowerCase() === 'maintenance').length;
     const occupiedCount    = Math.min(inHouseBookings.length, rooms.length);
     const roomStatus = {
@@ -1445,7 +1385,7 @@ app.get('/api/dashboard/admin-operations', async (req, res) => {
       occupied:    occupiedCount,
       vacant:      Math.max(rooms.length - occupiedCount - maintenanceRooms, 0),
       maintenance: maintenanceRooms,
-      // "cleaning" = rooms flagged dirty / in progress by housekeeping
+      // Rooms flagged Dirty or In Progress by housekeeping.
       cleaning:    rooms.filter(r => ['dirty', 'in progress'].includes((r.housekeeping || '').toLowerCase())).length,
     };
     const occupancyRate = roomStatus.total > 0
@@ -1601,8 +1541,7 @@ app.get('/api/reports/occupancy', async (req, res) => {
 
     const totalRooms = rooms.length || 1;
 
-    // Occupancy is driven by checked-in bookings (source of truth), not Room.status.
-    // Build the set of room numbers that currently have an in-house guest.
+    // Occupancy driven by checked-in bookings (source of truth), not Room.status.
     const occupiedRoomNums = new Set(
       bookings
         .filter(b => b.status === 'Checked In')
@@ -1611,21 +1550,20 @@ app.get('/api/reports/occupancy', async (req, res) => {
     );
     const isOccupied = (r) => occupiedRoomNums.has(String(r.room_number || '').trim());
 
-    // If some checked-in bookings reference rooms not found in the collection,
-    // still count them (capped at total) so the headline rate stays accurate.
+    // Caps occupied count at total rooms to keep the rate accurate.
     const occupiedNow = Math.min(
       bookings.filter(b => b.status === 'Checked In').length,
       totalRooms
     );
     const avgOccupancy = Math.round((occupiedNow / totalRooms) * 1000) / 10;
 
-    // Average length of stay from booking nights
+    // Average length of stay from booking nights.
     const nightsArr = bookings.map(b => parseInt(b.dates?.nights) || 0).filter(n => n > 0);
     const alos = nightsArr.length
       ? Math.round((nightsArr.reduce((a, c) => a + c, 0) / nightsArr.length) * 10) / 10
       : 0;
 
-    // Peak / low day by check-in day-of-week
+    // Peak and low check-in day by day-of-week frequency.
     const dowCount = [0, 0, 0, 0, 0, 0, 0];
     bookings.forEach(b => {
       if (b.dates?.check_in) {
@@ -1637,7 +1575,7 @@ app.get('/api/reports/occupancy', async (req, res) => {
     const peakDay = dayNames[dowCount.indexOf(Math.max(...dowCount))] || '—';
     const lowDay  = dayNames[dowCount.indexOf(Math.min(...dowCount))] || '—';
 
-    // Trend — last 4 weeks: % of rooms with a booking checked-in that week
+    // Occupancy trend over the last 4 weeks.
     const trend = [];
     for (let w = 3; w >= 0; w--) {
       const start = new Date(); start.setDate(start.getDate() - (w + 1) * 7);
@@ -1649,7 +1587,7 @@ app.get('/api/reports/occupancy', async (req, res) => {
       trend.push({ label: `Week ${4 - w}`, rate: Math.min(100, Math.round((inWeek / totalRooms) * 100)) });
     }
 
-    // By room type — count rooms of each type vs how many are occupied
+    // Occupancy breakdown by room type.
     const typeNameById = {};
     roomTypes.forEach(t => { typeNameById[t.type_id] = t.name; });
     const byTypeMap = {};
@@ -1665,7 +1603,7 @@ app.get('/api/reports/occupancy', async (req, res) => {
       rate: v.rooms ? Math.round((v.occupied / v.rooms) * 100) : 0,
     })).sort((a, b) => b.rate - a.rate);
 
-    // By floor
+    // Occupancy breakdown by floor.
     const byFloorMap = {};
     rooms.forEach(r => {
       const f = r.floor || 0;
@@ -1681,7 +1619,7 @@ app.get('/api/reports/occupancy', async (req, res) => {
         rate: v.rooms ? Math.round((v.occupied / v.rooms) * 100) : 0,
       }));
 
-    // 7-day forecast — confirmed check-ins per upcoming day
+    // 7-day check-in forecast.
     const forecast = [];
     for (let i = 0; i < 7; i++) {
       const d = new Date(); d.setDate(d.getDate() + i);
@@ -1709,7 +1647,7 @@ app.get('/api/reports/financial', async (req, res) => {
   try {
     const [bookings, rooms] = await Promise.all([Booking.find({}), Room.find({})]);
 
-    // Total revenue = sum of COMPLETED transactions; outstanding = sum of balance_due
+    // Total revenue from COMPLETED transactions; outstanding from balance_due.
     let totalRevenue = 0, outstandingTotal = 0, outstandingCount = 0;
     const methodTotals = {};   // payment_method → amount
     bookings.forEach(b => {
@@ -1725,14 +1663,13 @@ app.get('/api/reports/financial', async (req, res) => {
       if (bal > 0) { outstandingTotal += bal; outstandingCount++; }
     });
 
-    // Rooms revenue = room charge transactions; everything else grouped by description keyword
+    // Groups revenue by source category using description keywords.
     const sourceTotals = { Rooms: 0, 'F&B': 0, 'Spa & Wellness': 0, Minibar: 0, Laundry: 0, 'Penalties & Fees': 0, Other: 0 };
     bookings.forEach(b => (b.transactions || []).forEach(t => {
       if (t.status !== 'COMPLETED') return;
       const amt = parseAmt(t.amount);
       const desc = (t.description || '').toLowerCase();
-      // Order matters: check specific categories BEFORE the generic "room" keyword,
-      // so "F&B - Room Service" is counted as F&B, not Rooms.
+      // Check specific categories before "room" so "F&B - Room Service" lands in F&B.
       if (desc.includes('refund') || desc.includes('penalty') || desc.includes('fee') || desc.includes('cancel')) {
         sourceTotals['Penalties & Fees'] += amt;   // refunds are negative → net reduces this bucket
       } else if (desc.includes('f&b') || desc.includes('food') || desc.includes('restaurant') || desc.includes('room service')) {
@@ -1749,7 +1686,7 @@ app.get('/api/reports/financial', async (req, res) => {
         sourceTotals.Other += amt;
       }
     }));
-    // Only positive buckets are shown; base percentages on their sum so they total 100%
+    // Show only positive revenue buckets; percentages sum to 100%.
     const positiveSources = Object.entries(sourceTotals).filter(([, amt]) => amt > 0);
     const sourceSum = positiveSources.reduce((a, [, amt]) => a + amt, 0) || 1;
     const revenueBySource = positiveSources
@@ -1766,13 +1703,13 @@ app.get('/api/reports/financial', async (req, res) => {
       pct: Math.round((amount / methodSum) * 1000) / 10,
     })).sort((a, b) => b.amount - a.amount);
 
-    // ADR = total room revenue / number of room-nights sold
+    // ADR = room revenue ÷ room-nights sold.
     const roomNights = bookings.reduce((s, b) => s + (parseInt(b.dates?.nights) || 0), 0);
     const adr = roomNights ? Math.round(sourceTotals.Rooms / roomNights) : 0;
     const totalRooms = rooms.length || 1;
     const revpar = Math.round(totalRevenue / totalRooms);
 
-    // Weekly revenue trend (current 4 weeks) — from transaction datetimes
+    // Weekly revenue trend for the past 4 weeks.
     const revenueTrend = [];
     for (let w = 3; w >= 0; w--) {
       const start = new Date(); start.setDate(start.getDate() - (w + 1) * 7);
@@ -1786,14 +1723,14 @@ app.get('/api/reports/financial', async (req, res) => {
       revenueTrend.push({ label: `Week ${4 - w}`, current: Math.round(sum), previous: 0 });
     }
 
-    // ADR/RevPAR trend mirrors the weekly revenue for a simple visual
+    // ADR/RevPAR trend mirrors weekly revenue.
     const adrTrend = revenueTrend.map(r => ({
       label: r.label,
       adr,
       revpar: totalRooms ? Math.round(r.current / totalRooms) : 0,
     }));
 
-    // Expenses are not tracked in the DB → return empty so the UI shows nothing fabricated
+    // Expenses not tracked in DB; returns empty so UI shows nothing fabricated.
     const expenses = [];
     const totalExpenses = 0;
     const netProfit = totalRevenue - totalExpenses;
@@ -1821,7 +1758,7 @@ app.get('/api/reports/guests', async (req, res) => {
   try {
     const bookings = await Booking.find({});
 
-    // Group by unique guest (by name)
+    // Groups bookings by unique guest name to compute visit counts and spend.
     const guestMap = {};
     bookings.forEach(b => {
       const name = b.guest?.full_name || 'Unknown';
@@ -1840,7 +1777,7 @@ app.get('/api/reports/guests', async (req, res) => {
     const totalPaid = guests.reduce((s, g) => s + g.totalSpent, 0);
     const avgSpend = totalGuests ? Math.round(totalPaid / totalGuests) : 0;
 
-    // Booking source breakdown (real — from booking.source)
+    // Booking source breakdown from booking.source field.
     const srcMap = {};
     bookings.forEach(b => {
       const s = b.source || 'Other';
