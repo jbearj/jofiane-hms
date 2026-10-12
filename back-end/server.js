@@ -22,10 +22,10 @@ const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 let JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
   if (IS_PRODUCTION) {
-    console.error('❌ JWT_SECRET is not set. Refusing to start in production without it.');
+    console.error(' JWT_SECRET is not set. Refusing to start in production without it.');
     process.exit(1);
   }
-  console.warn('⚠️  JWT_SECRET is not set — using an INSECURE development fallback. Set JWT_SECRET before deploying.');
+  console.warn('  JWT_SECRET is not set — using an INSECURE development fallback. Set JWT_SECRET before deploying.');
   JWT_SECRET = 'dev-fallback-secret-set-JWT_SECRET-in-env';
 }
 const TOKEN_TTL = '12h'; // tokens expire after a shift-length window
@@ -2065,12 +2065,12 @@ const PORT = process.env.PORT || 5000;
 
 mongoose.connect(process.env.MONGO_URI, { autoIndex: false })
   .then(() => {
-    console.log('✅ Connected to MongoDB successfully!');
+    console.log('Connected to MongoDB successfully!');
     app.listen(PORT, () => {
       console.log(`🚀 Server is running on port ${PORT}`);
     });
   })
   .catch((err) => {
-    console.error('❌ MongoDB connection error:', err);
+    console.error('MongoDB connection error:', err);
     process.exit(1);
   });
