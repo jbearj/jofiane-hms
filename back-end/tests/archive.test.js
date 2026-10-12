@@ -115,8 +115,7 @@ test('permanent deletion checks archived references too', async () => {
   assert.equal(included, true);
 });
 
-// Transaction wrapper and journal are stubbed; no production connection/env is
-// loaded. These tests verify orchestration, not MongoDB rollback internals.
+
 function mutationHarness(row) {
   const writes = [];
   patch(mongoose.connection, 'transaction', async callback => callback(null));

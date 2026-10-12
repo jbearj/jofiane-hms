@@ -18,7 +18,6 @@ require('dotenv').config();
 
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 
-// JWT_SECRET must be set via environment; production refuses to start without it.
 let JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
   if (IS_PRODUCTION) {
@@ -28,7 +27,7 @@ if (!JWT_SECRET) {
   console.warn('  JWT_SECRET is not set — using an INSECURE development fallback. Set JWT_SECRET before deploying.');
   JWT_SECRET = 'dev-fallback-secret-set-JWT_SECRET-in-env';
 }
-const TOKEN_TTL = '12h'; // tokens expire after a shift-length window
+const TOKEN_TTL = '12h';
 
 
 const Room = require('./models/Room');
@@ -50,19 +49,16 @@ const { createRequireAuth } = require('./lib/auth');
 
 const app = express();
 
-// Only allow requests from whitelisted origins; defaults to the CRA dev server.
 const ALLOWED_ORIGINS = (process.env.CORS_ORIGIN || 'http://localhost:3000')
   .split(',')
   .map(o => o.trim())
   .filter(Boolean);
 app.use(cors({
   origin(origin, callback) {
-    // Allow non-browser clients (curl, Postman) that send no Origin header.
     if (!origin || ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
     return callback(new Error(`Origin ${origin} not allowed by CORS`));
   },
 }));
-// Raised to 5mb to accommodate base64-encoded profile photos.
 app.use(express.json({ limit: '5mb' }));
 app.use((req, res, next) => {
   if (containsArchiveFields(req.body)) return res.status(400).json({ error: 'Archive fields can only be changed through the archive workflow.' });
@@ -77,18 +73,14 @@ app.use((req, res, next) => {
 
 // ─────────────────────────────────────────────
 // VALIDATION HELPERS
-// Shared guards that block invalid IDs, operator injection, and unknown fields.
 // ─────────────────────────────────────────────
 
-// Returns true only for a well-formed MongoDB ObjectId.
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 
-// Rejects keys starting with "$" to block MongoDB operator injection.
 const hasMongoOperators = (obj) =>
   obj && typeof obj === 'object' &&
   Object.keys(obj).some(k => k.startsWith('$'));
 
-// Builds a $set from the payload keeping only whitelisted paths; returns null if nothing valid remains.
 const buildSafeSet = (body, allowedPaths) => {
   const source = (body && typeof body.$set === 'object') ? body.$set : body;
   if (!source || typeof source !== 'object') return null;
@@ -101,7 +93,6 @@ const buildSafeSet = (body, allowedPaths) => {
   return Object.keys(set).length ? { $set: set } : null;
 };
 
-// ── Employee: fields an admin is allowed to write via update ──
 const EMPLOYEE_ALLOWED_PATHS = [
   'full_name',
   'photo',
@@ -120,7 +111,6 @@ const EMPLOYEE_ALLOWED_PATHS = [
 const VALID_EMP_STATUS = ['ACTIVE', 'ON LEAVE', 'TERMINATED', 'INACTIVE'];
 const isValidEmail = (e) => typeof e === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 
-// Password must be 5–8 chars with uppercase, lowercase, number, and special character.
 const PASSWORD_RULE_MSG =
   'Password must be 5–8 characters and include an uppercase letter, a lowercase letter, a number, and a special character.';
 const validatePasswordPolicy = (pw) => {
@@ -133,7 +123,6 @@ const validatePasswordPolicy = (pw) => {
   return null;
 };
 
-// Validates employee $set fields (name, email, status, salary); returns an error string or null.
 const validateEmployeeSet = (set) => {
   if ('full_name' in set) {
     const n = String(set['full_name'] || '').trim();
@@ -153,25 +142,20 @@ const validateEmployeeSet = (set) => {
   return null;
 };
 
-// Is this employee an admin? (department contains "admin")
 const isAdminEmployee = (emp) =>
   (emp?.employment_details?.department || '').toLowerCase().includes('admin');
 
 
 // ─────────────────────────────────────────────
 // MONEY / BILLING HELPERS
-// Transaction ledger is the single source of truth; recomputeBilling() keeps totals consistent.
 // ─────────────────────────────────────────────
 
-// Parses a money string like "12,500.00" into a Number.
 const money = (str) => parseFloat(String(str ?? '0').replace(/,/g, '')) || 0;
 
-// Formats a Number back to the stored "12,500.00" string form.
 const moneyStr = (n) => Number(n || 0).toLocaleString('en-US', {
   minimumFractionDigits: 2, maximumFractionDigits: 2,
 });
 
-// Classifies a transaction as 'charge' | 'payment' | 'refund' using explicit type or field inference.
 const classifyTxn = (t) => {
   if (!t) return 'charge';
   const explicit = String(t.type || '').toLowerCase();
@@ -181,21 +165,17 @@ const classifyTxn = (t) => {
   const desc = String(t.description || '').toLowerCase();
   const method = String(t.payment_method || '').toLowerCase();
 
-  // Negative amounts → refunds.
   if (amt < 0 || desc.includes('refund')) return 'refund';
 
-  // Penalties, fees, and itemized charges.
   if (method === 'penalty' || desc.includes('charge') || desc.includes('penalty') ||
       desc.includes('fee') || desc.includes('minibar') || desc.includes('f&b') ||
       desc.includes('room service') || desc.includes('laundry') || desc.includes('spa')) {
     return 'charge';
   }
 
-  // Everything else positive is a payment (deposit / balance payment).
   return 'payment';
 };
 
-// Recomputes expected_total, total_paid, and balance_due from the ledger and writes them back to the booking.
 const recomputeBilling = (booking) => {
   const txns = (booking.transactions || []).filter(
     t => String(t.status || '').toUpperCase() !== 'VOIDED'
@@ -210,7 +190,6 @@ const recomputeBilling = (booking) => {
     else if (kind === 'refund')  refunds  += amt;
   }
 
-  // Preserve any legacy expected_total not represented as charge transactions.
   const storedExpected = money(booking.billing?.expected_total);
   const expectedTotal = Math.max(charges, storedExpected);
 
@@ -236,9 +215,6 @@ const recomputeBilling = (booking) => {
 // AUTH
 // ─────────────────────────────────────────────
 
-
-
-
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -260,7 +236,6 @@ app.post('/api/auth/login', async (req, res) => {
     }
 
 
-    // Accepts bcrypt hashes or plain-text (legacy); upgrades plain-text to hash on success.
     const stored = employee.portal_access.password || '';
     const looksHashed = stored.startsWith('$2');
     let passwordOk;
@@ -269,7 +244,6 @@ app.post('/api/auth/login', async (req, res) => {
     } else {
       passwordOk = stored === password;
       if (passwordOk) {
-        // Lazy migration: upgrade plain-text password to bcrypt hash.
         const hash = await bcrypt.hash(password, 10);
         await Employee.updateOne(
           { _id: employee._id },
@@ -282,16 +256,14 @@ app.post('/api/auth/login', async (req, res) => {
     }
 
 
-    // Routes user to the correct module based on their department.
     const dept = (employee.employment_details?.department || '').toLowerCase();
-    let module = 'frontdesk'; // default
+    let module = 'frontdesk';
     if (dept.includes('housekeeping'))  module = 'housekeeping';
     else if (dept.includes('maintenance')) module = 'maintenance';
     else if (dept.includes('admin'))    module = 'admin';
 
     const role = module === 'admin' ? 'admin' : 'employee';
 
-    // Signs a JWT with identity + role; middleware trusts this instead of re-querying the DB.
     const token = jwt.sign(
       {
         sub:      String(employee._id),
@@ -310,7 +282,7 @@ app.post('/api/auth/login', async (req, res) => {
       module,
       employee: {
         _id:         employee._id,
-        employee_id: employee.employee_id,   // numeric id that tasks/requests reference
+        employee_id: employee.employee_id,
         name:        employee.full_name,
         email:       employee.contact?.email,
         department:  employee.employment_details?.department,
@@ -328,10 +300,8 @@ app.post('/api/auth/login', async (req, res) => {
 
 // ─────────────────────────────────────────────
 // AUTH MIDDLEWARE
-// requireAuth → valid token required (401); requireAdmin → admin role required (403).
 // ─────────────────────────────────────────────
 
-// Verifies the Bearer token and attaches the decoded payload to req.user.
 const requireAuth = createRequireAuth(Employee, JWT_SECRET);
 
 // Gates a route to admins only; must run after requireAuth.
@@ -350,7 +320,6 @@ app.use('/api/archive', createArchiveRouter({ requireAuth, requireAdmin, Employe
 
 // ─────────────────────────────────────────────
 // CHANGE OWN PASSWORD
-// Authenticated users can change their own password after verifying the current one.
 // ─────────────────────────────────────────────
 app.post('/api/auth/change-password', requireAuth, async (req, res) => {
   try {
@@ -370,7 +339,6 @@ app.post('/api/auth/change-password', requireAuth, async (req, res) => {
     const employee = await Employee.findById(req.user.sub);
     if (!employee) return res.status(404).json({ error: 'Account not found.' });
 
-    // Handles both hashed and legacy plain-text passwords, same as login.
     const stored = employee.portal_access?.password || '';
     const currentOk = stored.startsWith('$2')
       ? await bcrypt.compare(currentPassword, stored)
@@ -395,7 +363,6 @@ app.post('/api/auth/change-password', requireAuth, async (req, res) => {
 
 // ─────────────────────────────────────────────
 // UPDATE OWN PROFILE
-// Authenticated users can update their own name, email, and photo only.
 // ─────────────────────────────────────────────
 app.put('/api/auth/me', requireAuth, async (req, res) => {
   try {
@@ -404,7 +371,6 @@ app.put('/api/auth/me', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Update operators are not allowed' });
     }
 
-    // Rejects stale/mismatched tokens where the client identity doesn't match the token's sub.
     if (body.expectUsername && req.user.username &&
         String(body.expectUsername).toLowerCase() !== String(req.user.username).toLowerCase()) {
       return res.status(409).json({
@@ -467,7 +433,6 @@ app.put('/api/auth/me', requireAuth, async (req, res) => {
 // ROOMS
 // ─────────────────────────────────────────────
 
-
 app.get('/api/rooms', async (req, res) => {
   try {
     const rooms = await Room.find();
@@ -477,7 +442,6 @@ app.get('/api/rooms', async (req, res) => {
   }
 });
 
-// PUT update a room by _id (housekeeping status, assignment, notes, etc.)
 app.put('/api/rooms/:id', requireAuth, async (req, res) => {
   try {
     const updated = await Room.findByIdAndUpdate(req.params.id, req.body, { new: true });
@@ -584,9 +548,6 @@ app.delete('/api/bookings/:id', requireAuth, requireAdmin, async (req, res) => {
     if (!booking) return res.status(404).json({ error: 'Booking not found' });
 
 
-    // Routes through the archive service instead of a hard delete.
-
-
     return archiveResponse(req, res, 'bookings');
   } catch (error) {
     console.error('Delete booking error:', error);
@@ -619,7 +580,6 @@ app.post('/api/bookings/:id/cancel', requireAuth, async (req, res) => {
       penalty_amount: penalty_applied ? moneyStr(money(penalty_amount)) : '0.00',
     };
 
-    // A cancellation penalty is a CHARGE the guest owes.
     if (penalty_applied && money(penalty_amount) > 0) {
       booking.transactions.push({
         txn_id: `TXN-${Date.now()}`,
@@ -647,7 +607,6 @@ app.post('/api/bookings/:id/cancel', requireAuth, async (req, res) => {
 app.post('/api/bookings', requireAuth, async (req, res) => {
   try {
     const booking = new Booking(req.body);
-    // Recomputes billing from initial transactions (deposits, room charges, etc.).
     recomputeBilling(booking);
     const saved = await booking.save();
     res.status(201).json(saved);
@@ -669,7 +628,6 @@ app.put('/api/bookings/:id', requireAuth, requireAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Update operators are not allowed' });
     }
 
-    // Strips _id, transactions, and booking_id to prevent accidental ledger rewrites.
     const update = { ...req.body };
     delete update._id;
     delete update.transactions;
@@ -704,7 +662,6 @@ app.post('/api/bookings/:id/checkin', requireAuth, async (req, res) => {
     );
     if (!updated) return res.status(404).json({ error: 'Booking not found' });
 
-    // Syncs the room status to Occupied; best-effort, won't fail check-in if no match.
     const roomNum = String(updated.room_number || '').trim();
     if (roomNum) {
       await Room.updateOne({ room_number: roomNum }, { $set: { status: 'Occupied' } });
@@ -717,7 +674,6 @@ app.post('/api/bookings/:id/checkin', requireAuth, async (req, res) => {
 });
 
 
-// POST check-out: set status to "Checked Out"
 app.post('/api/bookings/:id/checkout', requireAuth, async (req, res) => {
   try {
     const updated = await Booking.findByIdAndUpdate(
@@ -727,7 +683,6 @@ app.post('/api/bookings/:id/checkout', requireAuth, async (req, res) => {
     );
     if (!updated) return res.status(404).json({ error: 'Booking not found' });
 
-    // Frees the room and flags it Dirty for housekeeping turnover.
     const roomNum = String(updated.room_number || '').trim();
     if (roomNum) {
       await Room.updateOne(
@@ -751,7 +706,7 @@ app.post('/api/bookings/:id/transactions', requireAuth, requireAdmin, async (req
     if (!booking) return res.status(404).json({ error: 'Booking not found' });
 
     booking.transactions.push(req.body);
-    recomputeBilling(booking);           // keep billing in sync with the ledger
+    recomputeBilling(booking);
     const saved = await booking.save();
     res.status(201).json(saved);
   } catch (error) {
@@ -770,7 +725,7 @@ app.patch('/api/bookings/:id/transactions/:txnId/void', requireAuth, requireAdmi
     if (!txn) return res.status(404).json({ error: 'Booking or transaction not found' });
 
     txn.status = 'VOIDED';
-    recomputeBilling(booking);           // voiding a payment reopens the balance, etc.
+    recomputeBilling(booking);
     const saved = await booking.save();
     res.json(saved);
   } catch (error) {
@@ -781,7 +736,7 @@ app.patch('/api/bookings/:id/transactions/:txnId/void', requireAuth, requireAdmi
 
 
 // ─────────────────────────────────────────────
-// RECORD A PAYMENT — adds a PAYMENT transaction and recomputes the balance.
+// RECORD A PAYMENT
 // ─────────────────────────────────────────────
 app.post('/api/bookings/:id/payments', requireAuth, async (req, res) => {
   try {
@@ -825,7 +780,7 @@ app.post('/api/bookings/:id/payments', requireAuth, async (req, res) => {
 
 
 // ─────────────────────────────────────────────
-// ISSUE A REFUND — admin-only; adds a negative REFUND transaction capped at total paid.
+// ISSUE A REFUND
 // ─────────────────────────────────────────────
 app.post('/api/bookings/:id/refunds', requireAuth, requireAdmin, async (req, res) => {
   try {
@@ -852,7 +807,7 @@ app.post('/api/bookings/:id/refunds', requireAuth, requireAdmin, async (req, res
       type: 'refund',
       datetime: new Date().toLocaleString('en-CA', { hour12: false }).replace(',', ''),
       description: `Refund - ${req.body?.reason || 'Guest request'}`,
-      amount: `-${moneyStr(amountNum)}`,   // negative = money out
+      amount: `-${moneyStr(amountNum)}`,
       payment_method: String(req.body?.payment_method || 'Cash'),
       payment_details: req.body?.reference ? String(req.body.reference) : 'Front Desk',
       status: 'COMPLETED',
@@ -909,20 +864,16 @@ app.get('/api/transactions', async (req, res) => {
       }
     ]);
 
-    // Only COMPLETED transactions count; VOIDED are excluded.
     const completed = result.filter(t => String(t.status || '').toUpperCase() === 'COMPLETED');
 
-    // Income = sum of payment-type transactions.
     const totalIncome = completed
       .filter(t => classifyTxn(t) === 'payment')
       .reduce((sum, t) => sum + Math.abs(money(t.amount)), 0);
 
-    // Expenses = sum of refund-type transactions.
     const totalExpenses = completed
       .filter(t => classifyTxn(t) === 'refund')
       .reduce((sum, t) => sum + Math.abs(money(t.amount)), 0);
 
-    // Outstanding = live sum of balance_due across all non-cancelled bookings.
     const activeBookings = await Booking.find(
       { status: { $nin: ['Cancelled'] } },
       { 'billing.balance_due': 1 }
@@ -959,7 +910,6 @@ app.get('/api/employees', async (req, res) => {
     const filter = {};
     if (req.query.department) filter['employment_details.department'] = req.query.department;
     if (req.query.status)     filter['employment_details.status'] = req.query.status;
-    // Never expose the (hashed) password to the client.
     const employees = await Employee.find(filter)
       .select('-portal_access.password')
       .sort({ full_name: 1 });
@@ -975,7 +925,6 @@ app.get('/api/employees', async (req, res) => {
 app.post('/api/employees', requireAuth, requireAdmin, async (req, res) => {
   try {
     const body = { ...req.body };
-    // Hash the portal password before storing (if one was provided).
     if (body.portal_access && body.portal_access.password) {
       const policyError = validatePasswordPolicy(body.portal_access.password);
       if (policyError) return res.status(400).json({ error: policyError });
@@ -986,7 +935,6 @@ app.post('/api/employees', requireAuth, requireAdmin, async (req, res) => {
     }
     const employee = new Employee(body);
     const saved = await employee.save();
-    // Strip the password hash from the response.
     const out = saved.toObject();
     if (out.portal_access) delete out.portal_access.password;
     res.status(201).json(out);
@@ -1066,7 +1014,6 @@ app.put('/api/employees/:id', requireAuth, requireAdmin, async (req, res) => {
     res.status(500).json({ error: 'Failed to update employee', detail: error.message });
   }
 });
-
 
 
 
@@ -1329,7 +1276,6 @@ app.get('/api/dashboard/overview', async (req, res) => {
       inHouse:    { total: inHouseTotal, balanceOutstanding: inHouseWithBalance },
       bookings:   { total: totalBookings, confirmed: confirmedBookings, checkedIn: checkedInBookings },
       rooms:      (() => {
-        // Occupancy capped at total rooms; driven by checked-in bookings.
         const occ = Math.min(checkedInBookings, totalRooms);
         return { total: totalRooms, occupied: occ, vacant: Math.max(totalRooms - occ - maintenanceRooms, 0), maintenance: maintenanceRooms };
       })(),
@@ -1343,14 +1289,12 @@ app.get('/api/dashboard/overview', async (req, res) => {
 
 // ─────────────────────────────────────────────
 // ADMIN OPERATIONS MONITOR
-// Single aggregated endpoint powering the admin Overview dashboard with live data.
 // ─────────────────────────────────────────────
 app.get('/api/dashboard/admin-operations', async (req, res) => {
   try {
     const today = new Date().toISOString().slice(0, 10);
     const parseAmt = (str) => parseFloat((str || '0').replace(/,/g, '')) || 0;
 
-    // Pull the raw collections we need
     const [
       rooms,
       allBookings,
@@ -1377,7 +1321,7 @@ app.get('/api/dashboard/admin-operations', async (req, res) => {
       Employee.countDocuments({ 'employment_details.department': 'Front Desk', 'employment_details.status': 'ACTIVE' }),
     ]);
 
-    // ── ROOM STATUS — occupancy driven by checked-in bookings, capped at total rooms. ──
+    // ── ROOM STATUS ──
     const maintenanceRooms = rooms.filter(r => (r.status || '').toLowerCase() === 'maintenance').length;
     const occupiedCount    = Math.min(inHouseBookings.length, rooms.length);
     const roomStatus = {
@@ -1385,14 +1329,13 @@ app.get('/api/dashboard/admin-operations', async (req, res) => {
       occupied:    occupiedCount,
       vacant:      Math.max(rooms.length - occupiedCount - maintenanceRooms, 0),
       maintenance: maintenanceRooms,
-      // Rooms flagged Dirty or In Progress by housekeeping.
       cleaning:    rooms.filter(r => ['dirty', 'in progress'].includes((r.housekeeping || '').toLowerCase())).length,
     };
     const occupancyRate = roomStatus.total > 0
       ? Math.round((roomStatus.occupied / roomStatus.total) * 1000) / 10
       : 0;
 
-    // ── TODAY'S OPERATIONS (live from bookings) ──
+    // ── TODAY'S OPERATIONS ──
     const arrivalsToday   = allBookings.filter(b => b.dates?.check_in  === today);
     const departuresToday = allBookings.filter(b => b.dates?.check_out === today);
     const ops = {
@@ -1412,7 +1355,7 @@ app.get('/api/dashboard/admin-operations', async (req, res) => {
       },
     };
 
-    // ── REVENUE (live: sum of all COMPLETED transactions across bookings) ──
+    // ── REVENUE ──
     let todayRevenue = 0, totalRevenue = 0, outstanding = 0;
     allBookings.forEach(b => {
       (b.transactions || []).forEach(t => {
@@ -1425,7 +1368,7 @@ app.get('/api/dashboard/admin-operations', async (req, res) => {
       outstanding += parseAmt(b.billing?.balance_due);
     });
 
-    // ── 7-DAY REVENUE TREND (live, from transaction datetimes) ──
+    // ── 7-DAY REVENUE TREND ──
     const dayKeys = [];
     for (let i = 6; i >= 0; i--) {
       const d = new Date();
@@ -1445,13 +1388,13 @@ app.get('/api/dashboard/admin-operations', async (req, res) => {
       return { day: dk.label, value: Math.round(sum) };
     });
 
-    // ── 7-DAY BOOKINGS TREND (live, by check-in date) ──
+    // ── 7-DAY BOOKINGS TREND ──
     const bookingsByDay = dayKeys.map(dk => ({
       day:   dk.label,
       count: allBookings.filter(b => b.dates?.check_in === dk.iso).length,
     }));
 
-    // ── DEPARTMENT HEALTH (live signals) ──
+    // ── DEPARTMENT HEALTH ──
     const departmentHealth = [
       {
         dept: 'Front Desk',
@@ -1487,7 +1430,7 @@ app.get('/api/dashboard/admin-operations', async (req, res) => {
       },
     ];
 
-    // ── RECENT ACTIVITY (live from audits) ──
+    // ── RECENT ACTIVITY ──
     const recentActivity = recentAudits.map(a => ({
       id:   a._id,
       type: a.action_type,
@@ -1541,7 +1484,6 @@ app.get('/api/reports/occupancy', async (req, res) => {
 
     const totalRooms = rooms.length || 1;
 
-    // Occupancy driven by checked-in bookings (source of truth), not Room.status.
     const occupiedRoomNums = new Set(
       bookings
         .filter(b => b.status === 'Checked In')
@@ -1550,20 +1492,17 @@ app.get('/api/reports/occupancy', async (req, res) => {
     );
     const isOccupied = (r) => occupiedRoomNums.has(String(r.room_number || '').trim());
 
-    // Caps occupied count at total rooms to keep the rate accurate.
     const occupiedNow = Math.min(
       bookings.filter(b => b.status === 'Checked In').length,
       totalRooms
     );
     const avgOccupancy = Math.round((occupiedNow / totalRooms) * 1000) / 10;
 
-    // Average length of stay from booking nights.
     const nightsArr = bookings.map(b => parseInt(b.dates?.nights) || 0).filter(n => n > 0);
     const alos = nightsArr.length
       ? Math.round((nightsArr.reduce((a, c) => a + c, 0) / nightsArr.length) * 10) / 10
       : 0;
 
-    // Peak and low check-in day by day-of-week frequency.
     const dowCount = [0, 0, 0, 0, 0, 0, 0];
     bookings.forEach(b => {
       if (b.dates?.check_in) {
@@ -1575,7 +1514,6 @@ app.get('/api/reports/occupancy', async (req, res) => {
     const peakDay = dayNames[dowCount.indexOf(Math.max(...dowCount))] || '—';
     const lowDay  = dayNames[dowCount.indexOf(Math.min(...dowCount))] || '—';
 
-    // Occupancy trend over the last 4 weeks.
     const trend = [];
     for (let w = 3; w >= 0; w--) {
       const start = new Date(); start.setDate(start.getDate() - (w + 1) * 7);
@@ -1587,7 +1525,6 @@ app.get('/api/reports/occupancy', async (req, res) => {
       trend.push({ label: `Week ${4 - w}`, rate: Math.min(100, Math.round((inWeek / totalRooms) * 100)) });
     }
 
-    // Occupancy breakdown by room type.
     const typeNameById = {};
     roomTypes.forEach(t => { typeNameById[t.type_id] = t.name; });
     const byTypeMap = {};
@@ -1603,7 +1540,6 @@ app.get('/api/reports/occupancy', async (req, res) => {
       rate: v.rooms ? Math.round((v.occupied / v.rooms) * 100) : 0,
     })).sort((a, b) => b.rate - a.rate);
 
-    // Occupancy breakdown by floor.
     const byFloorMap = {};
     rooms.forEach(r => {
       const f = r.floor || 0;
@@ -1619,7 +1555,6 @@ app.get('/api/reports/occupancy', async (req, res) => {
         rate: v.rooms ? Math.round((v.occupied / v.rooms) * 100) : 0,
       }));
 
-    // 7-day check-in forecast.
     const forecast = [];
     for (let i = 0; i < 7; i++) {
       const d = new Date(); d.setDate(d.getDate() + i);
@@ -1628,7 +1563,7 @@ app.get('/api/reports/occupancy', async (req, res) => {
       forecast.push({
         date: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
         confirmed,
-        projected: confirmed, // no separate projection source; mirror confirmed
+        projected: confirmed,
       });
     }
 
@@ -1647,9 +1582,8 @@ app.get('/api/reports/financial', async (req, res) => {
   try {
     const [bookings, rooms] = await Promise.all([Booking.find({}), Room.find({})]);
 
-    // Total revenue from COMPLETED transactions; outstanding from balance_due.
     let totalRevenue = 0, outstandingTotal = 0, outstandingCount = 0;
-    const methodTotals = {};   // payment_method → amount
+    const methodTotals = {};
     bookings.forEach(b => {
       (b.transactions || []).forEach(t => {
         const amt = parseAmt(t.amount);
@@ -1663,15 +1597,13 @@ app.get('/api/reports/financial', async (req, res) => {
       if (bal > 0) { outstandingTotal += bal; outstandingCount++; }
     });
 
-    // Groups revenue by source category using description keywords.
     const sourceTotals = { Rooms: 0, 'F&B': 0, 'Spa & Wellness': 0, Minibar: 0, Laundry: 0, 'Penalties & Fees': 0, Other: 0 };
     bookings.forEach(b => (b.transactions || []).forEach(t => {
       if (t.status !== 'COMPLETED') return;
       const amt = parseAmt(t.amount);
       const desc = (t.description || '').toLowerCase();
-      // Check specific categories before "room" so "F&B - Room Service" lands in F&B.
       if (desc.includes('refund') || desc.includes('penalty') || desc.includes('fee') || desc.includes('cancel')) {
-        sourceTotals['Penalties & Fees'] += amt;   // refunds are negative → net reduces this bucket
+        sourceTotals['Penalties & Fees'] += amt;
       } else if (desc.includes('f&b') || desc.includes('food') || desc.includes('restaurant') || desc.includes('room service')) {
         sourceTotals['F&B'] += amt;
       } else if (desc.includes('spa')) {
@@ -1686,7 +1618,6 @@ app.get('/api/reports/financial', async (req, res) => {
         sourceTotals.Other += amt;
       }
     }));
-    // Show only positive revenue buckets; percentages sum to 100%.
     const positiveSources = Object.entries(sourceTotals).filter(([, amt]) => amt > 0);
     const sourceSum = positiveSources.reduce((a, [, amt]) => a + amt, 0) || 1;
     const revenueBySource = positiveSources
@@ -1697,19 +1628,16 @@ app.get('/api/reports/financial', async (req, res) => {
       .sort((a, b) => b.amount - a.amount);
 
     // Payment methods breakdown
-    const methodSum = Object.values(methodTotals).reduce((a, c) => a + c, 0) || 1;
-    const paymentMethods = Object.entries(methodTotals).map(([method, amount]) => ({
+    const methodSum = Object.values(methodTotals).reduce((a, c) => a + c, 0) || 1;    const paymentMethods = Object.entries(methodTotals).map(([method, amount]) => ({
       method, amount: Math.round(amount),
       pct: Math.round((amount / methodSum) * 1000) / 10,
     })).sort((a, b) => b.amount - a.amount);
 
-    // ADR = room revenue ÷ room-nights sold.
     const roomNights = bookings.reduce((s, b) => s + (parseInt(b.dates?.nights) || 0), 0);
     const adr = roomNights ? Math.round(sourceTotals.Rooms / roomNights) : 0;
     const totalRooms = rooms.length || 1;
     const revpar = Math.round(totalRevenue / totalRooms);
 
-    // Weekly revenue trend for the past 4 weeks.
     const revenueTrend = [];
     for (let w = 3; w >= 0; w--) {
       const start = new Date(); start.setDate(start.getDate() - (w + 1) * 7);
@@ -1723,14 +1651,12 @@ app.get('/api/reports/financial', async (req, res) => {
       revenueTrend.push({ label: `Week ${4 - w}`, current: Math.round(sum), previous: 0 });
     }
 
-    // ADR/RevPAR trend mirrors weekly revenue.
     const adrTrend = revenueTrend.map(r => ({
       label: r.label,
       adr,
       revpar: totalRooms ? Math.round(r.current / totalRooms) : 0,
     }));
 
-    // Expenses not tracked in DB; returns empty so UI shows nothing fabricated.
     const expenses = [];
     const totalExpenses = 0;
     const netProfit = totalRevenue - totalExpenses;
@@ -1758,7 +1684,6 @@ app.get('/api/reports/guests', async (req, res) => {
   try {
     const bookings = await Booking.find({});
 
-    // Groups bookings by unique guest name to compute visit counts and spend.
     const guestMap = {};
     bookings.forEach(b => {
       const name = b.guest?.full_name || 'Unknown';
@@ -1777,7 +1702,6 @@ app.get('/api/reports/guests', async (req, res) => {
     const totalPaid = guests.reduce((s, g) => s + g.totalSpent, 0);
     const avgSpend = totalGuests ? Math.round(totalPaid / totalGuests) : 0;
 
-    // Booking source breakdown from booking.source field.
     const srcMap = {};
     bookings.forEach(b => {
       const s = b.source || 'Other';
@@ -1789,7 +1713,6 @@ app.get('/api/reports/guests', async (req, res) => {
       pct: Math.round((count / totalBookings) * 1000) / 10,
     })).sort((a, b) => b.count - a.count);
 
-    // Top guests by revenue
     const topGuests = [...guests]
       .sort((a, b) => b.totalSpent - a.totalSpent)
       .slice(0, 5)
@@ -1799,7 +1722,6 @@ app.get('/api/reports/guests', async (req, res) => {
       kpis: { totalGuests, newGuests, returning, avgSpend, returnRate },
       bookingSource,
       topGuests,
-      // Not tracked in the DB → empty; UI will simply render nothing for these
       nationalities: [],
       purpose: [],
       feedback: null,
@@ -1892,7 +1814,6 @@ app.delete('/api/cleaning-tasks/:id', requireAuth, async (req, res) => {
 app.get('/api/housekeeping-logs', async (req, res) => {
   try {
     const filter = {};
-    // Optional: only today's logs when ?today=1
     if (req.query.today) {
       const start = new Date(); start.setHours(0, 0, 0, 0);
       const end = new Date(start.getTime() + 86400000);
@@ -2056,9 +1977,8 @@ app.delete('/api/front-desk-logs/:id', requireAuth, async (req, res) => {
 // ============================================================
 
 // ─────────────────────────────────────────────
-// START SERVER (only after MongoDB connects)
+// START SERVER
 // ─────────────────────────────────────────────
-
 
 const PORT = process.env.PORT || 5000;
 

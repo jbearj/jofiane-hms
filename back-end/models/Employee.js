@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 const employeeSchema = new mongoose.Schema({
-  auth_version: { type: Number, default: 0 }, // incremented on archive to revoke existing tokens
+  auth_version: { type: Number, default: 0 }, 
   employee_id: Number,       // e.g. 1
 
   full_name: String,         // e.g. "Ana Buenaflor"

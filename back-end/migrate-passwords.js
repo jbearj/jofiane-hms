@@ -1,10 +1,8 @@
 /**
- * One-time migration: bcrypt-hash any plain-text portal passwords.
- * Safe to run multiple times — already-hashed passwords (starting with "$2")
- * are skipped.
- *
- *   node migrate-passwords.js
+ * MIGRATION OF PASSWORDS 
+ * HASHED PASSWORDS START $2
  */
+
 require('dotenv').config();
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');

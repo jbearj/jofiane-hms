@@ -51,8 +51,8 @@ const bookingSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 bookingSchema.plugin(require('../lib/softDelete').softDelete, { identity: 'booking_id' });
-// Keep archived ledger rows intact in storage, but never expose them in normal
-// booking responses. Internal services use toObject() explicitly when needed.
+
+// KEEP ARCHIVE DATA INTACT 
 bookingSchema.set('toJSON', { transform(doc, ret) {
   if (ret.transactions) ret.transactions = ret.transactions.filter(t => !t.deleted_at);
   return ret;

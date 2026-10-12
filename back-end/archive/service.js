@@ -156,7 +156,7 @@ async function mutate(name, id, action, actor, reason = '') {
     const installed = await category.model.collection.indexes().catch(() => []);
     if (required.some(name => !installed.some(index => index.name === name && index.unique))) fail(503, 'The archive index migration must be applied before records can be restored.');
   }
-  // The audit write and state change commit together, or neither is kept.
+  //  AUDIT COMMIT WRITE AND STATE CHANGE
   await mongoose.connection.transaction(async session => {
     const liveActor = await models.Employee.findById(actor.sub).session(session);
     if (!liveActor?.portal_access?.has_access || (liveActor.auth_version || 0) !== (actor.auth_version || 0) || ['INACTIVE', 'TERMINATED'].includes(String(liveActor.employment_details?.status).toUpperCase())) fail(401, 'Your account no longer has access. Sign in again.');
@@ -167,8 +167,7 @@ async function mutate(name, id, action, actor, reason = '') {
       const module = dept.includes('housekeeping') ? 'housekeeping' : dept.includes('maintenance') ? 'maintenance' : 'frontdesk';
       if (!staffArchiveScope[module].includes(category.key)) fail(403, 'Your department cannot archive this category.');
     }
-    // A concurrent revocation/archival of the acting account must cause a write
-    // conflict instead of letting an already-revoked request commit.
+    // CONCURRENT REVOKE FOR ARCHIVE
     await models.Employee.updateOne({ _id: liveActor._id }, { $inc: { archive_revision: 1 } }).session(session);
     const row = await category.model.findOne({ _id: parentId, ...category.scope }).withArchived().session(session);
     if (!row) fail(404, 'Record not found');
@@ -195,8 +194,7 @@ async function mutate(name, id, action, actor, reason = '') {
       if (!(action === 'purge' ? result.deletedCount : result.matchedCount)) fail(409, 'The record changed. Refresh the archive and try again.');
     }
     await ArchiveEvent.create([{ category: category.key === 'guests' ? 'bookings' : category.key, record_id: id, action, actor_id: actor.sub, reason }], { session });
-    // Also retain a minimal event in the existing audit view. No guest details,
-    // passwords, or full record snapshots are copied into either journal.
+   
     await models.Audit.create([{ audit_id: `ARC-${randomUUID()}`, datetime: new Date().toISOString(), action_type: `Archive ${action}`, description: `${category.label}: ${id}`, user_id: actor.sub, status: 'COMPLETED' }], { session });
   });
   return { success: true, action, id };

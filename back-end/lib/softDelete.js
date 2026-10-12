@@ -1,4 +1,5 @@
-// Internal query capabilities are never derived from HTTP query/body options.
+
+// QUERY FROM HTTP 
 function softDelete(schema, { identity } = {}) {
   schema.add({
     deleted_at: { type: Date, default: null },
@@ -19,10 +20,10 @@ function softDelete(schema, { identity } = {}) {
     if (this._withArchived) return;
     const pipeline = this.pipeline();
     const match = { $match: { deleted_at: null } };
-    // $geoNear and Atlas $search must remain first.
+   
     pipeline.splice(pipeline[0]?.$geoNear || pipeline[0]?.$search ? 1 : 0, 0, match);
   });
-  // A missed legacy delete must fail closed, not silently erase data.
+ 
   ['deleteOne', 'deleteMany', 'findOneAndDelete'].forEach(op => schema.pre(op, function () {
     if (!this._archivePurge) throw new Error('Hard deletion is restricted to the archive service');
   }));
@@ -44,8 +45,7 @@ function purgeQuery(query) {
   return query;
 }
 
-// Reject attempts to bypass archive authorization through generic create/update
-// routes, including dotted paths and $set/$unset payloads.
+
 function containsArchiveFields(value) {
   if (!value || typeof value !== 'object') return false;
   return Object.entries(value).some(([key, child]) =>

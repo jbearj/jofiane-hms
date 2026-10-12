@@ -1,16 +1,12 @@
 /**
- * One-time migration: recompute every booking's billing (expected_total,
- * total_paid, balance_due) from its transaction ledger, using the same
- * charge/payment/refund classification the API uses. Safe to run repeatedly —
- * bookings whose totals already match are left untouched.
- *
- *   node recompute-billing.js
+ *  MIGRATION OF BILL COMPUTATION 
+ * DATA WILL BE NOT MODIFY IF ITS CORRECT 
  */
+
 require('dotenv').config();
 const mongoose = require('mongoose');
 const Booking = require('./models/Booking');
 
-// ── These mirror the helpers in server.js. Keep them in sync. ──
 const money = (str) => parseFloat(String(str ?? '0').replace(/,/g, '')) || 0;
 const moneyStr = (n) => Number(n || 0).toLocaleString('en-US', {
   minimumFractionDigits: 2, maximumFractionDigits: 2,

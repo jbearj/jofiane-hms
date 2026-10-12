@@ -8,8 +8,8 @@ function archiveError(res, error) {
   return res.status(status).json({ error: error.status ? error.message : status === 409 ? 'A conflicting record already exists.' : status === 503 ? 'Archive actions require MongoDB replica-set transactions. Ask your administrator to configure the database.' : 'The archive operation could not be confirmed. Refresh the list before retrying.' });
 }
 
-// Existing operational delete routes retain their scope; archive management and
-// the generic archive endpoint are exclusively admin routes.
+// OPERATIONAL DELETE ROUTES
+// ARCHIVE ENDPOINTS OF ADMIN ROUTE
 async function archiveResponse(req, res, category, id = req.params.id) {
   try { return res.json(await service.mutate(category, id, 'archive', req.user)); }
   catch (error) { return archiveError(res, error); }
@@ -27,7 +27,8 @@ function createArchiveRouter({ requireAuth, requireAdmin, Employee, archiveServi
     try { res.json(await archiveService.mutate(req.params.category, req.params.id, 'restore', req.user)); }
     catch (error) { archiveError(res, error); }
   });
-  // Soft-delete a currently active record, never a purge.
+  
+  // SOFT DELETE
   router.post('/:category/:id/archive', async (req, res) => {
     try { res.json(await archiveService.mutate(req.params.category, req.params.id, 'archive', req.user)); }
     catch (error) { archiveError(res, error); }

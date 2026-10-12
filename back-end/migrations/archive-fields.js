@@ -1,5 +1,5 @@
-// Safe by default: count legacy documents only. No records are deleted.
-// Run from back-end: node migrations/archive-fields.js [--apply]
+
+// FOR OLD DEV DOCUMENTS
 require('dotenv').config();
 const mongoose = require('mongoose');
 const { registry } = require('../archive/registry');
@@ -9,7 +9,9 @@ async function run() {
   const apply = process.argv.includes('--apply');
   const models = new Set([...registry.values()].map(item => item.model));
   let conflicts = 0;
-  // Preflight all unique indexes before changing any document or index.
+ 
+
+  // PREFLIGHT UNIQUE INDEXES 
   for (const model of models) {
     for (const [fields, options] of model.schema.indexes().filter(([, opts]) => opts.unique)) {
       const id = Object.fromEntries(Object.keys(fields).map(field => [field.replace(/\./g, '_'), `$${field}`]));
@@ -36,10 +38,9 @@ async function run() {
       await model.collection.updateMany(missing, { $set: { deleted_at: null } });
       await model.collection.updateMany({ deleted_by: { $exists: false } }, { $set: { deleted_by: null } });
       await model.collection.createIndex({ deleted_at: 1, _id: 1 });
-      await model.createIndexes(); // adds indexes; never drops existing indexes
+      await model.createIndexes(); 
     }
   }
-  // Embedded legacy ledger entries remain active when deleted_at is missing;
-  // new entries get null from the transaction schema. No ledger rewrite needed.
+  
 }
 run().catch(error => { console.error(error.name === 'MongoServerSelectionError' ? 'Database connection failed.' : error.message); process.exitCode = 1; }).finally(() => mongoose.disconnect());

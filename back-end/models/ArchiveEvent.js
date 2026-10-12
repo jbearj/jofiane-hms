@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 
-// Separate append-only journal: never offered as an archivable category.
+
+//SEPERATION APPEND FOR ACRHIVE 
 const schema = new mongoose.Schema({
   category: { type: String, required: true },
   record_id: { type: String, required: true },
